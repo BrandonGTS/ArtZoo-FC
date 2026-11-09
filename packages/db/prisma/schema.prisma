@@ -1,0 +1,2193 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+  moduleFormat = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension = "js"
+}
+datasource db {
+  provider = "postgresql"
+}
+model EnvironmentProbe {
+  id Int @id
+}
+enum Membership {
+  MEMBER
+  FRIEND
+}
+enum AdminRole {
+  NONE
+  ADMIN
+  SUPER_ADMIN
+}
+enum VerificationPurpose {
+  REGISTER
+  RESET_PASSWORD
+}
+model Account {
+  createdBotGroups BotGroup[] @relation("BotGroupCreator")
+  botManagementTests BotManagementTest[] @relation("BotManagementTestActor")
+  quickLinkCommands QuickLinkCommand[]
+ botGroupChallenges BotGroupChallenge[]
+ botManagementPublications BotManagementPublication[]
+ botManagementAudits BotManagementAudit[]
+  qqOfficialBindings QqOfficialBinding[]
+  qqOfficialBindingKeys QqOfficialBindingKey[]
+  qqOfficialChallenges QqOfficialChallenge[]
+  qqOfficialBindingAudits QqOfficialBindingAudit[]
+  siteAnnouncements SiteAnnouncement[] @relation("AnnouncementAuthor")
+  deletedSiteAnnouncements SiteAnnouncement[] @relation("AnnouncementDeleter")
+  siteAnnouncementCommands SiteAnnouncementCommand[]
+  processedGuestContacts GuestContactMessage[] @relation("GuestContactHandler")
+  receivedMessageNotifications MessageNotification[] @relation("MessageRecipient")
+  sentMessageNotifications MessageNotification[] @relation("MessageActor")
+  localQcNamespace String?
+  localQcSlot String?
+  @@unique([localQcNamespace, localQcSlot])
+ lifecycleCommands AccountLifecycleCommand[] @relation("LifecycleCommandActor")
+ lifecycleCommandTargets AccountLifecycleCommand[] @relation("LifecycleCommandTarget")
+ lifecycleAudits AccountLifecycleAudit[] @relation("LifecycleAuditActor")
+ lifecycleAuditTargets AccountLifecycleAudit[] @relation("LifecycleAuditTarget")
+  adminRoleRevision Int @default(0)
+  managementCommands AdminManagementCommand[]
+  managementAudits AdminManagementAudit[] @relation("ManagementAuditActor")
+  managementTargets AdminManagementAudit[] @relation("ManagementAuditTarget")
+ activityShares ActivityShare[]
+ activityShareMedia ActivityShareMedia[]
+ activityShareAudits ActivityShareAudit[]
+ activityShareCommands ActivityShareCommand[]
+  officialEventAudits OfficialEventAudit[]
+  officialEventCommands OfficialEventCommand[]
+  officialSyncRuns OfficialSyncRun[]
+ wishCommands WishCommand[]
+ wishMedia WishMedia[]
+ wishes Wish[] @relation("WishAuthor")
+ wishInterests WishInterest[] @relation("WishInterestedAccount")
+ wishComments WishComment[] @relation("WishCommentAuthor")
+ wishConversions WishConversion[] @relation("WishConversionActor")
+ wishNotifications WishNotification[] @relation("WishNotificationRecipient")
+ lotteries Lottery[]
+ lotteryEntries LotteryEntry[]
+ lotteryCommands LotteryCommand[]
+ lotteryNotifications LotteryNotification[]
+ lotteryStatus LotteryAccountStatus? @relation("LotteryStatusAccount")
+ lotteryStatusChanges LotteryAccountStatus[] @relation("LotteryStatusActor")
+ lotteryFacts LotteryAccountFact[] @relation("LotteryFactAccount")
+ lotteryFactChanges LotteryAccountFact[] @relation("LotteryFactActor")
+  dailyPosts DailyPost[]
+  dailyComments DailyComment[]
+  dailyMedia DailyMedia[]
+  dailyLikes DailyLike[]
+  dailyCommands DailyCommand[]
+  dailyNotifications DailyNotification[]
+  dailyAudits DailyAudit[]
+  knowledgeInteractions KnowledgeArticleInteraction[]
+  knowledgeImages KnowledgeImage[] @relation("KnowledgeImageUploader")
+  knowledgeArticles KnowledgeArticle[] @relation("KnowledgeAuthor")
+  knowledgeVersions KnowledgeVersion[] @relation("KnowledgeEditor")
+  knowledgeContributions KnowledgeContribution[] @relation("KnowledgeContributor")
+  knowledgeComments KnowledgeComment[] @relation("KnowledgeCommentAuthor")
+  knowledgeNotifications KnowledgeNotification[] @relation("KnowledgeRecipient")
+  knowledgeAudits KnowledgeAudit[] @relation("KnowledgeAuditActor")
+  id String @id @default(uuid())
+  phone String @unique
+  passwordHash String
+  passwordVersion Int @default(0)
+  displayName String?
+  gameRegion String?
+  gameServer String?
+  membership Membership
+  adminRole AdminRole @default(NONE)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  ownedTeams FixedTeam[]
+  teamMemberships TeamMembership[]
+  teamApplications TeamApplication[]
+  teamFeedback TeamFeedback[]
+  teamSessionMemberships TeamSessionMember[]
+  teamParticipationChanges TeamParticipationChange[]
+  teamLeaveRecords TeamSessionLeave[]
+  teamSubstitutions TeamSessionSubstitute[] @relation("TeamSubstitutePerson")
+  teamRecordedSubstitutions TeamSessionSubstitute[] @relation("TeamSubstituteRecorder")
+  teamCommands TeamCommand[]
+  teamNotifications TeamNotification[]
+  activities Activity[]
+  activityRegistrations ActivityRegistration[]
+  activityNotifications ActivityOutbox[]
+  activityCommands ActivityCommand[]
+  activityPenalties ActivityPenalty[]
+  activityScoreChanges ActivityScoreChange[]
+  activityCompletions ActivityCompletion[]
+  penaltyAppeals ActivityPenaltyAppeal[] @relation("PenaltyAppealOwner")
+  penaltyDecisions ActivityPenaltyAppeal[] @relation("PenaltyAppealReviewer")
+  attendanceAppeals ActivityAttendanceAppeal[] @relation("AppealOwner")
+  attendanceDecisions ActivityAttendanceAppeal[] @relation("AppealReviewer")
+  activityPoints Int @default(0)
+  activityDecayAt DateTime? @db.Timestamptz(3)
+  // Partial Account_due_activity_decay_idx (activityPoints >= 3) is maintained in the DATA07 SQL migration.
+  profile MemberProfile?
+  avatarAssets AvatarAsset[]
+  sessions AccountSession[]
+  invitations Invitation[] @relation("InvitationCreator")
+  usedInvitation Invitation? @relation("InvitationUser")
+  auditActions AccountAudit[] @relation("AuditActor")
+  auditTargets AccountAudit[] @relation("AuditTarget")
+  @@unique([gameServer, displayName])
+  @@index([createdAt, id])
+  albums Album[]
+  albumPhotos AlbumPhoto[]
+  albumComments AlbumComment[]
+  albumCommentMedia AlbumCommentMedia[]
+  albumCommands AlbumCommand[]
+  albumLikes AlbumLike[]
+  albumAudits AlbumAudit[]
+  albumNotifications AlbumNotification[]
+  dailyCheckins DailyCheckin[]
+  siteHelpStepProgress SiteHelpStepProgress[]
+}
+model AccountSession {
+  id String @id @default(uuid())
+  tokenHash String @unique
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  @@index([accountId, revokedAt])
+  @@index([expiresAt])
+}
+enum InvitationUsageMode {
+  SINGLE
+  MULTIPLE
+}
+model Invitation {
+  usageMode InvitationUsageMode @default(SINGLE)
+  tokenCiphertext String?
+  id String @id @default(uuid())
+  tokenHash String @unique
+  membership Membership
+  createdById String
+  createdBy Account @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  usedAt DateTime? @db.Timestamptz(3)
+  usedById String? @unique
+  usedBy Account? @relation("InvitationUser", fields: [usedById], references: [id], onDelete: Restrict)
+  revokedAt DateTime? @db.Timestamptz(3)
+  removedAt DateTime? @db.Timestamptz(3)
+  codes VerificationCode[]
+  audits AccountAudit[]
+  @@index([createdAt, id])
+}
+model VerificationCode {
+  id String @id @default(uuid())
+  phone String
+  purpose VerificationPurpose
+  invitationId String?
+  invitation Invitation? @relation(fields: [invitationId], references: [id], onDelete: Restrict)
+  codeHash String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  attempts Int @default(0)
+  consumedAt DateTime? @db.Timestamptz(3)
+  invalidatedAt DateTime? @db.Timestamptz(3)
+  deliveredAt DateTime? @db.Timestamptz(3)
+  @@index([phone, createdAt])
+}
+model AccountRateEvent {
+  id String @id @default(uuid())
+  key String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([key, createdAt])
+}
+model AccountAudit {
+  id String @id @default(uuid())
+  action String
+  actorId String
+  actor Account @relation("AuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  targetAccountId String?
+  targetAccount Account? @relation("AuditTarget", fields: [targetAccountId], references: [id], onDelete: Restrict)
+  invitationId String?
+  invitation Invitation? @relation(fields: [invitationId], references: [id], onDelete: Restrict)
+  beforeMembership Membership?
+  afterMembership Membership?
+  reason String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([createdAt, id])
+  @@index([action, createdAt, id])
+}
+
+model MemberProfile {
+  accountId String @id
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  bio String @default("")
+  commonJobs String[] @default([])
+  preferredPlaystyles String[] @default([])
+  revision Int @default(0)
+  avatarId String? @unique
+  avatar AvatarAsset? @relation(fields: [avatarId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+model AvatarAsset {
+  id String @id @default(uuid())
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  width Int
+  height Int
+  bytes Int
+  smallBytes Int
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  profile MemberProfile?
+  @@index([accountId])
+}
+
+enum ActivityScene {
+  GAME
+  OFFLINE
+}
+enum ActivityMode {
+  SINGLE
+  SERIES
+}
+enum ActivityCategory {
+  DUNGEON
+  SOCIAL
+}
+enum ActivitySeatKind {
+  ANY
+  ROLE
+  JOB
+}
+enum ActivityRole {
+  TANK
+  HEALER
+  DAMAGE
+}
+enum ActivityEventKind {
+  REGISTRATION_CONFIRMED
+  SERIES_READY
+  SERIES_FORMED
+  ACTIVITY_PUBLISHED
+  REGISTRATION_CREATED
+  REGISTRATION_WITHDRAWN
+  ACTIVITY_RESCHEDULED
+  ACTIVITY_CANCELLED
+  ACTIVITY_PENALTY
+  ACTIVITY_SCORE_CORRECTED
+  ATTENDANCE_APPEAL_RESULT
+  ACTIVITY_COMPLETED
+  PENALTY_APPEAL_RESULT
+}
+enum ActivityNotificationChannel {
+  QQ
+  IN_APP
+}
+model ActivitySeries {
+  id String @id @default(uuid())
+  state String @default("RECRUITING")
+  weekdays Int[]
+  durationMinutes Int
+  totalPeriods Int
+  endDate String?
+  formedAt DateTime? @db.Timestamptz(3)
+  cancelledAt DateTime? @db.Timestamptz(3)
+  readyNotifiedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  activities Activity[]
+  @@index([state, createdAt])
+  albums Album[]
+}
+model Activity {
+  officialDeliveries QqOfficialDelivery[]
+ publicShares ActivityShare[]
+ sourceWish Wish? @relation("WishLinkedActivity")
+ wishConversion WishConversion? @relation("WishConvertedActivity")
+ wishNotifications WishNotification[] @relation("WishNotificationActivity")
+  scene ActivityScene @default(GAME)
+  mode ActivityMode @default(SINGLE)
+  location String?
+  meetingInstructions String?
+  registrationClosesAt DateTime? @db.Timestamptz(3)
+  capacityUnlimited Boolean @default(false)
+  seriesId String?
+  series ActivitySeries? @relation(fields: [seriesId], references: [id], onDelete: Restrict)
+  periodNumber Int?
+
+  id String @id @default(uuid())
+  organizerId String
+  organizer Account @relation(fields: [organizerId], references: [id], onDelete: Restrict)
+  idempotencyKey String
+  requestFingerprint String
+  title String
+  description String
+  category ActivityCategory
+  dutyId String?
+  dutySnapshot Json?
+  startsAt DateTime @db.Timestamptz(3)
+  endsAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  managementEnabledAt DateTime @default(now()) @db.Timestamptz(3)
+  attendanceEnabledAt DateTime @default(now()) @db.Timestamptz(3)
+  autoAbsenceEnabledAt DateTime? @default(now()) @db.Timestamptz(3)
+  completionEnabledAt DateTime? @default(now()) @db.Timestamptz(3)
+  completions ActivityCompletion[]
+  revision Int @default(0)
+  cancelledAt DateTime? @db.Timestamptz(3)
+  cancellationReason String?
+  continuedAt DateTime? @db.Timestamptz(3)
+  commands ActivityCommand[]
+  penalties ActivityPenalty[]
+  seats ActivitySeat[]
+  registrations ActivityRegistration[]
+  events ActivityOutbox[]
+  @@unique([seriesId, periodNumber])
+  @@unique([organizerId, idempotencyKey])
+  @@index([startsAt, id])
+  linkedAlbums Album[] @relation("AlbumAnchor")
+  albumPeriodPhotos AlbumPhoto[] @relation("AlbumPeriod")
+}
+model ActivitySeat {
+  id String @id @default(uuid())
+  activityId String
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  position Int
+  kind ActivitySeatKind
+  groupKey String?
+  role ActivityRole?
+  job String?
+  registration ActivityRegistration?
+  @@unique([activityId, position])
+  @@unique([id, activityId])
+}
+model ActivityRegistration {
+  id String @id @default(uuid())
+  activityId String
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  seatId String? @unique
+  seat ActivitySeat? @relation(fields: [seatId, activityId], references: [id, activityId], onDelete: Restrict)
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  job String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  status String @default("ACTIVE")
+  exitedAt DateTime? @db.Timestamptz(3)
+  seatSnapshot Json?
+  rescheduleExitAllowed Boolean @default(false)
+  attendanceStatus String?
+  attendanceSource String?
+  attendanceRevision Int @default(0)
+  attendanceRecordedAt DateTime? @db.Timestamptz(3)
+  attendanceUpdatedAt DateTime? @db.Timestamptz(3)
+  // Partial ActivityRegistration_pending_attendance_idx is SQL-only: ACTIVE with all pending attendance columns NULL.
+  attendancePenaltyId String? @unique
+  attendancePenalty ActivityPenalty? @relation("CurrentAttendancePenalty", fields: [attendancePenaltyId], references: [id], onDelete: Restrict)
+  attendanceAppeals ActivityAttendanceAppeal[]
+  completion ActivityCompletion?
+  events ActivityOutbox[]
+  penalties ActivityPenalty[]
+  @@index([activityId, accountId])
+  @@unique([seatId, activityId])
+  @@index([accountId, createdAt])
+}
+model ActivityOutbox {
+  id String @id @default(uuid())
+  eventKey String @unique
+  activityId String
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  registrationId String?
+  registration ActivityRegistration? @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  kind ActivityEventKind
+  payload Json?
+  channel ActivityNotificationChannel
+  recipientId String?
+  recipient Account? @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  messageDeletedAt DateTime? @db.Timestamptz(3)
+  messageReadAt DateTime? @db.Timestamptz(3)
+  mockDelivery ActivityMockDelivery?
+  @@index([recipientId, createdAt])
+  @@index([recipientId, channel, messageReadAt, createdAt, id], map: "ActivityOutbox_recipientId_channel_messageReadAt_createdAt_id_i")
+}
+model ActivityMockDelivery {
+  id String @id @default(uuid())
+  eventId String @unique
+  event ActivityOutbox @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  deliveredAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model ActivityCommand {
+  id String @id @default(uuid())
+  activityId String
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  actorId String?
+  actor Account? @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  idempotencyKey String
+  requestFingerprint String
+  kind String
+  before Json
+  after Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([activityId, actorId, idempotencyKey])
+  @@index([activityId, createdAt])
+}
+model ActivityPenalty {
+  id String @id @default(uuid())
+  eventKey String @unique
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  activityId String
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  registrationId String?
+  registration ActivityRegistration? @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  scoreChange ActivityScoreChange?
+  attendanceRegistration ActivityRegistration? @relation("CurrentAttendancePenalty")
+  appeals ActivityPenaltyAppeal[]
+  appealEnabledAt DateTime? @default(now()) @db.Timestamptz(3)
+  reversedAt DateTime? @db.Timestamptz(3)
+  reversalReason String?
+  points Int
+  reason String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([accountId, createdAt])
+}
+
+model ActivityScoreChange {
+  sequence BigInt @unique @default(autoincrement())
+  decayBefore DateTime? @db.Timestamptz(3)
+  decayAfter DateTime? @db.Timestamptz(3)
+  id String @id @default(uuid())
+  eventKey String @unique
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  penaltyId String? @unique
+  penalty ActivityPenalty? @relation(fields: [penaltyId], references: [id], onDelete: Restrict)
+  completionId String? @unique
+  completion ActivityCompletion? @relation(fields: [completionId], references: [id], onDelete: Restrict)
+  delta Int
+  pointsBefore Int
+  pointsAfter Int
+  reason String
+  messageDeletedAt DateTime? @db.Timestamptz(3)
+  messageReadAt DateTime? @db.Timestamptz(3)
+  notices String[] @default([])
+  simulatedAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([accountId, createdAt])
+  @@index([accountId, messageReadAt, createdAt, id])
+}
+
+model ActivityAttendanceAppeal {
+  id String @id @default(uuid())
+  registrationId String
+  registration ActivityRegistration @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  accountId String
+  account Account @relation("AppealOwner", fields: [accountId], references: [id], onDelete: Restrict)
+  attendanceRevision Int
+  requestedStatus String
+  reason String
+  status String @default("PENDING")
+  revision Int @default(0)
+  decisionReason String?
+  decidedById String?
+  decidedBy Account? @relation("AppealReviewer", fields: [decidedById], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  decidedAt DateTime? @db.Timestamptz(3)
+  @@index([status, createdAt, id])
+  @@index([registrationId, createdAt, id])
+}
+
+model ActivityCompletion {
+  id String @id @default(uuid())
+  activityId String
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  registrationId String @unique
+  registration ActivityRegistration @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  active Boolean
+  revision Int @default(0)
+  evaluatedAt DateTime @db.Timestamptz(3)
+  updatedAt DateTime @db.Timestamptz(3)
+  scoreChange ActivityScoreChange?
+  @@unique([activityId, accountId])
+}
+
+model ActivityPenaltyAppeal {
+  id String @id @default(uuid())
+  sequence BigInt @unique @default(autoincrement())
+  penaltyId String
+  penalty ActivityPenalty @relation(fields: [penaltyId], references: [id], onDelete: Restrict)
+  accountId String
+  account Account @relation("PenaltyAppealOwner", fields: [accountId], references: [id], onDelete: Restrict)
+  reason String
+  submissionKey String
+  submissionFingerprint String
+  decisionKey String?
+  decisionFingerprint String?
+  status String @default("PENDING")
+  revision Int @default(0)
+  decisionReason String?
+  decidedById String?
+  decidedBy Account? @relation("PenaltyAppealReviewer", fields: [decidedById], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  decidedAt DateTime? @db.Timestamptz(3)
+  @@unique([accountId, submissionKey])
+  @@unique([decidedById, decisionKey])
+  @@index([status, createdAt, sequence])
+  @@index([penaltyId, sequence])
+}
+
+model FixedTeam {
+  recruitmentCompletedAt DateTime? @db.Timestamptz(3)
+  dutyName String @default("")
+  progress String @default("")
+  strategy String @default("")
+  id String @id @default(uuid())
+  creatorId String
+  creator Account @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  name String
+  description String
+  commonTimes String @default("")
+  qqGroupId String?
+  state String @default("ACTIVE")
+  revision Int @default(0)
+  idempotencyKey String
+  requestFingerprint String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  dissolvedAt DateTime? @db.Timestamptz(3)
+  seats TeamSeat[]
+  memberships TeamMembership[]
+  applications TeamApplication[]
+  sessions TeamSession[]
+  commands TeamCommand[]
+  notifications TeamNotification[]
+  participationChanges TeamParticipationChange[]
+  @@unique([creatorId, idempotencyKey])
+  @@index([state, createdAt, id])
+  @@index([recruitmentCompletedAt, state, createdAt])
+}
+model TeamSeat {
+  id String @id @default(uuid())
+  teamId String
+  team FixedTeam @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  position Int
+  kind ActivitySeatKind
+  role ActivityRole?
+  job String?
+  membership TeamMembership?
+  applications TeamApplication[]
+  @@unique([teamId, position])
+  @@unique([id, teamId])
+}
+model TeamMembership {
+  id String @id @default(uuid())
+  teamId String
+  team FixedTeam @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  seatId String? @unique
+  seat TeamSeat? @relation(fields: [seatId, teamId], references: [id, teamId], onDelete: Restrict)
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  position Int
+  job String
+  state String @default("ACTIVE")
+  joinedAt DateTime @default(now()) @db.Timestamptz(3)
+  leftAt DateTime? @db.Timestamptz(3)
+  sessionMembers TeamSessionMember[]
+  @@unique([seatId, teamId])
+  @@index([teamId, accountId, state])
+  @@index([accountId, state])
+}
+model TeamApplication {
+  id String @id @default(uuid())
+  teamId String
+  team FixedTeam @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  seatId String
+  seat TeamSeat @relation(fields: [seatId, teamId], references: [id, teamId], onDelete: Restrict)
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  job String
+  note String
+  state String @default("PENDING")
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  decidedAt DateTime? @db.Timestamptz(3)
+  @@index([teamId, state, createdAt])
+  @@index([accountId, createdAt])
+}
+model TeamSession {
+  id String @id @default(uuid())
+  teamId String
+  team FixedTeam @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  startsAt DateTime @db.Timestamptz(3)
+  endsAt DateTime @db.Timestamptz(3)
+  state String @default("PROPOSED")
+  timeVersion Int @default(0)
+  confirmedAt DateTime? @db.Timestamptz(3)
+  cancelledAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  feedback TeamFeedback[]
+  members TeamSessionMember[]
+  substitutes TeamSessionSubstitute[]
+  @@index([teamId, startsAt, id])
+}
+model TeamFeedback {
+  id String @id @default(uuid())
+  sessionId String
+  session TeamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  timeVersion Int
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  choice String
+  updatedAt DateTime @db.Timestamptz(3)
+  @@unique([sessionId, timeVersion, accountId])
+}
+model TeamSessionMember {
+  id String @id @default(uuid())
+  sessionId String
+  session TeamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  timeVersion Int
+  membershipId String
+  membership TeamMembership @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  position Int
+  job String
+  state String @default("MEMBER")
+  confirmedStartsAt DateTime? @db.Timestamptz(3)
+  confirmedEndsAt DateTime? @db.Timestamptz(3)
+  leave TeamSessionLeave?
+  participationChanges TeamParticipationChange[]
+  @@unique([sessionId, timeVersion, position])
+}
+model TeamCommand {
+  id String @id @default(uuid())
+  teamId String
+  team FixedTeam @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  actorId String
+  actor Account @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  idempotencyKey String
+  requestFingerprint String
+  kind String
+  before Json
+  after Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([teamId, actorId, idempotencyKey])
+}
+model TeamNotification {
+  id String @id @default(uuid())
+  eventKey String @unique
+  teamId String
+  team FixedTeam @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  recipientId String?
+  recipient Account? @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+  kind String
+  channel ActivityNotificationChannel
+  qqGroupTarget String?
+  payload Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  simulatedAt DateTime @db.Timestamptz(3)
+  messageReadAt DateTime? @db.Timestamptz(3)
+  messageDeletedAt DateTime? @db.Timestamptz(3)
+  @@index([recipientId, channel, messageReadAt, createdAt, id])
+}
+
+
+enum AlbumPrimaryCategory {
+  GAME
+  OFFLINE
+  DAILY
+}
+
+
+enum AlbumUploadMode {
+  AUTHOR
+  COMMUNITY
+  ACTIVITY
+}
+
+
+model AlbumCategory {
+  id String @id @default(uuid())
+  primary AlbumPrimaryCategory
+  label String
+  position Int @default(0)
+  active Boolean @default(true)
+  albums Album[]
+  @@unique([primary, label])
+  @@index([primary, position, id])
+}
+
+
+enum AlbumPublicity {
+  INTERNAL
+  PUBLIC_FEATURED
+}
+enum FeaturedPhotoPool {
+  CANDIDATE
+  SELECTED
+}
+enum GuestContactStatus {
+  PENDING
+  PROCESSED
+}
+
+model Album {
+  originalUploadPhotos AlbumPhoto[] @relation("AlbumUploadOrigin")
+  publicity AlbumPublicity @default(INTERNAL)
+  id String @id @default(uuid())
+  creatorId String
+  creator Account @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  name String
+  description String @default("")
+  primary AlbumPrimaryCategory
+  categoryId String?
+  category AlbumCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  uploadMode AlbumUploadMode
+  activityId String? @unique
+  activity Activity? @relation("AlbumAnchor", fields: [activityId], references: [id], onDelete: Restrict)
+  seriesId String? @unique
+  series ActivitySeries? @relation(fields: [seriesId], references: [id], onDelete: Restrict)
+  uploadsClosed Boolean @default(false)
+  revision Int @default(0)
+  removedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  coverPhotoId String?
+  coverPhoto AlbumPhoto? @relation("AlbumCover",fields:[coverPhotoId],references:[id],onDelete:Restrict)
+  photos AlbumPhoto[]
+  comments AlbumComment[]
+  commentMedia AlbumCommentMedia[]
+  audits AlbumAudit[]
+  notifications AlbumNotification[]
+  @@index([primary, categoryId, createdAt, id])
+  @@index([createdAt, id])
+}
+
+
+model AlbumPhoto {
+  featuredPool FeaturedPhotoPool?
+  featuredSelectedAt DateTime? @db.Timestamptz(3)
+  id String @id @default(uuid())
+  albumId String
+  album Album @relation(fields: [albumId], references: [id], onDelete: Restrict)
+  uploadAlbumId String?
+  uploadAlbum Album? @relation("AlbumUploadOrigin", fields: [uploadAlbumId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "AlbumPhoto_uploadAlbumId_fkey")
+  coveredBy Album[] @relation("AlbumCover")
+  uploaderId String
+  uploader Account @relation(fields: [uploaderId], references: [id], onDelete: Restrict)
+  batchId String
+  batchIndex Int
+  digest String
+  originalName String
+  mime String
+  bytes Int
+  width Int
+  height Int
+  frames Int @default(1)
+  description String @default("")
+  periodActivityId String?
+  periodActivity Activity? @relation("AlbumPeriod", fields: [periodActivityId], references: [id], onDelete: Restrict)
+  rotation Int @default(0)
+  revision Int @default(0)
+  featuredAt DateTime? @db.Timestamptz(3)
+  removedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  comments AlbumComment[]
+  likes AlbumLike[]
+  audits AlbumAudit[]
+  notifications AlbumNotification[]
+  @@unique([albumId, uploaderId, batchId, batchIndex])
+  @@index([albumId, periodActivityId, createdAt, id])
+  @@index([albumId, createdAt, id])
+  @@index([uploaderId, createdAt, id])
+  @@index([featuredAt, removedAt, id])
+  @@index([featuredPool, featuredSelectedAt, id], map: "AlbumPhoto_feature_pool_order_idx")
+}
+
+
+model AlbumComment {
+  id String @id @default(uuid())
+  albumId String
+  album Album @relation(fields: [albumId], references: [id], onDelete: Restrict)
+  photoId String?
+  photo AlbumPhoto? @relation(fields: [photoId], references: [id], onDelete: Restrict)
+  authorId String
+  author Account @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  parentId String?
+  parent AlbumComment? @relation("AlbumReplies", fields: [parentId], references: [id], onDelete: Restrict)
+  replies AlbumComment[] @relation("AlbumReplies")
+  notifications AlbumNotification[]
+  revision Int @default(0)
+  media AlbumCommentMedia[]
+  body String
+  mentions String[] @default([])
+  submissionKey String
+  removedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([authorId, submissionKey])
+  @@unique([id, albumId])
+  @@index([albumId, photoId, createdAt, id])
+}
+
+
+model AlbumLike {
+  photoId String
+  photo AlbumPhoto @relation(fields: [photoId], references: [id], onDelete: Restrict)
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@id([photoId, accountId])
+}
+
+
+model AlbumAudit {
+  id String @id @default(uuid())
+  albumId String
+  album Album @relation(fields: [albumId], references: [id], onDelete: Restrict)
+  photoId String?
+  photo AlbumPhoto? @relation(fields: [photoId], references: [id], onDelete: Restrict)
+  actorId String
+  actor Account @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  action String
+  reason String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([albumId, createdAt, id])
+}
+
+
+model AlbumNotification {
+  id String @id @default(uuid())
+  recipientId String
+  recipient Account @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+  commentId String
+  comment AlbumComment @relation(fields: [commentId], references: [id], onDelete: Restrict)
+  albumId String
+  album Album @relation(fields: [albumId], references: [id], onDelete: Restrict)
+  photoId String?
+  photo AlbumPhoto? @relation(fields: [photoId], references: [id], onDelete: Restrict)
+  kind String
+  readAt DateTime? @db.Timestamptz(3)
+  messageDeletedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([recipientId, commentId])
+  @@index([recipientId, readAt, createdAt, id])
+}
+
+// Single-session changes retain the confirmed original roster and never create team membership.
+model TeamSessionLeave {
+  id String @id @default(uuid())
+  memberId String @unique
+  member TeamSessionMember @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  reason String
+  recordedById String
+  recordedBy Account @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  createdAt DateTime @db.Timestamptz(3)
+}
+model TeamSessionSubstitute {
+  id String @id @default(uuid())
+  sessionId String
+  session TeamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  timeVersion Int
+  position Int
+  kind String
+  confirmedStartsAt DateTime @db.Timestamptz(3)
+  confirmedEndsAt DateTime @db.Timestamptz(3)
+  accountId String?
+  account Account? @relation("TeamSubstitutePerson", fields: [accountId], references: [id], onDelete: Restrict)
+  displayName String?
+  gameRegion String?
+  gameServer String?
+  job String
+  recordedById String
+  recordedBy Account @relation("TeamSubstituteRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+  createdAt DateTime @db.Timestamptz(3)
+  endedAt DateTime? @db.Timestamptz(3)
+  participationChanges TeamParticipationChange[]
+  @@index([sessionId, timeVersion, position])
+}
+
+// Append-only creator corrections; independent of ordinary activity attendance and points.
+model TeamParticipationChange {
+  id String @id @default(uuid())
+  teamId String
+  team FixedTeam @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  memberId String?
+  member TeamSessionMember? @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  substituteId String?
+  substitute TeamSessionSubstitute? @relation(fields: [substituteId], references: [id], onDelete: Restrict)
+  status String
+  reason String
+  actorId String
+  actor Account @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  recordedAt DateTime @db.Timestamptz(3)
+  revision Int
+  @@unique([teamId, revision])
+  @@index([memberId, revision])
+  @@index([substituteId, revision])
+}
+
+
+model KnowledgeCategory {
+  id String @id @default(uuid())
+  label String @unique
+  active Boolean @default(true)
+  revision Int @default(0)
+  articles KnowledgeArticle[]
+}
+
+model KnowledgeArticle {
+  interactions KnowledgeArticleInteraction[]
+  reads KnowledgeArticleRead[]
+  bodyFormat String @default("PLAIN")
+  images KnowledgeImage[]
+  id String @id @default(uuid())
+  authorId String
+  author Account @relation("KnowledgeAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  submissionKey String
+  requestFingerprint String
+  title String
+  body String
+  categoryId String
+  category KnowledgeCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  jobs String[] @default([])
+  playstyles String[] @default([])
+  gameVersions String[] @default([])
+  editMode String @default("AUTHOR")
+  revision Int @default(0)
+  removedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @db.Timestamptz(3)
+  versions KnowledgeVersion[]
+  contributions KnowledgeContribution[]
+  comments KnowledgeComment[]
+  audits KnowledgeAudit[]
+  @@unique([authorId, submissionKey])
+  @@index([categoryId, createdAt, id])
+}
+
+model KnowledgeVersion {
+  bodyFormat String @default("PLAIN")
+  id String @id @default(uuid())
+  articleId String
+  article KnowledgeArticle @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  editorId String
+  editor Account @relation("KnowledgeEditor", fields: [editorId], references: [id], onDelete: Restrict)
+  body String
+  number Int
+  restoredFromId String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([articleId, number])
+}
+
+model KnowledgeContribution {
+  articleId String
+  article KnowledgeArticle @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  accountId String
+  account Account @relation("KnowledgeContributor", fields: [accountId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@id([articleId, accountId])
+}
+
+model KnowledgeComment {
+  revision Int @default(0)
+  images KnowledgeImage[]
+  id String @id @default(uuid())
+  articleId String
+  article KnowledgeArticle @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  authorId String
+  author Account @relation("KnowledgeCommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  body String
+  parentId String?
+  parent KnowledgeComment? @relation("KnowledgeReply", fields: [parentId], references: [id], onDelete: Restrict)
+  replies KnowledgeComment[] @relation("KnowledgeReply")
+  mentions String[] @default([])
+  submissionKey String
+  removedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  notifications KnowledgeNotification[]
+  @@unique([authorId, submissionKey])
+  @@index([articleId, createdAt, id])
+}
+
+model KnowledgeNotification {
+  id String @id @default(uuid())
+  recipientId String
+  recipient Account @relation("KnowledgeRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+  commentId String
+  comment KnowledgeComment @relation(fields: [commentId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  messageReadAt DateTime? @db.Timestamptz(3)
+  messageDeletedAt DateTime? @db.Timestamptz(3)
+  @@unique([commentId, recipientId])
+  @@index([recipientId, createdAt, id])
+}
+
+model KnowledgeAudit {
+  id String @id @default(uuid())
+  articleId String?
+  article KnowledgeArticle? @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  actorId String
+  actor Account @relation("KnowledgeAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action String
+  targetId String
+  reason String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model KnowledgeImage {
+ orphanMountedAt DateTime? @db.Timestamptz(3)
+ commentPosition Int?
+ commentId String?
+ comment KnowledgeComment? @relation(fields:[commentId],references:[id],onDelete:Restrict)
+ id String @id @default(uuid())
+ uploaderId String
+ uploader Account @relation("KnowledgeImageUploader", fields:[uploaderId],references:[id],onDelete:Restrict)
+ articleId String?
+ article KnowledgeArticle? @relation(fields:[articleId],references:[id],onDelete:Restrict)
+ batchId String
+ batchIndex Int
+ digest String
+ originalName String
+ mime String
+ bytes Int
+ width Int
+ height Int
+ frames Int
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([uploaderId,batchId,batchIndex])
+ @@index([articleId])
+}
+
+
+model DailyPost {
+ id String @id @default(uuid())
+ authorId String
+ author Account @relation(fields:[authorId],references:[id],onDelete:Restrict)
+ body String
+ mentions String[]
+ revision Int @default(0)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ editedAt DateTime? @db.Timestamptz(3)
+ removedAt DateTime? @db.Timestamptz(3)
+ media DailyMedia[]
+ comments DailyComment[]
+ likes DailyLike[]
+ notifications DailyNotification[]
+ audits DailyAudit[]
+ @@index([createdAt,id])
+ @@index([authorId,createdAt,id])
+}
+
+model DailyMedia {
+ id String @id @default(uuid())
+ ownerId String
+ owner Account @relation(fields:[ownerId],references:[id],onDelete:Restrict)
+ postId String?
+ post DailyPost? @relation(fields:[postId],references:[id],onDelete:Restrict)
+ commentId String?
+ comment DailyComment? @relation(fields:[commentId,postId],references:[id,postId],onDelete:Restrict)
+ batchId String
+ batchIndex Int
+ fingerprint String
+ mime String
+ width Int
+ height Int
+ frames Int
+ position Int @default(0)
+ removedAt DateTime? @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([ownerId,batchId,batchIndex])
+ @@index([postId,position])
+ @@index([commentId,position])
+}
+
+model DailyComment {
+ id String @id @default(uuid())
+ postId String
+ post DailyPost @relation(fields:[postId],references:[id],onDelete:Restrict)
+ authorId String
+ author Account @relation(fields:[authorId],references:[id],onDelete:Restrict)
+ parentId String?
+ parent DailyComment? @relation("DailyReplies",fields:[parentId],references:[id],onDelete:Restrict)
+ replies DailyComment[] @relation("DailyReplies")
+ media DailyMedia[]
+ body String
+ mentions String[]
+ revision Int @default(0)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ removedAt DateTime? @db.Timestamptz(3)
+ notifications DailyNotification[]
+ audits DailyAudit[]
+ @@index([postId,createdAt,id])
+ @@unique([id,postId])
+}
+
+model DailyLike {
+ postId String
+ post DailyPost @relation(fields:[postId],references:[id],onDelete:Restrict)
+ accountId String
+ account Account @relation(fields:[accountId],references:[id],onDelete:Restrict)
+ @@id([postId,accountId])
+}
+
+model DailyCommand {
+ id String @id @default(uuid())
+ actorId String
+ actor Account @relation(fields:[actorId],references:[id],onDelete:Restrict)
+ submissionKey String
+ fingerprint String
+ resultId String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([actorId,submissionKey])
+}
+
+model DailyNotification {
+ id String @id @default(uuid())
+ eventKey String @unique
+ postId String
+ post DailyPost @relation(fields:[postId],references:[id],onDelete:Restrict)
+ commentId String?
+ comment DailyComment? @relation(fields:[commentId],references:[id],onDelete:Restrict)
+ recipientId String
+ recipient Account @relation(fields:[recipientId],references:[id],onDelete:Restrict)
+ kind String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ readAt DateTime? @db.Timestamptz(3)
+ deletedAt DateTime? @db.Timestamptz(3)
+ @@index([recipientId,deletedAt,readAt,createdAt])
+}
+
+model DailyAudit {
+ id String @id @default(uuid())
+ actorId String
+ actor Account @relation(fields:[actorId],references:[id],onDelete:Restrict)
+ postId String
+ post DailyPost @relation(fields:[postId],references:[id],onDelete:Restrict)
+ commentId String?
+ comment DailyComment? @relation(fields:[commentId],references:[id],onDelete:Restrict)
+ action String
+ reason String?
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([postId,createdAt])
+}
+
+model DailyCheckin {
+  id String @id @default(uuid())
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  day String @db.VarChar(10)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([accountId, day])
+}
+model ResourceCategory {
+  id String @id @default(uuid())
+  name String @unique @db.VarChar(40)
+  revision Int @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  resources ResourceLink[]
+}
+model ResourceLink {
+  id String @id @default(uuid())
+  name String @db.VarChar(80)
+  purpose String @db.VarChar(200)
+  url String @db.VarChar(2048)
+  categoryId String
+  category ResourceCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  revision Int @default(0)
+  position Int @default(0)
+  iconBytes Bytes?
+  iconBudgetMutationXid String? @db.VarChar(20)
+  iconBudgetComponentId String? @unique @db.VarChar(64)
+  iconBudgetComponent MediaStoredComponent? @relation("QuickIconBudgetComponent", fields: [iconBudgetComponentId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  iconVersion String? @db.VarChar(64)
+  iconSource String @default("auto") @db.VarChar(8)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@index([categoryId, name, id])
+  @@index([position, id])
+}
+
+model Wish {
+ moderatedAt DateTime? @db.Timestamptz(3)
+ revision Int @default(0)
+ updatedAt DateTime @default(now()) @db.Timestamptz(3)
+ deletedAt DateTime? @db.Timestamptz(3)
+ commands WishCommand[]
+ id String @id
+ authorId String
+ author Account @relation("WishAuthor", fields:[authorId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ category String?
+ title String
+ body String
+ wantedContent String @default("")
+ convenientTime String @default("")
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ idempotencyKey String
+ requestFingerprint String
+ activityId String? @unique
+ activity Activity? @relation("WishLinkedActivity", fields:[activityId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ interests WishInterest[]
+ comments WishComment[]
+ media WishMedia[]
+ conversion WishConversion?
+ notifications WishNotification[]
+ @@unique([authorId,idempotencyKey])
+ @@index([createdAt(sort:Desc),id(sort:Desc)])
+}
+model WishInterest {
+ active Boolean @default(true)
+ updatedAt DateTime @default(now()) @db.Timestamptz(3)
+ wishId String
+ wish Wish @relation(fields:[wishId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ accountId String
+ account Account @relation("WishInterestedAccount", fields:[accountId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@id([wishId,accountId])
+ @@index([wishId,active,updatedAt])
+}
+model WishComment {
+ parentId String?
+ parent WishComment? @relation("WishReplies",fields:[wishId,parentId],references:[wishId,id],onDelete:Restrict,onUpdate:NoAction)
+ replies WishComment[] @relation("WishReplies")
+ notifications WishNotification[]
+ id String @id
+ wishId String
+ wish Wish @relation(fields:[wishId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ authorId String
+ author Account @relation("WishCommentAuthor", fields:[authorId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ mentions String[] @default([])
+ media WishMedia[]
+ body String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ idempotencyKey String
+ requestFingerprint String
+ @@unique([wishId,authorId,idempotencyKey])
+ @@unique([wishId,id])
+ @@index([wishId,createdAt,id])
+}
+model WishConversion {
+ wishId String @id
+ wish Wish @relation(fields:[wishId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ actorId String
+ actor Account @relation("WishConversionActor", fields:[actorId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ activityId String @unique
+ activity Activity @relation("WishConvertedActivity", fields:[activityId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ idempotencyKey String
+ requestFingerprint String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+model WishNotification {
+ kind String @default("WISH_CONVERTED")
+ commentId String?
+ comment WishComment? @relation(fields:[commentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ id String @id
+ eventKey String @unique
+ wishId String
+ wish Wish @relation(fields:[wishId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ activityId String?
+ activity Activity? @relation("WishNotificationActivity", fields:[activityId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ recipientId String
+ recipient Account @relation("WishNotificationRecipient", fields:[recipientId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ readAt DateTime? @db.Timestamptz(3)
+ deletedAt DateTime? @db.Timestamptz(3)
+ @@index([recipientId,createdAt,id])
+}
+
+model WishCommand {
+ wishId String
+ wish Wish @relation(fields:[wishId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ actorId String
+ actor Account @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ idempotencyKey String
+ kind String
+ requestFingerprint String
+ payload Json @default("{}")
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@id([wishId,actorId,idempotencyKey])
+}
+model Lottery {
+ moderatedAt DateTime? @db.Timestamptz(3)
+ revision Int @default(0)
+ id String @id
+ creatorId String
+ creator Account @relation(fields:[creatorId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ idempotencyKey String
+ fingerprint String
+ title String @db.VarChar(80)
+ kind String
+ mode String
+ audience String
+ month String? @db.VarChar(7)
+ minDays Int?
+ prizes Json
+ drawAt DateTime @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ state String @default("OPEN")
+ result Json?
+ closedAt DateTime? @db.Timestamptz(3)
+ entries LotteryEntry[]
+ commands LotteryCommand[]
+ notifications LotteryNotification[]
+ @@unique([creatorId,idempotencyKey])
+ @@index([state,drawAt])
+}
+model LotteryEntry {
+ lotteryId String
+ lottery Lottery @relation(fields:[lotteryId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ accountId String
+ account Account @relation(fields:[accountId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ state String
+ source String
+ joinedAt DateTime @db.Timestamptz(3)
+ updatedAt DateTime @db.Timestamptz(3)
+ @@id([lotteryId,accountId])
+}
+model LotteryCommand {
+ requestFingerprint String?
+ payload Json @default("{}")
+ lotteryId String
+ lottery Lottery @relation(fields:[lotteryId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ actorId String
+ actor Account @relation(fields:[actorId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ key String
+ action String
+ createdAt DateTime @db.Timestamptz(3)
+ @@id([lotteryId,actorId,key])
+}
+model LotteryNotification {
+ eventKey String @id
+ messageId String? @unique @default(dbgenerated("(gen_random_uuid())::text"))
+ readAt DateTime? @db.Timestamptz(3)
+ deletedAt DateTime? @db.Timestamptz(3)
+ lotteryId String
+ lottery Lottery @relation(fields:[lotteryId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ recipientId String?
+ recipient Account? @relation(fields:[recipientId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ channel String
+ kind String
+ payload Json
+ createdAt DateTime @db.Timestamptz(3)
+ simulatedAt DateTime? @db.Timestamptz(3)
+ attempts Int @default(0)
+ @@index([simulatedAt,createdAt],map:"LotteryNotification_pending_idx")
+ @@index([recipientId,createdAt,messageId],map:"LotteryNotification_recipient_created_idx")
+}
+
+// New append-only activation facts. No existing Account fields are overwritten.
+model LotteryEligibilityControl {
+ id Int @id
+ enabledAt DateTime @db.Timestamptz(6)
+}
+model LotteryAccountStatus {
+ accountId String @id
+ account Account @relation("LotteryStatusAccount",fields:[accountId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ active Boolean @default(true)
+ revision Int @default(0)
+ reason String @default("Feature activation baseline")
+ changedById String?
+ changedBy Account? @relation("LotteryStatusActor",fields:[changedById],references:[id],onDelete:Restrict,onUpdate:NoAction)
+}
+model LotteryAccountFact {
+ sequence BigInt @id @default(autoincrement())
+ accountId String
+ account Account @relation("LotteryFactAccount",fields:[accountId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ effectiveAt DateTime @db.Timestamptz(6)
+ registeredAt DateTime @db.Timestamptz(6)
+ membership Membership
+ active Boolean
+ displayName String?
+ kind String
+ reason String?
+ changedById String?
+ changedBy Account? @relation("LotteryFactActor",fields:[changedById],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@index([accountId,effectiveAt(sort:Desc),sequence(sort:Desc)],map:"LotteryAccountFact_asof_idx")
+}
+
+// Official information is deliberately independent of member activities and all notices.
+model OfficialEvent {
+ imageId String?
+ image OfficialEventImage? @relation("CurrentOfficialImage", fields:[imageId,id], references:[id,eventId], onDelete:Restrict, onUpdate:NoAction)
+ images OfficialEventImage[] @relation("OfficialImages")
+ id String @id @default(uuid())
+ sourceKey String
+ externalId String
+ sourceUrl String
+ sourceTitle String
+ sourceText String
+ manualFields Json @default("[]")
+ sourceSnapshot Json @default("{}")
+ requestFingerprint String
+ status String @default("PENDING")
+ summary String @default("")
+ startsAt DateTime? @db.Timestamptz(3)
+ endsAt DateTime? @db.Timestamptz(3)
+ revision Int @default(0)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @default(now()) @db.Timestamptz(3)
+ audits OfficialEventAudit[]
+ commands OfficialEventCommand[]
+ @@unique([sourceKey, externalId])
+ @@index([status, createdAt, id])
+ @@index([status, startsAt, endsAt])
+}
+model OfficialEventImage {
+ id String @id
+ eventId String
+ event OfficialEvent @relation("OfficialImages", fields:[eventId], references:[id], onDelete:Restrict,onUpdate:NoAction)
+ currentFor OfficialEvent[] @relation("CurrentOfficialImage")
+ sourceUrl String
+ sourcePageUrl String
+ sourceKind String
+ fingerprint String
+ mime String
+ width Int
+ height Int
+ frames Int
+ originalBytes Int
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([id,eventId])
+ @@unique([eventId,fingerprint,sourceUrl], map:"OfficialEventImage_identity_key")
+}
+model OfficialEventAudit {
+ id String @id @default(uuid())
+ eventId String
+ event OfficialEvent @relation(fields:[eventId], references:[id], onDelete:Restrict)
+ actorId String?
+ actor Account? @relation(fields:[actorId], references:[id], onDelete:Restrict)
+ action String
+ reason String
+ before Json
+ after Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([eventId, createdAt, id])
+}
+model OfficialEventCommand {
+ id String @id @default(uuid())
+ eventId String
+ event OfficialEvent @relation(fields:[eventId], references:[id], onDelete:Restrict)
+ actorId String
+ actor Account @relation(fields:[actorId], references:[id], onDelete:Restrict)
+ idempotencyKey String
+ requestFingerprint String
+ action String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([eventId, actorId, idempotencyKey])
+}
+model OfficialSyncRun {
+ id String @id @default(uuid())
+ trigger String
+ actorId String?
+ actor Account? @relation(fields:[actorId], references:[id], onDelete:Restrict)
+ idempotencyKey String?
+ status String @default("RUNNING")
+ imported Int @default(0)
+ unchanged Int @default(0)
+ errors Json @default("[]")
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ finishedAt DateTime? @db.Timestamptz(3)
+ @@unique([actorId,idempotencyKey])
+ @@index([createdAt,id])
+}
+
+model ActivityShare {
+ id String @id @default(uuid())
+ activityId String
+ activity Activity @relation(fields:[activityId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ creatorId String
+ creator Account @relation(fields:[creatorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ title String @default("")
+ body String @default("")
+ mediaIds String[] @default([])
+ revision Int @default(0)
+ featuredAt DateTime? @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @default(now()) @db.Timestamptz(3)
+ media ActivityShareMedia[]
+ audits ActivityShareAudit[]
+ commands ActivityShareCommand[]
+ @@index([featuredAt,id])
+ @@index([activityId,createdAt,id])
+}
+model ActivityShareMedia {
+ id String @id @default(uuid())
+ shareId String
+ share ActivityShare @relation(fields:[shareId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ ownerId String
+ owner Account @relation(fields:[ownerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ batchId String
+ batchIndex Int
+ fingerprint String
+ mime String
+ width Int
+ height Int
+ frames Int
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([ownerId,batchId,batchIndex])
+ @@index([shareId,createdAt,id])
+}
+model ActivityShareAudit {
+ id String @id @default(uuid())
+ shareId String
+ share ActivityShare @relation(fields:[shareId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ actorId String
+ actor Account @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ action String
+ reason String
+ before Json
+ after Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([shareId,createdAt,id])
+}
+model ActivityShareCommand {
+ id String @id @default(uuid())
+ shareId String
+ share ActivityShare @relation(fields:[shareId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ actorId String
+ actor Account @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ idempotencyKey String
+ requestFingerprint String
+ action String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([actorId,idempotencyKey])
+}
+
+model AdminManagementCommand {
+  id String @id @default(uuid())
+  actorId String
+  actor Account @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  idempotencyKey String
+  requestFingerprint String
+  kind String
+  targetAccountId String?
+  result Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([actorId, idempotencyKey])
+}
+model AdminManagementAudit {
+  id String @id @default(uuid())
+  actorId String
+  actor Account @relation("ManagementAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  targetAccountId String?
+  target Account? @relation("ManagementAuditTarget", fields: [targetAccountId], references: [id], onDelete: Restrict)
+  kind String
+  reason String
+  beforeRole AdminRole?
+  afterRole AdminRole?
+  beforeQq String?
+  afterQq String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([kind, createdAt, id])
+}
+model PublicSiteSettings {
+  id String @id
+  adminQq String?
+  revision Int
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model AccountLifecycleCommand {
+ id String @id @default(uuid())
+ actorId String
+ actor Account @relation("LifecycleCommandActor",fields:[actorId],references:[id],onDelete:Restrict)
+ targetAccountId String
+ target Account @relation("LifecycleCommandTarget",fields:[targetAccountId],references:[id],onDelete:Restrict)
+ idempotencyKey String
+ requestFingerprint String
+ result Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([actorId,idempotencyKey])
+}
+model AccountLifecycleAudit {
+ id String @id @default(uuid())
+ actorId String
+ actor Account @relation("LifecycleAuditActor",fields:[actorId],references:[id],onDelete:Restrict)
+ targetAccountId String
+ target Account @relation("LifecycleAuditTarget",fields:[targetAccountId],references:[id],onDelete:Restrict)
+ beforeActive Boolean
+ afterActive Boolean
+ revisionBefore Int
+ revisionAfter Int
+ reason String
+ impact Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([targetAccountId,createdAt,id])
+ @@index([createdAt,id])
+}
+
+model LocalQcRun {
+  namespace String @id
+  anchor DateTime @db.Timestamptz(3)
+  manifestHash String
+  bindings Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+model LocalQcRecord {
+  namespace String
+  slot String
+  kind String
+  entityId String
+  digest String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@id([namespace, slot])
+}
+
+
+model AlbumCommand {
+ id String @id @default(uuid())
+ actorId String
+ actor Account @relation(fields:[actorId],references:[id],onDelete:Restrict)
+ submissionKey String
+ fingerprint String
+ result Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([actorId,submissionKey])
+}
+
+model AlbumCommentMedia {
+ orphanMountedAt DateTime? @db.Timestamptz(3)
+ id String @id @default(uuid())
+ ownerId String
+ owner Account @relation(fields:[ownerId],references:[id],onDelete:Restrict)
+ albumId String
+ album Album @relation(fields:[albumId],references:[id],onDelete:Restrict)
+ commentId String?
+ comment AlbumComment? @relation(fields:[commentId,albumId],references:[id,albumId],onDelete:Restrict,onUpdate:Cascade)
+ batchId String
+ batchIndex Int
+ fingerprint String
+ mime String
+ width Int
+ height Int
+ frames Int @default(1)
+ position Int @default(0)
+ removedAt DateTime? @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([ownerId,batchId,batchIndex])
+ @@index([albumId,commentId,removedAt])
+}
+
+model WishMedia {
+ id String @id @default(uuid())
+ ownerId String
+ owner Account @relation(fields:[ownerId],references:[id],onDelete:Restrict)
+ wishId String?
+ wish Wish? @relation(fields:[wishId],references:[id],onDelete:Restrict)
+ commentId String?
+ comment WishComment? @relation(fields:[wishId,commentId],references:[wishId,id],onDelete:Restrict)
+ batchId String
+ batchIndex Int
+ fingerprint String
+ mime String
+ width Int
+ height Int
+ frames Int @default(1)
+ position Int @default(0)
+ removedAt DateTime? @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([ownerId,batchId,batchIndex])
+ @@index([wishId,commentId])
+}
+
+model MessageNotification {
+  id String @id @default(uuid())
+  recipientId String
+  recipient Account @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+  actorId String?
+  actor Account? @relation("MessageActor", fields: [actorId], references: [id], onDelete: Restrict)
+  kind String
+  sourceType String
+  sourceId String
+  commentId String?
+  eventKey String @unique
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  readAt DateTime? @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3)
+  @@index([recipientId, deletedAt, createdAt, id])
+  @@index([recipientId, readAt, deletedAt])
+}
+
+model KnowledgeArticleInteraction {
+  id String @id @default(uuid())
+  articleId String
+  article KnowledgeArticle @relation(fields:[articleId],references:[id],onDelete:Restrict)
+  accountId String
+  account Account @relation(fields:[accountId],references:[id],onDelete:Restrict)
+  likedAt DateTime? @db.Timestamptz(3)
+  collectedAt DateTime? @db.Timestamptz(3)
+  likeNotifiedAt DateTime? @db.Timestamptz(3)
+  collectionNotifiedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([articleId,accountId])
+  @@index([articleId,likedAt])
+  @@index([articleId,collectedAt])
+}
+
+model KnowledgeArticleRead {
+  id String @id @default(uuid())
+  articleId String
+  article KnowledgeArticle @relation(fields:[articleId],references:[id],onDelete:Restrict)
+  sessionKey String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([articleId,sessionKey])
+}
+
+// Visitor-provided contact data is never part of an anonymous read projection.
+model GuestContactMessage {
+  id String @id @default(uuid())
+  submissionKey String @unique
+  requestFingerprint String
+  qq String
+  message String
+  status GuestContactStatus @default(PENDING)
+  processedById String?
+  processedBy Account? @relation("GuestContactHandler", fields: [processedById], references: [id], onDelete: Restrict)
+  processedAt DateTime? @db.Timestamptz(3)
+  revision Int @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([status, createdAt, id])
+}
+
+model SiteAnnouncement {
+  deletedAt DateTime? @db.Timestamptz(3)
+  deletedById String?
+  deletedBy Account? @relation("AnnouncementDeleter", fields: [deletedById], references: [id], onDelete: Restrict)
+  id String @id @default(uuid())
+  text String
+  active Boolean @default(false)
+  createdById String
+  createdBy Account @relation("AnnouncementAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([deletedAt, active, createdAt, id])
+  @@index([active, createdAt, id])
+  @@index([createdAt, id])
+}
+model SiteAnnouncementState {
+  id String @id
+  revision Int @default(0)
+}
+model SiteAnnouncementCommand {
+  id String @id @default(uuid())
+  actorId String
+  actor Account @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  idempotencyKey String
+  requestFingerprint String
+  kind String
+  result Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([actorId, idempotencyKey])
+}
+
+model QqOfficialBinding {
+  protocolVersion Int @default(1)
+  id String @id @default(uuid())
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  appId String
+  botId String
+  groupOpenId String
+  memberOpenId String
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  confirmedAt DateTime @db.Timestamptz(3)
+  @@unique([appId, botId, groupOpenId, memberOpenId])
+  @@unique([appId, botId, groupOpenId, accountId])
+}
+model QqOfficialBindingAudit {
+  id String @id @default(uuid())
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  action String
+  identityDigest String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+model QqOfficialChallenge {
+  id String @id @default(uuid())
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  sessionId String
+  publicCodeHash String @unique
+  browserProofHash String
+  selectedCandidateId String?
+  expiresAt DateTime @db.Timestamptz(3)
+  invalidatedAt DateTime? @db.Timestamptz(3)
+  consumedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  candidates QqOfficialCandidate[]
+  @@index([accountId, expiresAt])
+}
+model QqOfficialCandidate {
+  id String @id @default(uuid())
+  challengeId String
+  challenge QqOfficialChallenge @relation(fields: [challengeId], references: [id], onDelete: Restrict)
+  appId String
+  botId String
+  groupOpenId String
+  memberOpenId String
+  receiptCodeHash String @unique
+  finalProofHash String? @unique
+  selectedAt DateTime? @db.Timestamptz(3)
+  provenAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([challengeId, appId, botId, groupOpenId, memberOpenId])
+}
+model QqOfficialSignupCode {
+  code String @id
+  activatedAt DateTime? @db.Timestamptz(3)
+  appId String
+  botId String
+  groupOpenId String
+  activityId String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([appId, botId, groupOpenId, activityId])
+}
+
+model QqOfficialMessage {
+  simulated Boolean @default(false)
+  id String @id @default(uuid())
+  deliveryId String @unique
+  appId String
+  botId String
+  groupOpenId String
+  refIdx String
+  activityId String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([appId, botId, groupOpenId, refIdx])
+}
+model QqOfficialInbound {
+  id String @id @default(uuid())
+  appId String
+  botId String
+  groupOpenId String
+  eventKey String
+  fingerprint String
+  result Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([appId, botId, groupOpenId, eventKey])
+}
+model QqOfficialNonce {
+  id String @id @default(uuid())
+  nonceHash String @unique
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+model QqOfficialDelivery {
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "QqOfficialDelivery_activityId_fkey")
+  signupCode String?
+  signupButton Boolean @default(false)
+ groupGeneration Int?
+ planningEpoch Int?
+  renderedContent String?
+  managementVersion Int?
+  deliveryMode String @default("SIMULATION")
+  id String @id @default(uuid())
+  eventKey String @unique
+  appId String
+  botId String
+  groupOpenId String
+  activityId String
+  activityRevision Int
+  kind String
+  dueAt DateTime @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  payload Json
+  status String @default("PENDING")
+  attempts Int @default(0)
+  fence Int @default(0)
+  leaseOwner String?
+  leaseUntil DateTime? @db.Timestamptz(3)
+  dispatchedAt DateTime? @db.Timestamptz(3)
+  sentAt DateTime? @db.Timestamptz(3)
+  resultCode String?
+  providerMessageId String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([status, dueAt])
+  @@index([activityId, status])
+}
+
+model BotManagementState {
+ id String @id
+ scope Json
+ draft Json
+ draftRevision Int @default(0)
+ publishedVersion Int @default(0)
+ updatedAt DateTime @default(now()) @db.Timestamptz(3)
+}
+model BotManagementPublication {
+ tests BotManagementTest[]
+ notificationEpoch Int @default(0)
+ actor Account @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ version Int @id
+ digest String
+ scope Json
+ config Json
+ actorId String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+model BotManagementAudit {
+ actor Account @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ id String @id @default(uuid())
+ actorId String
+ idempotencyKey String
+ fingerprint String
+ action String
+ before Json
+ after Json
+ result Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([actorId,idempotencyKey])
+ @@index([createdAt,id])
+}
+model BotManagementObservation {
+ groupRevision Int?
+ groupDigest String?
+ id String @id
+ reportedVersion Int
+ reportedDigest String?
+ applyError String?
+ telemetry Json
+ observedAt DateTime @db.Timestamptz(3)
+}
+model BotManagementTest {
+  actor Account? @relation("BotManagementTestActor", fields: [actorId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "BotManagementTest_actorId_fkey")
+ actorId String?
+ providerMessageId String?
+ refIdx String?
+ receiptDigest String? @unique
+ sentAt DateTime? @db.Timestamptz(3)
+ publication BotManagementPublication @relation(fields:[version],references:[version],onDelete:Restrict,onUpdate:NoAction)
+ id String @id @default(uuid())
+ version Int
+ scope Json
+ content String
+ status String @default("PENDING")
+ leaseOwner String?
+ leaseUntil DateTime? @db.Timestamptz(3)
+ expiresAt DateTime @db.Timestamptz(3)
+ resultCode String?
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([status,createdAt])
+}
+
+model BotManagementSendRecord {
+ id String @id
+ direction String
+ outcome String
+ eventAt DateTime @db.Timestamptz(3)
+ observedAt DateTime @db.Timestamptz(3)
+ @@index([eventAt,id])
+}
+
+model BotGroupState {
+ id String @id
+ revision Int @default(0)
+}
+model BotGroup {
+  createdBy Account? @relation("BotGroupCreator", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "BotGroup_createdById_fkey")
+ id String @id @default(uuid())
+ appId String
+ botId String
+ groupOpenId String
+ label String
+ enabled Boolean @default(false)
+ enabledAt DateTime? @db.Timestamptz(3)
+ generation Int @default(1)
+ boundAt DateTime @db.Timestamptz(3)
+ legacy Boolean @default(false)
+ createdById String?
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([appId, botId, groupOpenId])
+}
+model BotGroupChallenge {
+ id String @id @default(uuid())
+ accountId String
+ account Account @relation(fields:[accountId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ sessionId String
+ label String
+ publicCodeHash String @unique
+ browserProofHash String
+ selectedCandidateId String?
+ expiresAt DateTime @db.Timestamptz(3)
+ invalidatedAt DateTime? @db.Timestamptz(3)
+ consumedAt DateTime? @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ candidates BotGroupCandidate[]
+ @@index([accountId,expiresAt])
+}
+model BotGroupCandidate {
+ id String @id @default(uuid())
+ challengeId String
+ challenge BotGroupChallenge @relation(fields:[challengeId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ appId String
+ botId String
+ groupOpenId String
+ memberOpenId String
+ receiptCodeHash String @unique
+ finalProofHash String? @unique
+ provenAt DateTime? @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([challengeId,appId,botId,groupOpenId,memberOpenId], map: "BotGroupCandidate_challengeId_appId_botId_groupOpenId_memberOpe")
+}
+
+model QuickLinkState {
+  id String @id
+  revision Int @default(0)
+}
+
+// Integrator: Account.quickLinkCommands QuickLinkCommand[]; preserve existing account fields.
+model QuickLinkCommand {
+  id String @id @default(uuid())
+  actorId String
+  actor Account @relation(fields:[actorId], references:[id], onDelete:Restrict)
+  idempotencyKey String
+  requestFingerprint String
+  kind String
+  result Json
+  snapshot Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([actorId,idempotencyKey])
+}
+// Account relation: siteHelpStepProgress SiteHelpStepProgress[]
+model SiteHelpStepProgress {
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  lessonId String @db.VarChar(64)
+  version Int
+  stepId String @db.VarChar(64)
+  completedAt DateTime @default(now()) @db.Timestamptz(3)
+  @@id([accountId, lessonId, version, stepId])
+}
+
+model QqOfficialBindingKey {
+  id String @id @default(uuid())
+  accountId String
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  sessionId String
+  appId String
+  botId String
+  groupOpenId String
+  enabledAt DateTime @db.Timestamptz(3)
+  keyHash String @unique
+  expiresAt DateTime @db.Timestamptz(3)
+  consumedAt DateTime? @db.Timestamptz(3)
+  invalidatedAt DateTime? @db.Timestamptz(3)
+  bindingId String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([accountId, expiresAt])
+}
+
+// MEDIA03 phase 1: persistent logical-media budgets only. No runtime upload integration or cleanup.
+model MediaBudgetState {
+  id String @id @default("global")
+  baselineBytes BigInt @default(0)
+  creditedBytes BigInt @default(0)
+  components MediaStoredComponent[]
+  committedBytes BigInt @default(0)
+  reservedBytes BigInt @default(0)
+  baselineFingerprint String? @db.VarChar(64)
+  baselineInitializedAt DateTime? @db.Timestamptz(3)
+}
+model MediaDailyBudget {
+  accountId String
+  day String @db.VarChar(10)
+  committedBytes BigInt @default(0)
+  reservedBytes BigInt @default(0)
+  @@id([accountId, day])
+}
+model MediaUploadReceipt {
+  reservationProtocol String? @db.VarChar(32)
+  scope String @db.VarChar(64)
+  operationKey String @db.VarChar(256)
+  fingerprint String @db.VarChar(64)
+  accountId String?
+  day String? @db.VarChar(10)
+  rawBytes BigInt
+  storedBytes BigInt
+  state String @db.VarChar(16)
+  persistenceStartedAt DateTime? @db.Timestamptz(3)
+  lotteryMountedAt DateTime? @db.Timestamptz(3)
+  attemptId String? @unique @db.VarChar(36)
+  objectIdentity String? @unique @db.VarChar(256)
+  storageReservedAt DateTime? @db.Timestamptz(3)
+  metadataReservedBytes BigInt @default(0)
+  retryHeadKey String? @db.VarChar(256)
+  retryRootKey String? @db.VarChar(256)
+  createdAt DateTime @db.Timestamptz(3)
+  updatedAt DateTime @db.Timestamptz(3)
+  settledAt DateTime? @db.Timestamptz(3)
+  components MediaStoredComponent[]
+  @@id([scope, operationKey])
+  @@index([accountId, day])
+  @@index([reservationProtocol, state, persistenceStartedAt, createdAt, scope, operationKey], map: "MediaUploadReceipt_reservation_candidates_idx")
+}
+
+
+// MEDIA03 phase 57: audit-preserving components only; no storage proof producer or cleanup executor.
+model MediaStoredComponent {
+  quickIcon ResourceLink? @relation("QuickIconBudgetComponent")
+  id String @id @db.VarChar(64)
+  sourceKind String @db.VarChar(16)
+  receiptScope String? @db.VarChar(64)
+  receiptOperationKey String? @db.VarChar(256)
+  receipt MediaUploadReceipt? @relation(fields: [receiptScope, receiptOperationKey], references: [scope, operationKey], onDelete: Restrict, onUpdate: NoAction, map: "MediaStoredComponent_receipt_fkey")
+  baselineStateId String?
+  baselineFingerprint String? @db.VarChar(64)
+  baseline MediaBudgetState? @relation(fields: [baselineStateId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "MediaStoredComponent_baseline_fkey")
+  namespace String @db.VarChar(64)
+  objectKey String @db.VarChar(256)
+  generation String @db.VarChar(64)
+  part String @db.VarChar(32)
+  policy String @db.VarChar(32)
+  chargedBytes BigInt
+  contentBindingSha256 String? @db.VarChar(64)
+  storageIdentityFingerprint String? @db.VarChar(64)
+  createdAt DateTime @db.Timestamptz(3)
+  retirement MediaRetirementIntent?
+  credit MediaStorageCredit?
+  @@unique([namespace, objectKey, generation, part])
+  @@index([receiptScope, receiptOperationKey])
+}
+model MediaRetirementIntent {
+  id String @id @db.VarChar(64)
+  componentId String @unique @db.VarChar(64)
+  component MediaStoredComponent @relation(fields: [componentId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  identityFingerprint String @db.VarChar(64)
+  authorityFingerprint String @db.VarChar(64)
+  state String @db.VarChar(16)
+  createdAt DateTime @db.Timestamptz(3)
+  acknowledgedAt DateTime? @db.Timestamptz(3)
+  credit MediaStorageCredit?
+  @@unique([id, componentId])
+}
+model MediaStorageCredit {
+  componentId String @id @db.VarChar(64)
+  component MediaStoredComponent @relation(fields: [componentId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  intentId String @unique @db.VarChar(64)
+  intent MediaRetirementIntent @relation(fields: [intentId, componentId], references: [id, componentId], onDelete: Restrict, onUpdate: NoAction, map: "MediaStorageCredit_intentId_fkey")
+  bytes BigInt
+  evidenceFingerprint String @db.VarChar(64)
+  createdAt DateTime @db.Timestamptz(3)
+  @@unique([intentId, componentId])
+}
+
+// COS phase 66: immutable physical-part locators only, no business cascades or backfill.
+model MediaCosObject {
+  id String @id @default(uuid()) @db.VarChar(36)
+  scope String @db.VarChar(32)
+  objectId String @db.VarChar(36)
+  part String @db.VarChar(16)
+  accountId String? @db.VarChar(36)
+  bucket String @db.VarChar(71)
+  region String @db.VarChar(32)
+  prefix String @db.VarChar(163)
+  objectKey String @db.VarChar(512)
+  bytes BigInt
+  sha256 String @db.VarChar(64)
+  etag String? @db.VarChar(256)
+  identityFingerprint String? @db.VarChar(64)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([scope, objectId, part])
+  @@unique([region, bucket, objectKey])
+}

@@ -1,0 +1,10 @@
+.site-forbidden-result .site-forbidden-illustration {
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 250 / 295;
+}
+.site-forbidden-result .site-forbidden-illustration > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}

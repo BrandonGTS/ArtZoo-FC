@@ -1,0 +1,1036 @@
+.teams-content {
+  gap: 32px;
+}
+.team-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 744fr) minmax(0, 544fr);
+  gap: 24px;
+  align-items: start;
+}
+.team-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.team-paper.ant-card {
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  min-width: 0;
+}
+.team-paper::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -3px -9px -15px;
+  pointer-events: none;
+}
+.team-paper-left::before {
+  border-image-source: var(--artzoo-bg-team-left);
+}
+.team-paper-right::before {
+  border-image-source: var(--artzoo-bg-team-right);
+}
+.team-paper-session::before {
+  border-image-source: var(--artzoo-bg-team-session);
+}
+.team-paper-session .ant-card-body {
+  padding: 16px !important;
+}
+.team-roster {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.team-seat {
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  min-height: 144px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 16px 14px;
+}
+.team-seat::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -3px -9px -15px;
+  background: var(--team-seat-paper) no-repeat center/100% 100%;
+  pointer-events: none;
+}
+.team-seat-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.team-seat-heading > span:first-child {
+  font-size: 20px;
+  line-height: 30px;
+}
+.team-seat-joined,
+.team-seat-member,
+.team-seat-job {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.team-seat-joined {
+  gap: 4px;
+  color: var(--artzoo-primary);
+}
+.team-seat-job img {
+  width: 32px;
+  height: 32px;
+}
+.team-seat-member a {
+  overflow-wrap: anywhere;
+}
+.team-seat-member .ant-avatar {
+  flex-shrink: 0;
+  background: var(--artzoo-fill);
+  border: 1px solid var(--artzoo-line);
+}
+.team-create-seat {
+  border-top: 1px solid var(--artzoo-line);
+  padding-top: 16px;
+}
+.team-create-seat label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.team-create-seat .ant-select {
+  width: 100%;
+}
+.team-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.team-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.team-section-heading .page-heading {
+  min-width: 0;
+  flex: 1;
+}
+.team-section-heading .ant-select {
+  width: 240px;
+}
+.team-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+.team-feedback-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.team-session-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding-block: 12px;
+  border-top: 1px solid var(--artzoo-line);
+}
+.team-feedback-people {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  grid-column: 1/-1;
+}
+.team-person-feedback {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+.team-feedback-can {
+  color: #326846;
+}
+.team-feedback-cannot {
+  color: #a34335;
+}
+.team-dialog-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.team-feedback-edit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.team-member-row,
+.team-application-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-block: 8px;
+  border-bottom: 1px solid var(--artzoo-line);
+}
+.team-date-time {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.team-date-time .ant-picker {
+  width: 200px;
+}
+.team-dialog-fields .ant-picker {
+  max-width: 100%;
+}
+.team-scheduled-members {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.team-role-label {
+  min-width: 36px;
+}
+.team-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1000px) {
+  .team-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .team-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .team-roster {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .team-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .team-roster {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .team-session-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .team-feedback-people {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .team-scheduled-members {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .team-section-heading .ant-select {
+    max-width: 100%;
+  }
+}
+
+.team-session-collapsed::before {
+  border-image-source: var(--artzoo-bg-team-seat);
+}
+.team-stack > .activity-detail-divider {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--artzoo-line);
+}
+.team-session-toggle.ant-btn {
+  width: 160px;
+  max-width: 100%;
+}
+.team-session-cancel.ant-btn {
+  width: 144px;
+  max-width: 100%;
+}
+.team-schedule-actions > .ant-btn,
+.team-feedback-entry > .ant-btn {
+  width: 180px;
+  max-width: 100%;
+}
+.team-dialog-fields > .team-actions,
+.team-dialog-fields .ant-form > .team-actions {
+  justify-content: flex-end;
+}
+.team-scheduled-members .team-seat-member {
+  min-width: 0;
+}
+.team-scheduled-members .ant-avatar {
+  flex-shrink: 0;
+  background: var(--artzoo-fill);
+  border: 1px solid var(--artzoo-line);
+}
+
+.team-session-change {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.team-session-people.ant-btn {
+  width: 144px;
+  max-width: 100%;
+  margin-left: auto;
+}
+.team-history-row {
+  padding-block: 12px;
+  border-top: 1px solid var(--artzoo-line);
+}
+@media (max-width: 600px) {
+  .team-session-change {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .team-session-change > div:last-child {
+    grid-column: 2;
+  }
+  .team-session-people.ant-btn {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .team-modal.ant-modal {
+    max-width: calc(100vw - 64px);
+  }
+}
+
+@media (max-width: 1200px) {
+  .team-session-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .team-session-row > .team-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Fixed-team recruitment follows the accepted homepage paper, title and fact rows. */
+.team-list {
+  gap: 24px 16px;
+  align-items: stretch;
+}
+.team-list .home-card-surface,
+.team-list .home-card-motion,
+.team-list .team-recruitment-card {
+  height: 100%;
+}
+.team-recruitment-card.ant-card .team-recruitment-body {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: 28px 34px repeat(4, 22px) 84px 52px;
+  align-content: space-between;
+  gap: 8px;
+  height: 406px;
+  min-height: 406px;
+  padding: 24px;
+}
+.team-author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 22px;
+}
+.team-author-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--artzoo-heading);
+  text-decoration: none;
+}
+.team-author-profile .ant-avatar {
+  flex: none;
+  background: var(--artzoo-fill);
+}
+.team-author-profile > span:last-child {
+  min-width: 0;
+  max-width: 130px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.team-author-server {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--artzoo-secondary);
+}
+.team-recruitment-title h3,
+.team-recruitment-title h3 a {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+.team-recruitment-fact {
+  min-width: 0;
+  height: 22px;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--artzoo-secondary);
+}
+.team-recruitment-fact > img {
+  flex: none;
+}
+.team-current-composition {
+  display: grid;
+  grid-template-rows: 22px 56px;
+  gap: 6px;
+  min-width: 0;
+}
+.team-current-composition > p,
+.team-required-jobs > span {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--artzoo-heading);
+}
+.team-compact-roster {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 26px);
+  gap: 4px;
+}
+.team-compact-roster > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  border-radius: 4px;
+  background: var(--artzoo-fill);
+  font-size: 12px;
+  line-height: 20px;
+}
+.team-compact-roster img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex: none;
+}
+.team-required-jobs {
+  display: grid;
+  grid-template-rows: 22px 24px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.team-required-jobs > span {
+  flex: none;
+}
+.team-required-jobs > div {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  align-items: center;
+}
+.team-required-jobs > div > span {
+  display: flex;
+  flex: 0 1 24px;
+  min-width: 0;
+}
+.team-required-jobs img {
+  width: 24px;
+  height: 24px;
+  max-width: 100%;
+  object-fit: contain;
+}
+.team-detail-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  min-width: 0;
+}
+.team-detail-information .team-information-title {
+  font-size: 24px;
+  line-height: 34px;
+}
+.team-detail-information .activity-title-row {
+  min-width: 0;
+}
+.team-detail-information .activity-facts dd {
+  min-width: 0;
+}
+.team-detail-participation .activity-paper-body {
+  display: block;
+}
+.team-detail-panels .team-detail-roster .activity-registration-seat {
+  position: relative;
+  padding: 18px 12px 12px;
+  min-height: 164px;
+}
+.team-detail-position {
+  position: absolute;
+  left: 10px;
+  top: 6px;
+  color: var(--artzoo-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+.team-detail-roster .team-seat-approved-name {
+  color: var(--team-approved-name);
+  font-weight: 700;
+}
+.team-detail-roster .activity-registration-seat-empty.team-seat-pending.ant-btn,
+.team-detail-roster .activity-registration-seat-empty.team-seat-pending.ant-btn:disabled {
+  background: var(--team-pending-bg);
+  border-color: var(--team-pending-border);
+}
+.team-seat-pending-name {
+  color: var(--team-pending-name);
+  font-weight: 700;
+}
+.team-seat-empty-name {
+  font-size: 14px;
+  line-height: 22px;
+}
+.team-my-application {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.team-application-exact-job {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.team-dialog-fields > .team-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+.team-dialog-fields .team-paper::before {
+  display: none;
+}
+.team-dialog-fields .team-paper.ant-card {
+  border: 1px solid var(--artzoo-line);
+  border-radius: 10px;
+  background: var(--artzoo-surface);
+}
+@media (max-width: 760px) {
+  .team-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .team-recruitment-card.ant-card .team-recruitment-body {
+    padding: 20px;
+  }
+  .team-detail-roster.activity-registration-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .team-required-jobs {
+    gap: 6px;
+  }
+  .team-required-jobs > div {
+    gap: 2px;
+  }
+  .team-required-jobs img {
+    width: 20px;
+    height: 20px;
+  }
+  .team-author-profile > span:last-child {
+    max-width: 110px;
+  }
+  .team-detail-information .activity-facts > div {
+    flex-wrap: wrap;
+  }
+  .team-detail-information .activity-facts dd {
+    max-width: 100%;
+  }
+}
+
+/* B-QC-20261022-01: list-only composition and demand fit one row of eight. */
+/* Explicit tracks fill the card independently of short fact text; the inherited
+   homepage justify-content otherwise leaves the implicit grid at intrinsic width. */
+.team-list .team-recruitment-card.ant-card .team-recruitment-body {
+  height: 438px;
+  min-height: 438px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 28px 34px repeat(4, 22px) 112px 70px;
+  justify-content: stretch;
+}
+.team-list .team-current-composition {
+  width: 100%;
+  grid-template-rows: 22px 84px;
+}
+.team-list .team-compact-roster {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 40px);
+  gap: 4px;
+}
+.team-list .team-compact-roster > span {
+  flex-direction: row;
+  border: 1px solid var(--artzoo-line);
+  background: transparent;
+  gap: 4px;
+  font-size: 12px;
+}
+.team-list .team-compact-roster img {
+  width: 34px;
+  height: 34px;
+  max-width: 100%;
+}
+.team-list .team-required-jobs {
+  width: 100%;
+  grid-template-rows: 22px 42px;
+}
+.team-list .team-required-jobs > div {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+}
+.team-list .team-required-jobs > div > span {
+  justify-content: center;
+}
+.team-list .team-required-jobs img {
+  width: 40px;
+  height: 40px;
+}
+.team-detail-panels .team-detail-roster .activity-registration-seat {
+  padding: 10px 8px;
+  min-height: 144px;
+}
+.team-detail-roster .team-detail-position {
+  position: static;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--artzoo-heading);
+}
+.team-detail-roster .activity-detail-seat-icon {
+  width: 64px;
+  height: 64px;
+}
+.team-detail-roster .activity-detail-seat-icon img {
+  width: 64px;
+  height: 64px;
+}
+@media (max-width: 600px) {
+  .team-required-jobs img {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+.team-leave-button.ant-btn {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--artzoo-error, #a34335);
+  border-radius: 8px;
+  background: var(--artzoo-surface, #fffdf7);
+  color: var(--artzoo-error, #a34335);
+  box-shadow: none;
+}
+
+.team-modal.activity-detail-registration-modal .activity-registration-job-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 600px) {
+  .team-modal.activity-detail-registration-modal .activity-registration-job-option.ant-btn {
+    padding: 4px;
+  }
+  .team-modal.activity-detail-registration-modal .activity-registration-job-name {
+    font-size: 12px;
+  }
+}
+
+/* B-QC-20261023-01: the publishing form uses the accepted activity layout. */
+.team-create-main {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.team-create-section {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.team-create-section .ant-form-item {
+  margin-bottom: 0;
+}
+.team-create-information .activity-paper-body {
+  display: grid;
+  gap: 24px;
+}
+.team-create-time {
+  border-top: 1px solid var(--artzoo-line);
+  padding-top: 24px;
+}
+.team-create-columns,
+.team-create-seats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  min-width: 0;
+}
+.team-create-columns .ant-select {
+  width: 100%;
+}
+.team-create-preview.team-list {
+  display: block;
+  min-width: 0;
+}
+.team-create-preview.team-list .team-recruitment-card.ant-card .team-recruitment-body {
+  height: auto;
+  min-height: 0;
+  grid-template-rows: 28px 34px repeat(4, 22px) 112px 70px auto;
+  gap: 12px;
+}
+.team-create-submit {
+  border-top: 1px solid var(--artzoo-line);
+  padding-top: 20px;
+  margin-top: 4px;
+  display: grid;
+  gap: 12px;
+}
+/* Keep the edit border and texture on one real container, with no stretched
+   album paper pseudo-element outside its content bounds. */
+.ant-modal.team-modal.team-edit-modal .ant-modal-container {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 64px);
+  padding: 28px;
+  border: 1.5px solid var(--artzoo-primary);
+  border-radius: 16px 13px 15px 12px;
+  background: var(--artzoo-surface);
+  background-image: linear-gradient(#fffdf4cc, #fffdf4cc), var(--artzoo-bg-paper-texture);
+  background-size: auto, 385px;
+  box-shadow: none;
+}
+.team-edit-modal .ant-modal-header {
+  flex: none;
+  background: transparent;
+  margin-bottom: 24px;
+}
+.team-edit-modal .ant-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+@media (max-width: 600px) {
+  .team-create-columns,
+  .team-create-seats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ant-modal.team-modal.team-edit-modal .ant-modal-container {
+    padding: 20px;
+    max-height: calc(100dvh - 48px);
+  }
+}
+
+/* B-QC-20261024-03: static workspace columns and click disclosures. */
+.team-layout.team-workspace-layout {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+.team-workspace-column {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.team-workspace-layout > .activity-paper,
+.team-workspace-column > .activity-paper {
+  min-width: 0;
+  width: 100%;
+}
+.team-confirmed-session,
+.team-proposed-session {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--artzoo-line);
+  border-radius: 8px;
+}
+.team-session-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.team-session-heading > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.team-session-name,
+.team-feedback-disclosure {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.team-session-name > span {
+  overflow-wrap: anywhere;
+}
+.team-content-disclosure {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--artzoo-heading);
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+}
+.team-content-disclosure:hover {
+  color: var(--artzoo-primary);
+}
+.team-content-disclosure:focus-visible {
+  outline: 2px solid var(--artzoo-primary);
+  outline-offset: 2px;
+}
+.team-content-disclosure::before,
+.team-content-disclosure::after {
+  content: none !important;
+}
+.team-content-chevron {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid currentColor;
+  transition: transform 0.2s ease;
+}
+.team-content-chevron.is-expanded {
+  transform: rotate(180deg);
+}
+.team-workspace-layout .team-scheduled-members {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.team-session-member {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.team-session-job {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+.team-session-job img {
+  width: 24px;
+  height: 24px;
+}
+.team-workspace-layout .team-feedback-people {
+  grid-template-columns: minmax(0, 1fr);
+}
+.team-workspace-column .team-detail-roster.activity-registration-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.team-workspace-column .team-detail-roster .activity-registration-seat {
+  min-height: 112px;
+  padding: 10px 6px;
+  gap: 6px;
+}
+.team-workspace-column .team-detail-roster .activity-detail-seat-icon,
+.team-workspace-column .team-detail-roster .activity-detail-seat-icon img {
+  width: 40px;
+  height: 40px;
+}
+.team-workspace-column .team-detail-roster .team-detail-position,
+.team-workspace-column .team-detail-roster .team-seat-approved-name,
+.team-workspace-column .team-detail-roster .team-seat-empty-name {
+  font-size: 12px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.team-weekly-sessions {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+  min-width: 0;
+}
+.team-weekly-session {
+  padding: 16px;
+  border: 1px solid var(--artzoo-line);
+  border-radius: 8px;
+  min-width: 0;
+}
+.team-weekly-session > .team-section-heading {
+  margin-bottom: 12px;
+}
+.team-weekly-existing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  min-width: 0;
+}
+.team-weekly-existing-copy {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--artzoo-line);
+  border-radius: 6px;
+  background: var(--artzoo-fill);
+  color: var(--artzoo-secondary);
+  overflow-wrap: anywhere;
+}
+.team-weekly-existing-copy > span:last-child {
+  font-size: 12px;
+}
+.team-weekly-add.ant-btn {
+  flex: none;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 20px;
+}
+.team-weekly-new {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--artzoo-line);
+  min-width: 0;
+}
+.team-weekly-new > .team-section-heading {
+  margin-bottom: 12px;
+}
+.team-weekly-new .ant-form-item {
+  margin-bottom: 12px;
+}
+.team-weekly-session .team-date-time {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.team-weekly-session .team-date-time .ant-picker {
+  width: 100%;
+}
+@media (max-width: 1000px) {
+  .team-layout.team-workspace-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .team-weekly-session .team-date-time {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .team-confirmed-session,
+  .team-proposed-session,
+  .team-weekly-session {
+    padding: 12px;
+  }
+  .team-workspace-layout .team-scheduled-members {
+    gap: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .team-content-chevron {
+    transition: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .team-workspace-column .team-detail-roster.activity-registration-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* B-QC-20261025-02: one date action, roster disclosure and a responsive team selector. */
+.team-weekly-date-heading {
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+}
+.team-weekly-date-heading > h4 {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.team-maintain-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.team-maintain-heading > h4 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.teams-content > .activity-page-heading {
+  flex-wrap: wrap;
+}
+.team-current-team {
+  min-width: 0;
+  max-width: 100%;
+  margin-left: auto;
+}
+.team-current-team > span {
+  flex: none;
+}
+.team-current-team-select.ant-select {
+  width: 360px;
+  max-width: 100%;
+  min-width: 0;
+}
+/* AntD single-select and option-content ellipsis rules need scoped specificity. */
+.teams-content
+  .team-current-team-select.ant-select-single:not(.ant-select-customize)
+  .ant-select-content.team-current-team-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  overflow: visible;
+}
+.team-current-team-popup {
+  max-width: calc(100vw - 32px);
+}
+.team-current-team-popup.ant-select-dropdown .ant-select-item-option .ant-select-item-option-content {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  overflow: visible;
+}
+@media (max-width: 600px) {
+  .team-current-team {
+    width: 100%;
+  }
+  .team-current-team-select.ant-select {
+    flex: 1;
+    width: auto;
+  }
+}
+
+/* B-QC-20261025-03: retain the original form submit at the bottom action position. */
+.team-maintain-actions {
+  margin-top: 24px;
+}

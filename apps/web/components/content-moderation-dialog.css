@@ -1,0 +1,11 @@
+.content-moderation-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.content-moderation-actions .ant-btn.ant-btn-dangerous.ant-btn-variant-solid,
+.content-moderation-actions .ant-btn.ant-btn-dangerous.ant-btn-variant-solid:hover,
+.content-moderation-actions .ant-btn.ant-btn-dangerous.ant-btn-variant-solid:active {
+  box-shadow: none;
+}

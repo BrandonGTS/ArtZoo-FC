@@ -1,0 +1,179 @@
+.site-help-popover .ant-popover-container {
+  box-shadow: none;
+}
+.site-help-panel {
+  width: min(280px, calc(100vw - 104px));
+  max-height: calc(100svh - 120px);
+  overflow-y: auto;
+  font-family: var(--artzoo-body-font);
+}
+.site-help-quick-start.ant-btn {
+  text-align: left;
+}
+.site-help-guide .ant-collapse-header {
+  font-weight: 700;
+}
+.site-help-lessons {
+  display: grid;
+  gap: 14px;
+}
+.site-help-lesson {
+  min-width: 0;
+}
+.site-help-lesson-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.site-help-lesson-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  color: var(--artzoo-heading);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.site-help-lesson-title svg {
+  flex-shrink: 0;
+}
+.site-help-lesson-heading .ant-btn {
+  padding-inline: 6px;
+  font-size: 14px;
+}
+.site-help-lesson .ant-progress {
+  display: block;
+  margin: 4px 0 0;
+}
+.site-help-guest-note {
+  margin: 8px 0;
+  color: var(--artzoo-secondary);
+}
+.site-help-read-error p {
+  margin: 8px 0 0;
+}
+.site-help-tour.ant-tour {
+  width: min(400px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+}
+.site-help-tour-section {
+  width: min(400px, calc(100vw - 24px));
+  font-family: var(--artzoo-body-font);
+}
+.site-help-tour .ant-tour-description {
+  font-size: 16px;
+  line-height: 26px;
+}
+.site-help-tour .ant-tour-description p {
+  margin: 0;
+}
+.site-help-tour .ant-tour-description .site-help-guest-note {
+  margin-bottom: 8px;
+}
+.site-help-tour-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.site-help-panel .ant-btn:focus-visible,
+.site-help-guide .ant-collapse-header:focus-visible,
+.site-help-tour .ant-btn:focus-visible,
+.site-help-tour .ant-tour-close:focus-visible {
+  outline: 2px solid var(--artzoo-primary);
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .site-help-tour-actions .ant-btn {
+    padding-inline: 12px;
+  }
+  .site-help-lesson-title {
+    gap: 6px;
+  }
+}
+
+.site-help-loading-tour {
+  position: fixed;
+  z-index: 1001;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  width: min(320px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid var(--artzoo-line);
+  border-radius: 12px;
+  background: var(--artzoo-surface);
+  font-family: var(--artzoo-body-font);
+}
+.site-help-loading-tour p {
+  margin: 0 0 12px;
+}
+
+.site-help-lesson-heading .site-help-completed {
+  min-width: 72px;
+}
+.site-help-restart-label {
+  display: none;
+}
+.site-help-completed:is(:hover, :focus-visible):not(:disabled) .site-help-completed-label {
+  display: none;
+}
+.site-help-completed:is(:hover, :focus-visible):not(:disabled) .site-help-restart-label {
+  display: inline;
+}
+.site-help-panel .site-help-lesson-heading .site-help-completed.ant-btn {
+  box-shadow: none;
+}
+.site-help-panel
+  .site-help-lesson-heading
+  .site-help-completed.ant-btn:is(:hover, :focus-visible):not(:disabled) {
+  color: var(--site-help-restart-color);
+  border-color: var(--site-help-restart-bg);
+  background: var(--site-help-restart-bg);
+  box-shadow: none;
+}
+.site-help-panel .site-help-lesson-heading .site-help-completed.ant-btn:focus-visible {
+  outline-color: var(--site-help-restart-bg);
+}
+.site-help-panel .site-help-lesson-heading .site-help-completed.ant-btn:active:not(:disabled) {
+  color: var(--site-help-restart-color);
+  border-color: var(--site-help-restart-active-bg);
+  background: var(--site-help-restart-active-bg);
+  box-shadow: none;
+}
+.site-help-tour .site-help-tour-footer {
+  align-items: center;
+  gap: 12px;
+}
+.site-help-tour .ant-tour-indicators {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 26px;
+}
+.site-help-loading-close.ant-btn {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+}
+
+/* The card stays next to a measured target edge. No reserved page region. */
+.site-help-tour.ant-tour {
+  position: fixed !important;
+  left: var(--site-help-card-x, 12px) !important;
+  top: var(--site-help-card-y, 12px) !important;
+  bottom: auto !important;
+  right: auto !important;
+  transform: none !important;
+  width: var(--site-help-card-width, min(400px, calc(100vw - 24px))) !important;
+  visibility: hidden;
+}
+.site-help-tour.ant-tour[data-help-position='placed'] {
+  visibility: visible;
+}
+.site-help-tour-section {
+  width: 100%;
+  max-height: var(--site-help-card-max-height, calc(100svh - 24px));
+  overflow-y: auto;
+}

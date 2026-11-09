@@ -1,0 +1,11 @@
+.member-shares {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.member-shares-retry {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}

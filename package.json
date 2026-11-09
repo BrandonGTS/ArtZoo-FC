@@ -1,0 +1,30 @@
+{
+  "name": "artzoo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.9.1",
+  "engines": {
+    "node": ">=24.21.0 <25",
+    "pnpm": "12.9.1"
+  },
+  "scripts": {
+    "account:initialize-owner": "node --import ./scripts/auth-cli-loader.mjs ./apps/web/server/auth/owner-init-cli.mjs",
+    "db:generate": "pnpm --filter @artzoo/db generate",
+    "prepare:code": "node scripts/prepare-stickers.mjs && node scripts/prepare-static-assets.mjs && pnpm db:generate && pnpm --filter @artzoo/domain build && pnpm --filter @artzoo/db build && pnpm --filter @artzoo/media build && pnpm --filter @artzoo/web exec next typegen",
+    "build": "pnpm prepare:code && pnpm --filter @artzoo/worker build && pnpm --filter @artzoo/web build",
+    "lint": "pnpm --filter @artzoo/web lint",
+    "typecheck": "pnpm -r typecheck",
+    "dev:web": "pnpm --filter @artzoo/web dev",
+    "dev:worker": "pnpm --filter @artzoo/worker start",
+    "worker:smoke": "pnpm --filter @artzoo/worker smoke",
+    "secret:check": "python3 scripts/check-tracked-files.py",
+    "format": "prettier --write . --ignore-unknown",
+    "format:check": "prettier --check . --ignore-unknown"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3"
+  }
+}

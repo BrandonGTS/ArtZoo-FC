@@ -1,0 +1,92 @@
+/* B-QC-20261022-01: one shared indeterminate waiting cue. */
+.site-waiting {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  overflow: clip;
+  z-index: 2000;
+  height: 6px;
+  background: linear-gradient(#254b38 0 4px, transparent 4px);
+  pointer-events: none;
+}
+.site-waiting-indicator {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  width: 32%;
+  height: 2px;
+  background: #254b38;
+  visibility: hidden;
+}
+.site-waiting[data-active='true'] .site-waiting-indicator {
+  visibility: visible;
+  animation: site-waiting-travel 1.15s linear infinite;
+}
+@keyframes site-waiting-travel {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(312.5%);
+  }
+}
+.site-waiting-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Keep AntD loading/disabled behavior and original labels; remove only the spinner. */
+body .ant-btn .ant-btn-loading-icon,
+body .ant-input-search .anticon-loading,
+body .ant-select .anticon-loading,
+body .ant-spin .ant-spin-dot,
+body .ant-spin .ant-spin-text {
+  display: none !important;
+}
+/* Native and AntD disabled controls still block interaction; the forbidden cursor is visual only. */
+body
+  :is(
+    :disabled,
+    [aria-disabled='true'],
+    .ant-btn-loading,
+    .ant-select-disabled,
+    .ant-picker-disabled,
+    .ant-input-disabled,
+    .ant-input-affix-wrapper-disabled,
+    .ant-input-number-disabled,
+    .ant-checkbox-disabled,
+    .ant-radio-disabled,
+    .ant-upload-disabled,
+    .ant-pagination-disabled,
+    .ant-menu-item-disabled
+  ),
+body
+  :is(
+    :disabled,
+    [aria-disabled='true'],
+    .ant-btn-loading,
+    .ant-select-disabled,
+    .ant-picker-disabled,
+    .ant-input-disabled,
+    .ant-input-affix-wrapper-disabled,
+    .ant-input-number-disabled,
+    .ant-checkbox-disabled,
+    .ant-radio-disabled,
+    .ant-upload-disabled,
+    .ant-pagination-disabled,
+    .ant-menu-item-disabled
+  )
+  * {
+  cursor: default !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-waiting[data-active='true'] .site-waiting-indicator {
+    width: 100%;
+    animation: none;
+  }
+}

@@ -1,0 +1,14 @@
+.appeals-page {
+  gap: 32px;
+}
+.appeal-record-card {
+  position: relative;
+}
+.appeal-record-card .activity-copy-section > h2 {
+  padding-right: 44px;
+}
+.appeal-record-card .activity-copy-section > .operation-menu-entry {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+}

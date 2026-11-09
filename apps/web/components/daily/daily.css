@@ -1,0 +1,749 @@
+.daily-content {
+  display: grid;
+  gap: 24px;
+}
+.daily-page-heading,
+.daily-card-heading,
+.daily-card-footer,
+.daily-composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.daily-flow,
+.daily-composer {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.daily-card article {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.daily-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.daily-person a {
+  color: var(--artzoo-heading);
+  overflow-wrap: anywhere;
+}
+.daily-person time,
+.daily-meta {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--artzoo-secondary);
+}
+.daily-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.daily-actions .ant-btn-link,
+.daily-text-link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.daily-actions .ant-btn-link {
+  padding-inline: 0;
+}
+.daily-actions .ant-btn-link + .ant-btn-link {
+  margin-left: 16px;
+}
+.daily-text-link {
+  color: var(--artzoo-primary);
+}
+.daily-post-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  min-width: 0;
+}
+.daily-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+  line-height: 26px;
+  min-width: 0;
+  flex: 1;
+}
+.daily-images {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  max-width: 440px;
+}
+.daily-images .ant-image {
+  width: 132px;
+}
+.daily-images .ant-image-img {
+  height: 112px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.daily-edit-media {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.daily-edit-media > div {
+  display: grid;
+  gap: 8px;
+}
+.daily-mention {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.daily-member-search {
+  width: 280px;
+  max-width: 100%;
+}
+.daily-comments {
+  border-top: 1px solid var(--artzoo-line);
+  padding-top: 16px;
+  display: grid;
+  gap: 16px;
+}
+.daily-comment {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.daily-comment-content {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.daily-reply {
+  margin-left: 44px;
+}
+.daily-comment-form {
+  border-top: 1px solid var(--artzoo-line);
+  padding-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+.daily-modal-actions {
+  justify-content: flex-end;
+}
+.daily-error {
+  color: #a34335;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.daily-preview {
+  min-width: 0;
+}
+.daily-preview .daily-post-content {
+  gap: 16px;
+}
+.home-main-content .daily-preview .daily-post-content > .daily-body {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 78px;
+  min-height: 78px;
+  max-height: 78px;
+  max-width: 100%;
+}
+.daily-preview .daily-images {
+  max-width: 132px;
+}
+.daily-preview .daily-images .ant-image:not(:first-child) {
+  display: none;
+}
+@media (max-width: 800px) {
+  .daily-post-content {
+    flex-direction: column;
+  }
+  .daily-images {
+    justify-content: flex-start;
+    max-width: 100%;
+  }
+  .daily-card-heading {
+    align-items: flex-start;
+  }
+  .daily-publisher .daily-composer-footer {
+    align-items: flex-start;
+  }
+}
+@media (max-width: 600px) {
+  .daily-images .ant-image {
+    width: calc((100vw - 132px) / 2);
+    max-width: 132px;
+  }
+  .daily-reply {
+    margin-left: 24px;
+  }
+  .daily-card-heading > .daily-actions {
+    margin-left: auto;
+  }
+  .daily-member-search {
+    width: 220px;
+  }
+}
+
+.daily-composer-tools {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.daily-modal-actions .ant-btn.ant-btn-dangerous.ant-btn-variant-solid,
+.daily-modal-actions .ant-btn.ant-btn-dangerous.ant-btn-variant-solid:hover,
+.daily-modal-actions .ant-btn.ant-btn-dangerous.ant-btn-variant-solid:active {
+  box-shadow: none;
+}
+
+/* Keep the accepted homepage paper footprint after removing the text CTA. */
+.home-main-content .daily-preview .home-card-surface .daily-card article {
+  padding-bottom: 38px;
+}
+
+/* Homepage daily stream: bounded post preview, expandable inline replies. */
+.daily-home-card {
+  min-width: 0;
+}
+.daily-home-card .member-paper-body {
+  padding: 24px;
+}
+.home-main-content .daily-home-preview .home-card-surface .daily-card article {
+  padding-bottom: 0;
+}
+.daily-home-card article {
+  gap: 12px;
+  min-height: 152px;
+}
+.daily-home-heading {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.daily-home-author {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.daily-home-author > a {
+  width: fit-content;
+  color: var(--artzoo-secondary);
+}
+.daily-home-author time {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--artzoo-secondary);
+}
+.daily-home-author-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.daily-home-author-line > a {
+  color: var(--artzoo-heading);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+}
+.daily-home-author-line .daily-meta {
+  overflow-wrap: anywhere;
+}
+.daily-home-content {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-left: 76px;
+}
+.home-main-content .daily-home-preview .daily-home-body {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: auto;
+  min-height: 0;
+  max-height: 78px;
+  max-width: 100%;
+}
+.home-main-content .daily-home-preview .daily-home-card-with-media .daily-home-body {
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  max-height: 52px;
+}
+.daily-home-images {
+  display: flex;
+  gap: 8px;
+  max-height: 144px;
+  overflow: hidden;
+  min-width: 0;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.daily-home-images .ant-image {
+  flex: 0 1 144px;
+  min-width: 0;
+  max-width: 144px;
+}
+.daily-home-images .ant-image-img {
+  height: 144px;
+  max-width: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.daily-home-images .ant-image:nth-child(n + 4) {
+  display: none;
+}
+.daily-home-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+.daily-home-actions .ant-btn {
+  color: var(--artzoo-secondary);
+}
+.daily-home-actions .ant-btn[aria-pressed='true'] {
+  color: var(--artzoo-primary);
+}
+.daily-home-reply {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 4px;
+  margin-left: 12px;
+  min-width: 0;
+}
+.daily-home-reply[hidden] {
+  display: none;
+}
+.daily-home-reply-content {
+  flex: 1;
+  min-width: 0;
+}
+.daily-home-reply-placeholder.ant-btn {
+  justify-content: flex-start;
+  text-align: left;
+  color: var(--artzoo-secondary);
+}
+.daily-home-reply .daily-comment-form {
+  border-top: 0;
+  padding-top: 0;
+}
+.daily-home-reply .daily-composer-footer {
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+.daily-home-reply .daily-composer-tools {
+  gap: 8px;
+}
+.daily-home-reply .daily-mention {
+  max-width: 100%;
+}
+.daily-home-reply .daily-member-search {
+  width: 220px;
+}
+.daily-home-reply .ant-upload-wrapper {
+  min-width: 0;
+  max-width: 100%;
+}
+.daily-home-reply .ant-upload-list-item-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.daily-emoji-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 40px);
+  gap: 4px;
+}
+.daily-comment-images {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.daily-comment-images .ant-image {
+  width: 100px;
+}
+.daily-comment-images .ant-image-img {
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.daily-mention-popup .ant-select-item-option-content {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .daily-home-card .member-paper-body {
+    padding: 20px;
+  }
+  .daily-home-heading {
+    gap: 12px;
+  }
+  .daily-home-content {
+    margin-left: 0;
+  }
+  .daily-home-author-line {
+    gap: 4px 10px;
+  }
+  .daily-home-reply {
+    margin-left: 0;
+    gap: 8px;
+  }
+  .daily-home-reply .daily-composer-footer {
+    flex-wrap: wrap;
+  }
+  .daily-home-reply .daily-composer-footer > .ant-btn {
+    margin-left: auto;
+  }
+  .daily-home-images .ant-image {
+    flex-basis: 112px;
+  }
+  .daily-home-images .ant-image-img {
+    height: 128px;
+  }
+  .daily-home-images {
+    max-height: 128px;
+  }
+}
+
+/* Daily homepage QC: keep expanded discussion inside its original paper. */
+.daily-home-actions .ant-btn[aria-expanded='true'] {
+  color: var(--artzoo-primary);
+}
+.daily-action-icon-detail {
+  stroke: var(--artzoo-paper, #fff);
+}
+.daily-home-location {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.daily-home-location svg {
+  flex: none;
+}
+.daily-home-comments {
+  border-top: 0;
+  padding-top: 0;
+  gap: 16px;
+}
+.daily-comment-list {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.daily-home-comments .daily-comment-list:not(:empty) {
+  border-top: 1px solid var(--artzoo-line);
+  padding-top: 24px;
+  margin-top: 8px;
+}
+.daily-home-comments .daily-comment {
+  gap: 16px;
+  padding: 0 12px;
+}
+.daily-home-comments .daily-reply {
+  margin-left: 56px;
+}
+.daily-home-comments .daily-person > a {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 26px;
+}
+.daily-home-comments .daily-person time {
+  flex-basis: 100%;
+}
+.daily-home-comments .daily-comment .daily-actions {
+  justify-content: flex-end;
+}
+.daily-composer-icon-tools .ant-btn {
+  color: var(--artzoo-secondary);
+}
+.daily-composer-icon-tools .ant-btn-icon {
+  display: inline-flex;
+}
+@media (max-width: 600px) {
+  .daily-home-comments .daily-comment {
+    padding-inline: 0;
+    gap: 12px;
+  }
+  .daily-home-comments .daily-reply {
+    margin-left: 24px;
+  }
+  .daily-home-comments .daily-person {
+    gap: 4px 8px;
+  }
+}
+
+.daily-delete-entry {
+  flex: none;
+  align-self: flex-start;
+  margin-left: auto;
+}
+.daily-delete-trigger.ant-btn {
+  width: 32px;
+  height: 32px;
+  color: var(--artzoo-secondary);
+}
+.daily-delete-chevron {
+  display: block;
+  width: 9px;
+  height: 9px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+.daily-comment-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.daily-comment-heading > .daily-person {
+  flex: 1;
+  min-width: 0;
+}
+.daily-inline-reply {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.daily-inline-reply [hidden] {
+  display: none;
+}
+.daily-home-comments .daily-inline-reply .daily-comment-form {
+  border-top: 0;
+  padding-top: 0;
+}
+.daily-inline-reply .daily-composer-footer {
+  gap: 12px;
+  align-items: flex-start;
+}
+.daily-inline-reply .daily-mention {
+  max-width: 100%;
+}
+.daily-inline-reply .daily-member-search {
+  width: 220px;
+  max-width: 100%;
+}
+.daily-inline-reply .ant-upload-list-item-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Keep attachments outside the compact icon/submit row, using Upload's native list. */
+.daily-comment-form .daily-composer-footer-compact {
+  display: grid;
+  grid-template-columns: 32px 32px 32px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+.daily-composer-footer-compact .daily-composer-tools,
+.daily-composer-footer-compact .daily-comment-upload,
+.daily-composer-footer-compact .daily-mention {
+  display: contents;
+}
+.daily-composer-footer-compact .daily-comment-upload-trigger {
+  grid-column: 1;
+  grid-row: 1;
+}
+.daily-composer-footer-compact .daily-mention > .ant-btn {
+  grid-column: 2;
+  grid-row: 1;
+}
+.daily-composer-footer-compact .daily-composer-tools > .ant-btn {
+  grid-column: 3;
+  grid-row: 1;
+}
+.daily-composer-footer-compact > .ant-btn {
+  grid-column: 5;
+  grid-row: 1;
+  margin-left: 0;
+}
+.daily-composer-footer-compact .daily-comment-file-list,
+.daily-composer-footer-compact .daily-member-search,
+.daily-composer-footer-compact .daily-mention > [role='alert'] {
+  grid-column: 1 / -1;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+.daily-composer-footer-compact .daily-comment-file-list .ant-upload-list-item {
+  height: auto;
+  min-height: 22px;
+}
+.daily-composer-footer-compact .daily-comment-file-list .ant-upload-list-item-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Size the toolbar to its own editor: nested replies can be narrow on any viewport. */
+.daily-home-comments .daily-comment-form {
+  container: daily-reply-composer / inline-size;
+}
+.daily-comment-form .daily-composer-footer-compact {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+@container daily-reply-composer (max-width:225px) {
+  .daily-comment-form .daily-composer-footer-compact {
+    grid-template-columns: repeat(3, minmax(24px, 28px)) minmax(0, 1fr) auto;
+    column-gap: 4px;
+  }
+  .daily-composer-footer-compact > .ant-btn {
+    padding-inline: 8px;
+    gap: 4px;
+  }
+  .daily-composer-footer-compact .daily-comment-upload-trigger .ant-btn,
+  .daily-composer-footer-compact .daily-mention > .ant-btn,
+  .daily-composer-footer-compact .daily-composer-tools > .ant-btn {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 24px;
+    max-width: 28px;
+    padding-inline: 0;
+  }
+}
+@container daily-reply-composer (max-width:197px) {
+  .daily-composer-footer-compact > .ant-btn {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: end;
+  }
+}
+
+/* The feed shares accepted home interactions, while showing the complete post. */
+.daily-feed-card .daily-home-images {
+  flex-wrap: wrap;
+  max-height: none;
+  overflow: visible;
+}
+.daily-feed-card .daily-home-images .ant-image:nth-child(n + 4) {
+  display: block;
+}
+.daily-feed-card .daily-home-images .ant-image-img {
+  height: 144px;
+}
+.daily-feed-card .daily-home-body {
+  display: block;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+.daily-feed-composer .daily-composer-footer-compact {
+  display: grid;
+  grid-template-columns: 32px 32px 32px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+}
+.daily-feed-composer .daily-composer-cancel {
+  grid-column: 4;
+  grid-row: 1;
+  justify-self: end;
+}
+.daily-page-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 24px;
+}
+.daily-page-navigation > span {
+  font: 700 24px/40px var(--artzoo-body-font);
+  color: var(--artzoo-text);
+}
+.daily-content .daily-page-navigation .ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: 1;
+  background: transparent;
+  color: var(--artzoo-text);
+}
+.daily-page-navigation .ant-btn,
+.daily-page-navigation .ant-btn:is(:hover, :active) {
+  border: 0 solid transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: none !important;
+}
+.daily-page-navigation .ant-btn:not(:focus-visible) {
+  outline: none !important;
+}
+.daily-page-navigation .ant-btn::before,
+.daily-page-navigation .ant-btn::after {
+  content: none !important;
+  display: none !important;
+}
+.daily-page-navigation .ant-btn:is(:hover, :active):not(:disabled) {
+  color: var(--artzoo-primary);
+}
+.daily-page-navigation .ant-btn:disabled {
+  color: var(--artzoo-secondary);
+  opacity: 0.35;
+}
+.daily-page-navigation .ant-btn .ant-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 600px) {
+  .daily-feed-card .daily-home-images {
+    max-height: none;
+  }
+  .daily-feed-card .daily-home-images .ant-image-img {
+    height: 128px;
+  }
+  .daily-page-navigation {
+    gap: 18px;
+  }
+}
+
+/* Only the daily feed opts in to motion; blank paper keeps its previous non-link behavior. */
+.daily-flow .home-card-surface {
+  cursor: default;
+}
+
+/* Detail reuses feed controls and complete content without mounting card motion. */
+.daily-detail-surface {
+  min-width: 0;
+}
+.daily-detail-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

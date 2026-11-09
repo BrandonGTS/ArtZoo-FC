@@ -1,0 +1,32 @@
+.home-card-surface {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+}
+.home-card-motion {
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  transform-origin: center;
+}
+.home-card-motion > .ant-card {
+  min-width: 0;
+  width: 100%;
+  flex: 1;
+}
+.home-card-surface a[data-home-card-link] {
+  text-decoration: none;
+}
+.home-card-surface:has(a[data-home-card-link]:focus-visible) {
+  outline: 2px solid var(--artzoo-primary);
+  outline-offset: 5px;
+  border-radius: 14px;
+}
+@media (prefers-reduced-motion: reduce), (hover: none), (pointer: coarse) {
+  .home-card-surface .home-card-motion {
+    transform: none !important;
+  }
+}

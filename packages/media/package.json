@@ -1,0 +1,70 @@
+{
+  "name": "@artzoo/media",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./official": {
+      "types": "./dist/official-images.d.ts",
+      "import": "./dist/official-images.js"
+    },
+    "./photo-contract": {
+      "types": "./dist/photo-contract.d.ts",
+      "import": "./dist/photo-contract.js"
+    },
+    "./photo-processor": {
+      "types": "./dist/photo-processor.d.ts",
+      "import": "./dist/photo-processor.js"
+    },
+    "./photo-storage": {
+      "types": "./dist/photo-storage.d.ts",
+      "import": "./dist/photo-storage.js"
+    },
+    "./stock-retirement": {
+      "types": "./dist/stock-retirement.d.ts",
+      "import": "./dist/stock-retirement.js"
+    },
+    "./daily-orphan-maintenance": {
+      "types": "./dist/daily-orphan-maintenance.d.ts",
+      "import": "./dist/daily-orphan-maintenance.js"
+    },
+    "./wish-orphan-maintenance": {
+      "types": "./dist/wish-orphan-maintenance.d.ts",
+      "import": "./dist/wish-orphan-maintenance.js"
+    },
+    "./lottery-orphan-maintenance": {
+      "types": "./dist/lottery-orphan-maintenance.d.ts",
+      "import": "./dist/lottery-orphan-maintenance.js"
+    },
+    "./knowledge-orphan-maintenance": {
+      "types": "./dist/knowledge-orphan-maintenance.d.ts",
+      "import": "./dist/knowledge-orphan-maintenance.js"
+    },
+    "./album-comment-orphan-maintenance": {
+      "types": "./dist/album-comment-orphan-maintenance.d.ts",
+      "import": "./dist/album-comment-orphan-maintenance.js"
+    },
+    "./cos-object-storage": {
+      "types": "./dist/cos-object-storage.d.ts",
+      "import": "./dist/cos-object-storage.js"
+    },
+    "./cos-routed-storage": {
+      "types": "./dist/cos-routed-storage.d.ts",
+      "import": "./dist/cos-routed-storage.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@artzoo/db": "workspace:*",
+    "@artzoo/domain": "workspace:*",
+    "cos-nodejs-sdk-v5": "3.0.0",
+    "sharp": "0.35.5"
+  }
+}

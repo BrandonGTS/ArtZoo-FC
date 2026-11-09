@@ -1,0 +1,88 @@
+.page {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  min-height: 75vh;
+  width: min(100%, 960px);
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 64px) 24px;
+  color: var(--artzoo-text, #24372b);
+}
+.paper {
+  isolation: isolate;
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  padding: clamp(24px, 4vw, 40px);
+  border-radius: 14px;
+  background: var(--artzoo-surface, #fffdf4);
+  box-shadow: none;
+}
+/* Same nine-slice outline and scale as the approved paper-daily/paper-activity cards. */
+.paper::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: -5px -11px -17px;
+  border: solid transparent;
+  border-width: 30px 30px 48px;
+  border-image: url('/_next/image?url=%2Fartzoo%2Fdaily-paper.png&w=1920&q=90') 60 60 96 60 / 30px 30px 48px
+    stretch;
+}
+.paper :global(.page-heading) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.paper :global(.page-heading h1) {
+  margin: 0;
+  font-size: clamp(30px, 5vw, 48px);
+  line-height: 1.2;
+  color: var(--artzoo-heading, #254b38);
+  overflow-wrap: anywhere;
+}
+.message {
+  margin: 24px 0;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.primary,
+.link {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px solid var(--artzoo-line, #c5c9b1);
+  border-radius: 12px;
+  font: inherit;
+  line-height: 1.5;
+  text-decoration: none;
+  cursor: pointer;
+}
+.primary {
+  color: #fff;
+  background: var(--artzoo-primary, #436b4e);
+  border-color: var(--artzoo-primary, #436b4e);
+}
+.link {
+  color: var(--artzoo-primary, #436b4e);
+  background: var(--artzoo-surface, #fffdf4);
+}
+.primary:hover,
+.link:hover {
+  border-color: var(--artzoo-heading, #254b38);
+}
+.primary:focus-visible,
+.link:focus-visible {
+  outline: 2px solid var(--artzoo-primary, #436b4e);
+  outline-offset: 3px;
+}

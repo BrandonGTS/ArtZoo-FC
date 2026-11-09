@@ -1,0 +1,39 @@
+node_modules/
+.pnpm-store/
+.next/
+dist/
+out/
+*.tsbuildinfo
+next-env.d.ts
+packages/db/src/generated/
+.env
+.env.*
+!.env.example
+.local/
+secrets/
+*.log
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+.DS_Store
+
+# Local execution evidence; preserve on disk, summarize verified results in docs.
+tests/account-invitation/game-server-backend.tap
+tests/account-invitation/postgres-results.json
+tests/account-invitation/postgres-game-server-first-results.json
+tests/account-invitation/postgres-game-server-results.json
+
+# Phase 3 local test evidence (test sources remain versioned).
+tests/member-profile/*.tap
+
+# Local activity test output; keep source tests versioned.
+tests/single-activity/*.tap
+
+# Python-only plugin test bytecode; never a deliverable
+/plugins/astrbot_plugin_artzoo/__pycache__/
+/tests/qq-official-plugin/__pycache__/
+
+# Unified test output patterns; tracked artifacts are retained pending review.
+tests/**/*.tap
+tests/**/*results*.json

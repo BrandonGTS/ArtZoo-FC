@@ -1,0 +1,36 @@
+@media (max-width: 700px) {
+  .photo-preview-layout {
+    grid-template-columns: 1fr;
+  }
+  .photo-preview-layout > .album-comments {
+    border-left: 0;
+    border-top: 1px solid #78816a;
+    padding-left: 0;
+    padding-top: 20px;
+  }
+  .photo-preview-modal {
+    top: 20px;
+  }
+  .album-admin-card {
+    flex-wrap: wrap;
+  }
+}
+
+/* Original Figma closed paper assets include their own irregular border and soft shadow. */
+.album-card {
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  padding: 16px;
+}
+.album-card::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+  inset: -5px -11px -17px;
+  background: var(--artzoo-bg-album-card) center/100% 100% no-repeat;
+}

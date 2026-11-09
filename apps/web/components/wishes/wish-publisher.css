@@ -1,0 +1,39 @@
+/* Publishing uses the formal-activity form proportions; actual WishCard stays unchanged. */
+.wish-publisher-content .wish-publisher-fields .wish-paper-body {
+  display: grid;
+  gap: 24px;
+}
+.wish-publisher-content .activity-form-section {
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 16px;
+}
+.wish-publisher-content .activity-publisher-section-title {
+  margin: 0;
+  border-bottom: 0;
+}
+.wish-publisher-content .wish-publisher-time {
+  border-top: 1px solid var(--artzoo-line);
+  padding-top: 24px;
+}
+.wish-publisher-content .wish-publisher-fields .ant-form-item:last-child {
+  margin-bottom: 0;
+}
+.wish-publisher-content .wish-publisher-aside {
+  min-width: 0;
+}
+.wish-publisher-content .wish-publisher-preview .wish-card-title {
+  height: 68px;
+  min-height: 68px;
+}
+.wish-publisher-content .wish-publisher-preview .wish-card-title h3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  overflow: hidden;
+}
+.wish-publisher-content .wish-publisher-preview .activity-publisher-submit {
+  margin-top: 4px;
+}

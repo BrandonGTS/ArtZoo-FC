@@ -1,0 +1,9 @@
+name: astrbot_plugin_artzoo
+display_name: ArtZoo QQ Official Bridge
+desc: 默认关闭的官方 QQ 确定性绑定、活动报名与回执桥接
+version: v0.3.6
+author: ArtZoo
+repo: https://github.com/BrandonGTS/artzoo-next
+support_platforms:
+  - qq_official
+astrbot_version: '>=4.29.3,<4.30.0'

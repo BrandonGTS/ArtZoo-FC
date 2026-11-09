@@ -1,0 +1,798 @@
+@import './static-assets.css';
+
+:root {
+  color-scheme: light;
+  --artzoo-page: #faf2df;
+  --artzoo-heading: #254b38;
+  --artzoo-text: #24372b;
+  --artzoo-secondary: #58614f;
+  --artzoo-primary: #436b4e;
+  --artzoo-line: #c5c9b1;
+  --artzoo-surface: #fffdf4;
+  --artzoo-fill: #e4ebd8;
+  --artzoo-body-font: 'Patrick Hand', 'Xiaolai', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+/* Keep the shared shell's available width stable between short and long routes. */
+html {
+  scrollbar-gutter: stable;
+}
+/* Preserve stable content width without Chromium's unpaintable empty gutter. */
+html.site-scrollbar-compensated {
+  scrollbar-gutter: auto;
+}
+html.site-scrollbar-compensated body {
+  padding-inline-end: max(0px, calc(var(--site-native-scrollbar-width, 0px) - (100vw - 100%))) !important;
+}
+
+@supports (scrollbar-gutter: stable) {
+  /* rc-component/portal locks overflow and subtracts the scrollbar from body.
+     The root gutter already reserves it; only suppress the duplicate width
+     compensation, retaining AntD's overflow lock and multi-modal lifecycle. */
+  html body {
+    width: auto !important;
+  }
+}
+body {
+  margin: 0;
+  background: var(--artzoo-page);
+  color: var(--artzoo-text);
+  font-family: var(--artzoo-body-font);
+  font-size: 16px;
+  line-height: 26px;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+p {
+  margin: 0;
+  font-weight: 400;
+}
+h3 {
+  font-size: 24px;
+  line-height: 34px;
+}
+h4 {
+  font-size: 20px;
+  line-height: 30px;
+}
+h5 {
+  font-size: 16px;
+  line-height: 26px;
+}
+a {
+  color: var(--artzoo-primary);
+}
+img {
+  max-width: 100%;
+}
+:focus-visible {
+  outline: 2px solid var(--artzoo-primary);
+  outline-offset: 3px;
+}
+.auxiliary {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--artzoo-secondary);
+}
+
+.artzoo-site {
+  isolation: isolate;
+  min-height: 100svh;
+}
+.site-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--artzoo-page);
+}
+.backdrop-paper,
+.backdrop-animals {
+  position: absolute;
+  inset: 0;
+  background-position: left top;
+  background-repeat: repeat;
+}
+.backdrop-paper {
+  background-image: var(--artzoo-bg-paper-optimized);
+  background-size: 615px 615px;
+  mix-blend-mode: luminosity;
+  opacity: 0.25;
+}
+.backdrop-animals {
+  background-image: url('/_next/image?url=%2Fartzoo%2Fanimal-v5.png&w=1080&q=75');
+  background-size: 719px 719px;
+  opacity: 0.15;
+}
+.book-cart {
+  position: absolute;
+  width: min(30vw, 432px);
+  height: auto;
+  right: max(40px, calc((100vw - 1440px) / 2 + 40px));
+  bottom: 0;
+  opacity: 0.75;
+}
+
+.site-header-wrap {
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: 16px 40px;
+}
+.site-header {
+  --logo-width: 228px;
+  --logo-scale: 1;
+  display: grid;
+  grid-template-columns: var(--logo-width) minmax(0, 1fr) auto;
+  grid-template-rows: 70px;
+  column-gap: 32px;
+  align-items: center;
+  height: 72px;
+  padding: 0 24px;
+  background: var(--artzoo-surface);
+  border-bottom: 2px solid var(--artzoo-line);
+}
+.site-logo {
+  display: block;
+  position: relative;
+  width: var(--logo-width);
+  height: calc(74px * var(--logo-scale));
+  align-self: start;
+  top: -2px;
+}
+.site-logo-art {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: calc(-3px * var(--logo-scale));
+  width: 228px;
+  height: 74px;
+  transform: scale(var(--logo-scale));
+  transform-origin: top left;
+  background: var(--artzoo-heading);
+  mask-image: url('/artzoo/logo-mask.png');
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: 228px 74px;
+}
+.site-navigation {
+  min-width: 0;
+  height: 46px;
+  align-self: start;
+  margin-top: 12px;
+}
+.main-menu.ant-menu-horizontal {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  width: 764px;
+  min-width: 764px;
+  border-bottom: 0;
+  background: transparent;
+  font-size: 18px;
+  line-height: 46px;
+}
+.site-header .main-menu.ant-menu-horizontal > .ant-menu-item,
+.site-header .main-menu.ant-menu-horizontal > .ant-menu-submenu {
+  flex: none;
+  margin: 0;
+  padding-inline: 16px;
+  border-radius: 12px;
+}
+.site-header .main-menu.ant-menu-horizontal::before,
+.site-header .main-menu.ant-menu-horizontal::after {
+  display: none;
+  content: none;
+}
+.main-menu.ant-menu-horizontal > .ant-menu-item {
+  height: 46px;
+}
+.site-header .main-menu.ant-menu-horizontal > .ant-menu-submenu {
+  padding-inline: 0;
+}
+.site-header .main-menu.ant-menu-horizontal .ant-menu-submenu-title {
+  padding: 0 16px;
+}
+.site-header .main-menu.ant-menu-horizontal > .ant-menu-item::after,
+.site-header .main-menu.ant-menu-horizontal > .ant-menu-submenu::after {
+  inset-inline: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  bottom: 0;
+}
+.site-header .main-menu.ant-menu-horizontal > .ant-menu-submenu .ant-menu-submenu-arrow {
+  display: none;
+}
+.nav-submenu-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  vertical-align: top;
+}
+.local-icon {
+  flex-shrink: 0;
+  object-fit: contain;
+}
+.main-menu .ant-menu-submenu-title .ant-menu-title-content {
+  display: inline;
+}
+.main-menu .ant-menu-title-content {
+  white-space: nowrap;
+}
+/* AntD 6.6.5 does not apply subMenu.list semantics to the popup ul. */
+.navigation-popup.ant-menu-submenu-popup .ant-menu.ant-menu-sub.ant-menu-vertical {
+  width: 208px;
+  min-width: 208px;
+  box-sizing: border-box;
+  padding: 7px;
+  border: 1px solid #78816a;
+  border-radius: 12px;
+  background: var(--artzoo-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.navigation-popup.ant-menu-submenu-popup .ant-menu.ant-menu-sub.ant-menu-vertical::before,
+.navigation-popup.ant-menu-submenu-popup .ant-menu.ant-menu-sub.ant-menu-vertical::after {
+  display: none;
+  content: none;
+}
+.personal-entry {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.message-entry.ant-btn {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
+}
+.avatar-trigger.ant-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+}
+.visitor-avatar.ant-avatar {
+  background: var(--artzoo-fill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.personal-panel {
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  padding: 16px;
+  background: var(--artzoo-surface);
+  border: 1px solid #78816a;
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(37, 75, 56, 0.18);
+}
+.personal-identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.check-in-preview {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--artzoo-fill);
+  display: grid;
+  gap: 8px;
+}
+.check-in-preview p {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--artzoo-secondary);
+}
+.personal-panel .ant-dropdown-menu-item-divider {
+  margin: 0;
+  background-color: var(--artzoo-line);
+}
+.personal-panel .ant-dropdown-menu-item-danger .ant-dropdown-menu-title-content {
+  color: #b8493a;
+}
+.personal-panel
+  .personal-menu-list.ant-dropdown-menu
+  .ant-dropdown-menu-item-danger:is(:hover, :active, .ant-dropdown-menu-item-active) {
+  background-color: #a34335;
+  color: var(--artzoo-surface);
+}
+.personal-panel
+  .ant-dropdown-menu-item-danger:is(:hover, :active, .ant-dropdown-menu-item-active)
+  .ant-dropdown-menu-title-content {
+  color: var(--artzoo-surface);
+}
+.feature-notice p {
+  overflow-wrap: anywhere;
+}
+
+.home-content {
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: 24px 64px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+.page-heading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+}
+.page-heading h1,
+.page-heading h2 {
+  font-family: 'DymonShouXieTi', sans-serif;
+  color: var(--artzoo-heading);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+  paint-order: stroke fill;
+  -webkit-text-stroke-color: white;
+}
+.heading-1 {
+  gap: 12px;
+}
+.heading-1 h1 {
+  font-size: 48px;
+  line-height: 50px;
+  -webkit-text-stroke-width: 10px;
+}
+.heading-2 h2 {
+  font-size: 32px;
+  line-height: 42px;
+  -webkit-text-stroke-width: 8px;
+}
+.heading-2 {
+  position: relative;
+  display: block;
+  padding-left: 50px;
+}
+.heading-2 .food-decoration {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.home-main-content .heading-2 h2 {
+  line-height: 34px;
+}
+.food-decoration {
+  display: block;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  background-repeat: no-repeat;
+}
+.food-burger {
+  flex-basis: 48px;
+  width: 48px;
+  height: 48px;
+  background-image: url('/_next/image?url=%2Fartzoo%2Ffood-title.png&w=384&q=75');
+  background-size: 149.3376px 99.5568px;
+  background-position: -4.488px -5.9952px;
+}
+.food-tomato {
+  background-image: url('/_next/image?url=%2Fartzoo%2Ffood-title.png&w=384&q=75');
+  background-size: 147.692px 98.464px;
+  background-position: -103.556px -11.396px;
+}
+.food-cheese {
+  background-image: url('/_next/image?url=%2Fartzoo%2Ffood-title.png&w=384&q=75');
+  background-size: 139.272px 92.848px;
+  background-position: -5.568px -46.916px;
+}
+.food-patty {
+  background-image: url('/_next/image?url=%2Fartzoo%2Fpatty-title.png&w=128&q=75');
+  background-size: 46.296px 46.296px;
+  background-position: -3.148px -2.944px;
+}
+.home-section {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 16px;
+}
+.activity-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.activity-grid > .home-activities-state {
+  grid-column: 1 / -1;
+}
+.home-secondary {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  align-items: start;
+  gap: 24px;
+}
+.paper-panel.ant-card {
+  isolation: isolate;
+  position: relative;
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 14px;
+}
+.paper-panel::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: -5px -11px -17px;
+  border-style: solid;
+  border-color: transparent;
+  border-width: 30px 30px 48px;
+  border-image-slice: 60 60 96 60;
+  border-image-width: 30px 30px 48px;
+  border-image-repeat: stretch;
+}
+.paper-panel::after {
+  content: '';
+  position: absolute;
+  z-index: -2;
+  pointer-events: none;
+  inset: 2px;
+  border-radius: 14px;
+  background-color: #fdf7e5;
+  background-image:
+    linear-gradient(rgba(253, 247, 229, 0.8), rgba(253, 247, 229, 0.8)), var(--artzoo-bg-paper-optimized);
+  background-repeat: repeat;
+  background-size:
+    auto,
+    385.1px 385.1px;
+  background-blend-mode: normal, luminosity;
+}
+/* Activity cards reuse the approved daily outline and its shared nine-slice scale.
+   Fixed slice widths keep stroke thickness and normal edge variation at 1/2
+   source size, including on tall calendars; only the edge length stretches. */
+.paper-activity::before,
+.paper-daily::before {
+  border-image-source: url('/_next/image?url=%2Fartzoo%2Fdaily-paper.png&w=1920&q=90');
+}
+.paper-wish::before {
+  border-image-source: url('/_next/image?url=%2Fartzoo%2Fwish-paper.png&w=1920&q=90');
+}
+.paper-panel-body {
+  min-height: 186px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.paper-activity .paper-panel-body {
+  min-height: 218px;
+}
+.paper-wish .paper-panel-body {
+  min-height: 186px;
+  padding: 16px;
+}
+.section-empty.ant-empty {
+  margin: 0;
+  width: 100%;
+  color: var(--artzoo-secondary);
+}
+.section-empty-image {
+  height: 40px;
+  margin-bottom: 8px;
+}
+.section-empty .section-empty-description {
+  color: var(--artzoo-secondary);
+  line-height: 26px;
+  overflow-wrap: anywhere;
+}
+
+/* The existing admin skeleton remains a separate development utility. */
+.shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 52px 28px;
+}
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 46px;
+}
+.brand {
+  font-size: 18px;
+}
+.hero {
+  margin-bottom: 32px;
+}
+.hero h1 {
+  font-size: 48px;
+  line-height: 50px;
+  margin-bottom: 16px;
+}
+.hero p {
+  color: var(--artzoo-secondary);
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.footer {
+  color: var(--artzoo-secondary);
+  font-size: 14px;
+  margin-top: 40px;
+}
+
+@media (max-width: 1339px) {
+  .home-content {
+    padding-inline: 48px;
+  }
+  .site-header {
+    column-gap: 16px;
+  }
+  .main-menu.ant-menu-horizontal {
+    gap: 8px;
+    width: 684px;
+    min-width: 684px;
+  }
+  .site-header .main-menu.ant-menu-horizontal > .ant-menu-item {
+    padding-inline: 12px;
+  }
+  .site-header .main-menu.ant-menu-horizontal .ant-menu-submenu-title {
+    padding-inline: 12px;
+  }
+}
+@media (max-width: 1175px) {
+  .site-header {
+    --logo-width: 204px;
+    --logo-scale: 0.8947368421;
+  }
+  .site-logo {
+    align-self: center;
+    top: 0;
+  }
+}
+@media (max-width: 1151px) {
+  .site-header-wrap {
+    padding-inline: 24px;
+  }
+  .site-header {
+    --logo-width: 200px;
+    --logo-scale: 0.8771929825;
+    column-gap: 8px;
+    padding-inline: 16px;
+  }
+}
+@media (max-width: 1083px) {
+  .main-menu.ant-menu-horizontal {
+    gap: 4px;
+    width: 604px;
+    min-width: 604px;
+  }
+  .site-header .main-menu.ant-menu-horizontal > .ant-menu-item {
+    padding-inline: 8px;
+  }
+  .site-header .main-menu.ant-menu-horizontal .ant-menu-submenu-title {
+    padding-inline: 8px;
+  }
+}
+@media (max-width: 1003px) {
+  .site-header {
+    --logo-width: 180px;
+    --logo-scale: 0.7894736842;
+  }
+}
+@media (max-width: 983px) {
+  .site-header {
+    height: auto;
+    min-height: 72px;
+    grid-template-columns: var(--logo-width) 1fr;
+    grid-template-rows: 70px auto;
+    row-gap: 10px;
+    padding-bottom: 12px;
+  }
+  .personal-entry {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+  .site-navigation {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    height: auto;
+    margin-top: 0;
+  }
+}
+@media (max-width: 850px) {
+  .site-header-wrap {
+    padding-inline: 24px;
+  }
+  .main-menu.ant-menu-horizontal {
+    flex-wrap: wrap;
+    width: auto;
+    min-width: 0;
+    row-gap: 8px;
+  }
+  .main-menu.ant-menu-horizontal > .ant-menu-overflow-item-rest {
+    display: none;
+  }
+  .home-content {
+    padding-inline: 48px;
+  }
+}
+@media (max-width: 600px) {
+  .site-header-wrap {
+    padding: 12px 16px;
+  }
+  .site-header {
+    padding-inline: 16px;
+    column-gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .personal-entry {
+    gap: 12px;
+  }
+  .main-menu.ant-menu-horizontal {
+    gap: 4px;
+  }
+  .site-header .main-menu.ant-menu-horizontal > .ant-menu-item {
+    padding-inline: 12px;
+  }
+  .site-header .main-menu.ant-menu-horizontal .ant-menu-submenu-title {
+    padding-inline: 12px;
+  }
+  .home-content {
+    padding: 24px 24px 48px;
+  }
+  .home-secondary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+  }
+  .activity-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .book-cart {
+    width: 55vw;
+    right: 16px;
+  }
+  .shell {
+    padding: 28px 20px;
+  }
+  .cards {
+    grid-template-columns: 1fr;
+  }
+  .topbar {
+    padding-bottom: 32px;
+  }
+}
+@media (max-width: 359px) {
+  .site-header {
+    --logo-width: 140px;
+    --logo-scale: 0.6140350877;
+  }
+}
+
+/* Account entry uses the approved guest-header 96 × 40 button. */
+.personal-entry.guest-entry {
+  width: 96px;
+  min-width: 96px;
+}
+.login-entry.ant-btn {
+  width: 96px;
+  height: 40px;
+}
+.personal-identity > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.personal-identity .auxiliary {
+  flex-shrink: 0;
+}
+
+.admin-page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.admin-page-heading > p {
+  color: var(--artzoo-secondary);
+  overflow-wrap: anywhere;
+}
+.admin-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.admin-entry-grid > .ant-card {
+  height: 100%;
+}
+.admin-entry-card {
+  display: flex;
+  min-height: 190px;
+  height: 100%;
+  flex-direction: column;
+  gap: 12px;
+}
+.admin-entry-card p {
+  overflow-wrap: anywhere;
+  color: var(--artzoo-secondary);
+}
+.admin-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+@media (max-width: 1100px) {
+  .admin-entry-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .admin-entry-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* A single focus cue belongs to the form-control shell, including body portals.
+   These properties never change borders, fills, selection, or pointer events. */
+:root[data-artzoo-control-focus-ready] {
+  --artzoo-control-shadow: none;
+  --artzoo-control-outline: transparent;
+}
+[data-artzoo-control-focus] {
+  --artzoo-control-focus-color: var(--artzoo-primary);
+}
+[data-artzoo-control-focus]:is(
+  .ant-input-status-error,
+  .ant-input-affix-wrapper-status-error,
+  .ant-input-number-status-error,
+  .ant-picker-status-error,
+  .ant-select-status-error
+),
+[data-artzoo-control-focus][aria-invalid='true'] {
+  --artzoo-control-focus-color: #a34335;
+}
+[data-artzoo-control-focus]:is(
+  .ant-input-status-warning,
+  .ant-input-affix-wrapper-status-warning,
+  .ant-input-number-status-warning,
+  .ant-picker-status-warning,
+  .ant-select-status-warning
+) {
+  --artzoo-control-focus-color: #79561a;
+}
+/* !important is limited to outline: AntD variants otherwise override it.
+   Keyboard focus is explicitly restored below; buttons/links remain native. */
+[data-artzoo-control-focus='pointer'],
+[data-artzoo-control-focus] :is(input, textarea, select):focus {
+  outline: none !important;
+}
+[data-artzoo-control-focus='keyboard'] {
+  outline: 2px solid var(--artzoo-control-focus-color) !important;
+  outline-offset: 2px !important;
+}
+@media (forced-colors: active) {
+  [data-artzoo-control-focus='keyboard'] {
+    outline-color: Highlight !important;
+  }
+}

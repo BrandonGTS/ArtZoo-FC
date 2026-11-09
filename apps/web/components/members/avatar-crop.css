@@ -1,0 +1,11 @@
+.avatar-crop-preview.avatar-crop-interactive {
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.avatar-crop-preview.avatar-crop-interactive[data-dragging='true'] {
+  cursor: grabbing;
+}
+.avatar-crop-preview.avatar-crop-interactive[data-disabled='true'] {
+  cursor: default;
+}

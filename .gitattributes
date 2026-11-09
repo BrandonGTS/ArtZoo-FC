@@ -1,0 +1,2 @@
+# Keep vendored skill bytes identical to the pinned upstream archive.
+.agents/skills/** -whitespace

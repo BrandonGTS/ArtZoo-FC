@@ -1,0 +1,87 @@
+.inline-sticker-input {
+  width: 100%;
+  min-width: 0;
+  color: var(--inline-color);
+  font-size: var(--inline-font-size);
+}
+.inline-sticker-input > div:first-child {
+  min-height: var(--inline-min-height);
+}
+.inline-sticker-editable {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--inline-min-height);
+  max-height: var(--inline-max-height);
+  overflow: auto;
+  padding: 4px 11px;
+  border: 1px solid var(--inline-border);
+  border-radius: var(--inline-radius);
+  background: var(--inline-bg);
+  line-height: 24px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+  cursor: text;
+}
+.inline-sticker-editable:hover {
+  border-color: var(--inline-hover);
+}
+.inline-sticker-editable:focus {
+  border-color: var(--inline-active);
+  box-shadow: var(--artzoo-control-shadow, 0 0 0 2px rgba(67, 107, 78, 0.12));
+}
+.inline-sticker-editable p {
+  margin: 0;
+  min-height: 24px;
+}
+.inline-sticker-editable:has(> p:only-child > br.ProseMirror-trailingBreak:only-child)::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--inline-placeholder);
+  pointer-events: none;
+  height: 0;
+}
+.inline-sticker-editable .inline-sticker-image {
+  display: inline-block;
+  height: 3lh;
+  max-height: 4rem;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-inline: 0.15em;
+  cursor: default;
+}
+.inline-sticker-editable .ProseMirror-selectednode {
+  outline: 2px solid var(--inline-active);
+  border-radius: 3px;
+}
+.inline-sticker-input-disabled .inline-sticker-editable {
+  cursor: default;
+  background: var(--inline-disabled-bg);
+  color: var(--inline-placeholder);
+}
+.inline-sticker-input-disabled .inline-sticker-editable:hover {
+  border-color: var(--inline-border);
+}
+.inline-sticker-count {
+  display: block;
+  text-align: right;
+  color: var(--artzoo-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+.inline-sticker-limit {
+  display: block;
+  color: var(--artzoo-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .inline-sticker-editable {
+    transition: none;
+  }
+}

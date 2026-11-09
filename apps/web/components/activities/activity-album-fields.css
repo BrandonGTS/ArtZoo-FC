@@ -1,0 +1,13 @@
+.activity-album-fields .activity-album-name {
+  width: 100%;
+  max-width: 400px;
+}
+.activity-album-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.activity-album-categories > .ant-form-item {
+  width: 240px;
+  max-width: 100%;
+}

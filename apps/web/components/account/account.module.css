@@ -1,0 +1,154 @@
+.paper {
+  isolation: isolate;
+  position: relative;
+  background: transparent !important;
+  border-radius: 14px;
+}
+.paper::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: -12px -15px;
+  border: 30px solid transparent;
+  border-image-slice: 60 fill;
+  border-image-width: 30px;
+  border-image-repeat: stretch;
+  border-image-source: var(--artzoo-bg-login-paper);
+}
+.paper::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  z-index: -2;
+  border-radius: 14px;
+  background: var(--artzoo-surface) var(--artzoo-bg-paper-texture) repeat;
+  background-size: 385px;
+}
+.header {
+  background: transparent;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  padding-right: 24px;
+}
+.title :global(.page-heading h2) {
+  font-weight: 700;
+}
+.title :global(.food-burger) {
+  flex-basis: 40px;
+  width: 40px;
+  height: 40px;
+  background-size: 124.448px 82.964px;
+  background-position: -3.74px -4.996px;
+}
+.body {
+  min-width: 0;
+}
+.note {
+  color: var(--artzoo-secondary);
+  font-size: 14px;
+  line-height: 22px;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+.error {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 22px;
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
+}
+.error img {
+  flex: 0 0 20px;
+}
+.errorSlot {
+  min-height: 38px;
+}
+.codeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 144px;
+  gap: 16px;
+}
+.codeField {
+  margin: 0;
+}
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  min-height: 40px;
+}
+.link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.identity {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 40px;
+  margin-bottom: 16px;
+}
+.identityLabel {
+  min-width: 80px;
+}
+.identityTag {
+  font-size: 14px;
+  line-height: 22px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  margin: 0;
+}
+.success {
+  color: var(--artzoo-primary);
+  margin-bottom: 16px;
+}
+@media (max-width: 480px) {
+  .codeRow {
+    grid-template-columns: minmax(0, 1fr) 128px;
+    gap: 12px;
+  }
+}
+@media (max-width: 360px) {
+  .codeRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The portal wrapper spans the browser viewport. Auto margins center short cards,
+   and collapse to zero for tall cards so the complete form remains scrollable. */
+.modal .wrapper {
+  display: flex;
+  flex-direction: column;
+  padding: 36px 32px;
+  box-sizing: border-box;
+  scrollbar-gutter: stable both-edges;
+}
+.modal .wrapper::before {
+  display: none;
+}
+.modal .wrapper :global(.ant-modal) {
+  top: 0;
+  flex: none;
+  max-width: 100%;
+  margin: auto;
+  padding-bottom: 0;
+}
+
+/* Only browser-autofilled fields acquire the blue fill. Paint the affix wrapper
+   as well as its input so prefixes, padding and the password eye share it. */
+.body :global(input:is(:autofill, :-webkit-autofill)) {
+  background-color: #e8f0fe !important;
+  -webkit-box-shadow: 0 0 0 1000px #e8f0fe inset !important;
+  box-shadow: 0 0 0 1000px #e8f0fe inset !important;
+  -webkit-text-fill-color: var(--artzoo-heading);
+  caret-color: var(--artzoo-heading);
+}
+.body :global(.ant-input-affix-wrapper:has(input:is(:autofill, :-webkit-autofill))) {
+  background-color: #e8f0fe !important;
+}

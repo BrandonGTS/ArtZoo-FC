@@ -1,0 +1,60 @@
+.home-content.member-directory-page {
+  gap: 24px;
+}
+/* Directory-only adaptation of the accepted daily identity and paper card. */
+.member-directory-page .member-card-identity {
+  align-items: center;
+  gap: 16px;
+  flex-wrap: nowrap;
+  min-height: 72px;
+}
+.member-directory-page .member-directory-membership {
+  align-self: flex-start;
+}
+.member-directory-page .member-directory-card .member-paper-body {
+  min-height: 224px;
+}
+.member-directory-page .member-card-text h3 {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+.member-directory-page .member-directory-location {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 22px;
+}
+.member-directory-page .member-directory-location > svg {
+  flex: none;
+}
+.member-directory-page .member-directory-registered {
+  font-size: 14px;
+  line-height: 22px;
+}
+.member-directory-page .member-directory-membership.ant-tag {
+  margin: 0;
+  flex: none;
+  padding: 4px 10px;
+  line-height: 22px;
+  border-radius: 8px;
+  color: #fff;
+}
+.member-directory-page .member-directory-avatar-link {
+  display: inline-flex;
+  flex: none;
+  border-radius: 50%;
+}
+.member-directory-page .member-directory-avatar-link:focus-visible {
+  outline: 2px solid var(--artzoo-primary);
+  outline-offset: 4px;
+}
+.member-directory-page .member-card-bio {
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  text-overflow: ellipsis;
+}
+.member-directory-page .member-name-link:hover {
+  text-decoration: none;
+}

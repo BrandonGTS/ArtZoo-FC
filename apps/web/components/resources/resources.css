@@ -1,0 +1,125 @@
+.resource-content {
+  display: grid;
+  gap: 24px;
+}
+.resource-filters {
+  min-width: 0;
+}
+.resource-filters .collection-filterbar {
+  width: 100%;
+}
+.resource-list {
+  display: grid;
+  background: var(--artzoo-surface);
+  border: 1px solid var(--artzoo-line);
+  border-radius: 14px;
+  padding: 0 24px;
+}
+.resource-row {
+  padding: 20px 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.resource-row + .resource-row {
+  border-top: 1px solid var(--artzoo-line);
+}
+.resource-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.resource-title-row a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.resource-category {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--artzoo-secondary);
+}
+.resource-row p {
+  margin: 8px 0 0;
+}
+.resource-admin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.resource-admin-filters .ant-select {
+  width: 220px;
+  max-width: 100%;
+}
+.resource-admin-filters > .collection-search {
+  flex: 0 1 400px;
+  min-width: 0;
+  margin: 0;
+  padding-bottom: 0;
+}
+.resource-admin-filters .ant-input-search {
+  width: 100%;
+  max-width: 100%;
+}
+.resource-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.resource-panel-heading h2 {
+  margin: 0;
+}
+.resource-admin-list {
+  display: grid;
+  gap: 8px;
+}
+.resource-admin .resource-select-row {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  width: 100%;
+  height: auto;
+  white-space: normal;
+  padding: 12px;
+  gap: 4px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.resource-select-row > span:last-child {
+  color: var(--artzoo-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
+/* Keep the selected row visible through AntD's text-button interaction states. */
+.resource-admin .resource-admin-list .ant-btn.resource-select-row[aria-pressed='true'],
+.resource-admin .resource-admin-list .ant-btn.resource-select-row[aria-pressed='true']:not(:disabled):hover,
+.resource-admin .resource-admin-list .ant-btn.resource-select-row[aria-pressed='true']:not(:disabled):active,
+.resource-admin .resource-admin-list .ant-btn.resource-select-row[aria-pressed='true']:focus-visible {
+  background: var(--artzoo-fill);
+}
+.resource-category-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.resource-category-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.resource-category-editor {
+  display: grid;
+  gap: 6px;
+}
+.resource-category-list .ant-btn[aria-pressed='true'] {
+  background: var(--artzoo-fill);
+}
+@media (max-width: 800px) {
+  .resource-category-layout {
+    grid-template-columns: 1fr;
+  }
+}

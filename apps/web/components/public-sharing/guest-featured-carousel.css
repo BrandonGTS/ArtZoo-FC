@@ -1,0 +1,51 @@
+.guest-featured-carousel {
+  min-width: 0;
+}
+.guest-featured-slide {
+  padding: 8px 36px 32px;
+}
+.guest-featured-image {
+  display: block;
+  width: 100%;
+  height: clamp(240px, 40vw, 520px);
+  object-fit: contain;
+}
+.guest-featured-slide p {
+  margin: 12px 0 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+/* Button visuals come directly from the shared pagination component and CSS. */
+.guest-featured-carousel .ant-carousel .guest-featured-arrow {
+  margin: 0;
+  gap: 0;
+  width: 44px;
+  height: 44px;
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+.guest-featured-carousel:hover .ant-carousel .guest-featured-arrow,
+.guest-featured-carousel:focus-within .ant-carousel .guest-featured-arrow {
+  opacity: 1;
+  pointer-events: auto;
+}
+.guest-featured-carousel .ant-carousel .guest-featured-arrow::after {
+  content: none;
+  display: none;
+}
+@media (hover: none) {
+  .guest-featured-carousel .ant-carousel .guest-featured-arrow {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+.guest-featured-carousel .ant-carousel .slick-dots li button,
+.guest-featured-carousel .ant-carousel .slick-dots li.slick-active::after {
+  background: var(--artzoo-primary);
+}
+@media (max-width: 600px) {
+  .guest-featured-slide {
+    padding: 4px 24px 28px;
+  }
+}

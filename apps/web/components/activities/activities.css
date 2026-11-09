@@ -1,0 +1,769 @@
+.activities-content {
+  min-width: 0;
+}
+.activity-browser-status {
+  height: 32px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.activity-browser-status > .activity-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activity-browser-status > .ant-btn {
+  flex: none;
+}
+.activity-page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.activity-page-heading > .ant-btn {
+  flex: none;
+}
+.activity-paper .activity-paper-body {
+  padding: 24px;
+}
+.activity-note {
+  color: var(--artzoo-secondary);
+  font-size: 14px;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+.activity-text-link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  width: fit-content;
+}
+.activity-load-error {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.activity-empty {
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.activity-calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 904fr) minmax(300px, 384fr);
+  gap: 24px;
+  align-items: start;
+}
+.activity-calendar-paper .activity-paper-body {
+  padding: 16px;
+}
+.activity-calendar-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-bottom: 16px;
+}
+.activity-calendar-toolbar h3 {
+  font-size: 24px;
+  white-space: nowrap;
+}
+.activity-month-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.activity-month-navigation .ant-btn {
+  padding-inline: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.activity-modes {
+  display: flex;
+  gap: 8px;
+  justify-self: end;
+}
+.activity-selected.ant-btn {
+  background: var(--artzoo-fill);
+  border-color: var(--artzoo-primary);
+}
+.activity-calendar-weekdays,
+.activity-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.activity-calendar-weekdays {
+  min-height: 32px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--artzoo-secondary);
+}
+.activity-calendar-grid {
+  grid-auto-rows: 180px;
+  border-top: 1px solid var(--artzoo-line);
+  border-left: 1px solid var(--artzoo-line);
+}
+.activity-calendar-day {
+  position: relative;
+  isolation: isolate;
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 5px;
+  border-right: 1px solid var(--artzoo-line);
+  border-bottom: 1px solid var(--artzoo-line);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+}
+.activity-day-selected {
+  background: var(--artzoo-fill);
+  box-shadow: inset 0 0 0 1px var(--artzoo-primary);
+}
+.activity-outside-month {
+  color: #828578;
+}
+.activity-day-number.ant-btn {
+  position: static;
+  flex: none;
+  align-self: flex-start;
+  height: 28px;
+  min-width: 28px;
+  padding: 0 4px;
+  border-radius: 50%;
+  color: inherit;
+}
+.activity-day-number.ant-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+.activity-calendar-event.ant-btn,
+.activity-calendar-day > .ant-btn-link {
+  position: relative;
+  z-index: 1;
+}
+.activity-today.ant-btn {
+  background: var(--artzoo-primary);
+  color: var(--artzoo-surface);
+}
+.activity-calendar-event.ant-btn {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: 0;
+  padding: 3px 5px;
+  border: 1px solid var(--artzoo-line);
+  border-radius: 6px;
+  flex: none;
+  height: 46px;
+  min-height: 46px;
+  width: 100%;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--artzoo-text);
+  white-space: normal;
+  text-align: left;
+}
+.activity-calendar-event > span {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.activity-calendar-event small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 18px;
+}
+.activity-event-full.ant-btn {
+  background: #f6ebcb;
+  color: #79561a;
+}
+.activity-calendar-day > .ant-btn-link {
+  flex: none;
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 20px;
+  line-height: 18px;
+  padding: 0;
+  text-align: left;
+  align-self: flex-start;
+  text-decoration: underline;
+  font-size: 12px;
+}
+.activity-day-aside {
+  gap: 16px;
+  min-height: 260px;
+}
+.activity-day-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.activity-day-heading > .heading-2 {
+  flex: none;
+}
+.activity-day-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.activity-day-meta > .beijing-clock {
+  margin-inline-start: auto;
+}
+.activity-day-aside .heading-2 h2 {
+  white-space: normal;
+}
+.activity-card .activity-paper-body {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+}
+.activity-card h3 {
+  font-size: 20px;
+  line-height: 30px;
+  overflow-wrap: anywhere;
+}
+.activity-status {
+  color: var(--artzoo-secondary);
+}
+.activity-status-full {
+  color: #79561a;
+}
+.activity-status-time_ended,
+.activity-status-registration_closed {
+  color: var(--artzoo-secondary);
+}
+.activity-list-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+.activity-list-toolbar > .activity-browser-status {
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+}
+.activity-list-toolbar > .activity-modes {
+  justify-self: end;
+}
+.activity-participants {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.activity-participants > span {
+  flex: none;
+}
+.activity-avatars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 0;
+  max-width: 200px;
+  padding-left: 4px;
+}
+.activity-avatars a {
+  display: flex;
+  margin-left: -4px;
+}
+.activity-avatars .ant-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #78816a;
+  background: var(--artzoo-fill);
+}
+.activity-preview-popover {
+  width: 416px;
+  max-width: calc(100vw - 32px);
+  border: 1px solid var(--artzoo-primary);
+}
+.activity-preview {
+  display: grid;
+  gap: 12px;
+  padding: 8px;
+}
+.activity-preview h3 {
+  font-size: 24px;
+  line-height: 32px;
+  overflow-wrap: anywhere;
+}
+.activity-preview-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.activity-preview-heading .ant-btn {
+  flex: none;
+}
+.activity-preview-description {
+  display: grid;
+  gap: 12px;
+  line-height: 24px;
+}
+.activity-preview-copy-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.activity-preview-arrangement,
+.activity-preview-requirements {
+  min-height: 48px;
+  max-height: clamp(48px, 20dvh, 144px);
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.activity-preview > .ant-btn {
+  justify-self: start;
+}
+.activity-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 856fr) minmax(310px, 432fr);
+  gap: 24px;
+  align-items: start;
+}
+.activity-form-section {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--artzoo-line);
+}
+.activity-form-section:last-child {
+  margin-bottom: 0;
+  border: 0;
+  padding-bottom: 0;
+}
+.activity-form-section .ant-form-item {
+  margin-bottom: 0;
+}
+.activity-form-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.activity-form-columns .ant-picker,
+.activity-form-columns .ant-input-number {
+  width: 100%;
+}
+.activity-title-input {
+  max-width: 400px;
+}
+.activity-cutoff {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--artzoo-fill);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.activity-seat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.activity-seat-trigger.ant-btn {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding-inline: 8px;
+}
+.activity-seat-trigger .ant-btn-icon {
+  position: absolute;
+  left: 8px;
+  display: flex;
+}
+.activity-seat-trigger:has(.ant-btn-icon img) {
+  padding-left: 34px;
+}
+.activity-seat-trigger > span:not(.ant-btn-icon) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.activity-seat-popover {
+  padding: 12px;
+  border: 1px solid #78816a;
+}
+.activity-seat-menu {
+  width: 374px;
+  max-width: calc(100vw - 64px);
+  display: grid;
+  gap: 8px;
+}
+.activity-seat-menu-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 40px;
+}
+.activity-seat-menu-heading .ant-btn {
+  width: 128px;
+}
+.activity-seat-menu-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+.activity-seat-menu-row > span {
+  padding-top: 8px;
+  font-size: 14px;
+  color: var(--artzoo-secondary);
+}
+.activity-seat-roles {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--artzoo-line);
+}
+.activity-seat-options {
+  display: grid;
+  grid-template-columns: repeat(7, 40px);
+  gap: 8px;
+}
+.activity-icon-button.ant-btn {
+  width: 40px;
+  height: 40px;
+  padding: 7px;
+  border-radius: 8px;
+}
+.activity-icon-button[aria-pressed='true'] {
+  background: var(--artzoo-fill);
+  border-color: var(--artzoo-primary);
+}
+.activity-icon-button .ant-btn-icon {
+  display: flex;
+}
+.activity-summary .activity-paper-body {
+  display: grid;
+  gap: 20px;
+}
+.activity-summary h3 {
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+.activity-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.activity-facts > div {
+  display: flex;
+  gap: 12px;
+}
+.activity-facts dt {
+  color: var(--artzoo-secondary);
+  flex: 0 0 72px;
+}
+.activity-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.activity-copy-section {
+  display: grid;
+  gap: 20px;
+}
+.activity-detail-copy .activity-paper-body {
+  display: grid;
+  gap: 24px;
+}
+.activity-detail-title {
+  color: var(--artzoo-heading);
+  font-size: 32px;
+  line-height: 42px;
+  overflow-wrap: anywhere;
+}
+.activity-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.activity-registration-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.activity-registration-seat {
+  padding: 12px;
+  border: 1px solid var(--artzoo-line);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  text-align: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.activity-seat-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.activity-my-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+.activity-notifications .activity-paper-body {
+  display: grid;
+  gap: 16px;
+}
+.activity-notifications .activity-paper-body > div {
+  padding-top: 12px;
+  border-top: 1px solid var(--artzoo-line);
+}
+@media (max-width: 1199px) {
+  .activity-calendar-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(250px, 1fr);
+  }
+  .activity-calendar-toolbar {
+    grid-template-columns: 1fr auto;
+  }
+  .activity-calendar-toolbar > .activity-month-navigation {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+  .activity-calendar-grid {
+    grid-auto-rows: 160px;
+  }
+  .activity-calendar-day {
+    padding: 3px;
+  }
+  .activity-detail-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  }
+  .activity-seat-grid,
+  .activity-registration-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 850px) {
+  .activity-calendar-layout,
+  .activity-detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .activity-day-aside {
+    margin-top: 12px;
+  }
+  .activity-calendar-toolbar {
+    grid-template-columns: 1fr auto 1fr;
+  }
+  .activity-calendar-toolbar > .activity-month-navigation {
+    grid-row: auto;
+    grid-column: auto;
+  }
+}
+@media (max-width: 600px) {
+  .activity-page-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .activities-content .heading-1 h1 {
+    font-size: 40px;
+    line-height: 48px;
+  }
+  .activity-calendar-toolbar {
+    grid-template-columns: 1fr auto;
+  }
+  .activity-calendar-toolbar > .activity-month-navigation {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+  .activity-calendar-toolbar h3 {
+    font-size: 20px;
+  }
+  .activity-calendar-paper .activity-paper-body {
+    padding: 8px;
+  }
+  .activity-calendar-grid {
+    grid-auto-rows: 152px;
+  }
+  .activity-calendar-day {
+    padding: 2px;
+  }
+  .activity-calendar-event.ant-btn {
+    height: 42px;
+    min-height: 42px;
+    padding: 2px;
+    font-size: 12px;
+    line-height: 17px;
+  }
+  .activity-form-columns,
+  .activity-my-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .activity-list-toolbar {
+    grid-template-columns: 1fr auto;
+  }
+  .activity-list-toolbar > .activity-month-navigation {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+  .activity-seat-options {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .activity-icon-button.ant-btn {
+    width: 100%;
+    min-width: 28px;
+    padding: 2px;
+  }
+  .activity-seat-menu-row {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 4px;
+  }
+}
+
+.activity-publisher-party {
+  display: grid;
+  gap: 12px;
+}
+.activity-publisher-party > h3 {
+  color: var(--artzoo-secondary);
+  font-size: 16px;
+  line-height: 26px;
+}
+
+/* Display activity type before its title everywhere; retain natural wrapping. */
+.activity-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+}
+.activity-title-row > h2,
+.activity-title-row > h3 {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+}
+.activity-title-row > .ant-tag {
+  flex: none;
+  margin-inline-end: 0;
+}
+
+/* Week wrappers keep official event tracks continuous above ordinary day entries. */
+.activity-calendar-grid:has(.activity-calendar-week) {
+  display: flex;
+  flex-direction: column;
+}
+.activity-calendar-week {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  height: 180px;
+  min-height: 180px;
+}
+.activity-week-with-official .activity-day-number {
+  margin-bottom: 52px;
+}
+@media (max-width: 1100px) {
+  .activity-calendar-week {
+    height: 160px;
+    min-height: 160px;
+  }
+  .activity-week-with-official {
+    height: 180px;
+    min-height: 180px;
+  }
+}
+@media (max-width: 700px) {
+  .activity-calendar-week {
+    height: 152px;
+    min-height: 152px;
+  }
+  .activity-week-with-official {
+    height: 174px;
+    min-height: 174px;
+  }
+}
+
+/* The body portal must fit the actual layout viewport, including its border.
+   Keep AntD's vertical placement and all desktop positioning unchanged. */
+@media (max-width: 600px) {
+  .activity-seat-popover-root.ant-popover {
+    left: auto !important;
+    right: 8px !important;
+    max-width: calc(100% - 16px);
+  }
+  .activity-seat-popover-root .activity-seat-popover {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+.activity-attendance-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.activity-attendance-row {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.activity-attendance-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+.activity-attendance-person {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.activity-attendance-person .ant-avatar {
+  flex: none;
+}
+.activity-attendance-person > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.activity-attendance-main > .ant-btn,
+.activity-attendance-main > .activity-note,
+.activity-attendance-present {
+  flex: none;
+}
+.activity-attendance-present {
+  color: var(--artzoo-primary);
+}
+.activity-attendance-row > .ant-btn {
+  align-self: flex-start;
+}

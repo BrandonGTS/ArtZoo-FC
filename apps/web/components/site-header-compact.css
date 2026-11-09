@@ -1,0 +1,77 @@
+.site-header-slot {
+  position: relative;
+}
+.site-header-sentinel {
+  display: none;
+}
+
+@media (min-width: 984px) {
+  /* Matches the original 72px header and its 16px block padding. The slot
+     stays in flow when its header is fixed, so content never jumps. */
+  .site-header-slot {
+    height: 104px;
+    z-index: 100;
+  }
+  .site-header-sentinel {
+    display: block;
+    position: absolute;
+    top: 15px;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+  }
+  /* Applies only on pages containing this shared header, including anchors
+     navigated to before the first scroll/observer notification. */
+  html:has(.site-header-slot) {
+    scroll-padding-top: 72px;
+  }
+  .site-header-slot .site-header {
+    transition:
+      height 160ms ease,
+      grid-template-columns 160ms ease,
+      grid-template-rows 160ms ease,
+      box-shadow 160ms ease;
+  }
+  .site-header-slot .site-logo {
+    transition:
+      width 160ms ease,
+      height 160ms ease;
+  }
+  .site-header-slot .site-logo-art {
+    transition: transform 160ms ease;
+  }
+  .site-header-slot .site-navigation {
+    transition: margin-top 160ms ease;
+  }
+  .site-header-slot[data-compact='true'] .site-header-wrap {
+    position: fixed;
+    top: 4px;
+    left: 0;
+    right: 0;
+    padding-block: 0;
+  }
+  .site-header-slot[data-compact='true'] .site-header {
+    --logo-width: 164px;
+    --logo-scale: 0.7192982456;
+    height: 56px;
+    grid-template-rows: 54px;
+    box-shadow: 0 5px 12px rgb(37 75 56 / 10%);
+  }
+  .site-header-slot[data-compact='true'] .site-logo {
+    align-self: center;
+    top: 0;
+  }
+  .site-header-slot[data-compact='true'] .site-navigation {
+    margin-top: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-header-slot .site-header,
+  .site-header-slot .site-logo,
+  .site-header-slot .site-logo-art,
+  .site-header-slot .site-navigation {
+    transition: none;
+  }
+}

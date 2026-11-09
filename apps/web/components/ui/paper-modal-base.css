@@ -1,0 +1,17 @@
+.album-modal .ant-modal-container {
+  border: 1.5px solid #254b38;
+  border-radius: 16px 13px 15px 12px;
+  background: #fffdf4;
+  background-image: var(--artzoo-paper-texture);
+  box-shadow: 0 6px 10px #254b381a;
+  padding: 28px;
+}
+.album-modal .ant-modal-title {
+  font: 400 24px/32px var(--artzoo-body-font);
+  color: #254b38;
+  background: transparent;
+}
+.album-modal .ant-modal-header {
+  background: transparent;
+  margin-bottom: 24px;
+}

@@ -1,0 +1,205 @@
+.quick-links-popover .ant-popover-container {
+  box-shadow: none;
+}
+.quick-links-panel {
+  width: min(280px, calc(100vw - 104px));
+  font-family: var(--artzoo-body-font);
+}
+.quick-links-panel .collection-search {
+  margin: 0 0 12px;
+  width: 100%;
+}
+.quick-links-items {
+  display: grid;
+  gap: 0;
+  overflow: visible;
+}
+.quick-links-items > p {
+  margin: 12px 0;
+  color: var(--artzoo-secondary);
+}
+.quick-link-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 6px;
+  min-width: 0;
+  color: var(--artzoo-heading);
+  text-decoration: none;
+  border-radius: 8px;
+}
+.quick-link-item > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quick-link-item:hover {
+  background: var(--artzoo-primary-bg, #eff2e5);
+  color: var(--artzoo-primary);
+}
+.quick-link-item:focus-visible {
+  outline: 2px solid var(--artzoo-primary);
+  outline-offset: 2px;
+}
+.quick-link-icon {
+  display: inline-flex;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--artzoo-primary);
+}
+.quick-link-icon img {
+  object-fit: contain;
+  width: 24px;
+  height: 24px;
+}
+.quick-links-panel .collection-page-navigation {
+  gap: 18px;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.quick-links-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.quick-links-admin-paper {
+  margin-top: 24px;
+}
+.quick-links-admin-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 16px;
+}
+.quick-links-admin-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--artzoo-line);
+}
+.quick-link-order.ant-btn {
+  display: flex;
+  flex: 0 0 36px;
+  width: 36px;
+  min-width: 36px;
+  height: 40px;
+  padding: 0;
+  color: var(--artzoo-secondary);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  box-shadow: none;
+}
+.quick-link-dragging {
+  background: var(--artzoo-fill);
+}
+.quick-link-dragging .quick-link-order.ant-btn {
+  cursor: grabbing;
+  color: var(--artzoo-primary);
+}
+.quick-link-order.ant-btn:disabled {
+  cursor: default;
+}
+.quick-link-order.ant-btn:focus-visible {
+  outline: 2px solid var(--artzoo-primary);
+  outline-offset: 2px;
+}
+.quick-link-sort-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.quick-link-edit.ant-btn {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  height: auto;
+  min-height: 40px;
+  text-align: left;
+  white-space: normal;
+}
+.quick-link-edit.ant-btn > span:last-child {
+  overflow-wrap: anywhere;
+}
+.quick-link-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+.quick-link-modify.ant-btn,
+.quick-link-modify.ant-btn:hover,
+.quick-link-modify.ant-btn:active,
+.quick-link-modify.ant-btn:disabled {
+  box-shadow: none !important;
+}
+.quick-link-delete.ant-btn {
+  flex: 0 0 auto;
+}
+.quick-link-delete.ant-btn,
+.quick-link-delete.ant-btn:hover,
+.quick-link-delete.ant-btn:active,
+.quick-link-delete.ant-btn:disabled {
+  box-shadow: none !important;
+}
+.quick-link-delete.ant-btn:focus-visible,
+.quick-link-modal-actions .ant-btn-dangerous:focus-visible {
+  outline: 2px solid var(--ant-color-error, #a34335);
+  outline-offset: 2px;
+}
+.quick-link-add.ant-btn {
+  display: block;
+  margin: 16px auto 0;
+}
+.quick-link-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.quick-link-modal-actions .ant-btn-dangerous {
+  box-shadow: none !important;
+}
+.quick-link-icon-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.quick-link-label {
+  display: block;
+  font-weight: 700;
+  margin: 16px 0 8px;
+}
+@media (max-width: 600px) {
+  .quick-links-admin-item {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 8px 6px;
+  }
+  .quick-link-actions {
+    grid-column: 2;
+    justify-self: end;
+  }
+  .quick-links-heading {
+    flex-wrap: wrap;
+  }
+}
+
+.quick-link-batch-results {
+  margin: 16px 0 0;
+  padding-left: 20px;
+  overflow-wrap: anywhere;
+}
+.quick-link-batch-results li {
+  margin: 6px 0;
+}

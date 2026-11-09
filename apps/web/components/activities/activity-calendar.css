@@ -1,0 +1,291 @@
+/* Calendar geometry is scoped to this browser; content never changes row height. */
+.activity-calendar-browser .activity-calendar-page-heading,
+.activity-calendar-browser .activity-calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 904fr) minmax(300px, 384fr);
+  gap: 24px;
+  align-items: start;
+}
+.activity-calendar-browser .activity-calendar-page-heading {
+  align-items: center;
+}
+.activity-calendar-browser .activity-calendar-page-heading .activity-page-heading {
+  margin: 0;
+  min-width: 0;
+  gap: 16px;
+}
+.activity-calendar-browser .activity-day-heading {
+  min-width: 0;
+}
+.activity-calendar-browser .activity-current-mobile-heading {
+  display: none;
+}
+.activity-calendar-browser .activity-day-aside {
+  margin: 0;
+  gap: 16px;
+}
+.activity-calendar-browser .activity-calendar-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  margin-bottom: 8px;
+}
+.activity-calendar-browser .activity-calendar-toolbar > .activity-month-navigation {
+  grid-column: 2;
+  grid-row: 1;
+}
+.activity-calendar-browser .activity-calendar-publish.ant-btn {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  height: 46px;
+  padding-inline: 20px;
+  font-size: 17px;
+}
+.activity-calendar-browser .activity-month-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+.activity-calendar-browser .activity-month-navigation h3 {
+  color: var(--artzoo-text);
+  font: 700 30px/40px var(--artzoo-body-font);
+}
+.activity-calendar-browser .activity-month-navigation .ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: 1;
+  background: transparent;
+  color: var(--artzoo-text);
+}
+/* Remove the first-hover transition as well as its resting frame. */
+.activity-calendar-browser .activity-month-navigation .ant-btn,
+.activity-calendar-browser .activity-month-navigation .ant-btn:is(:hover, :active) {
+  border: 0 solid transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: none !important;
+}
+.activity-calendar-browser .activity-month-navigation .ant-btn:not(:focus-visible) {
+  outline: none !important;
+}
+.activity-calendar-browser .activity-month-navigation .ant-btn::before,
+.activity-calendar-browser .activity-month-navigation .ant-btn::after {
+  content: none !important;
+  display: none !important;
+}
+.activity-calendar-browser .activity-month-navigation .ant-btn:is(:hover, :active) {
+  color: var(--artzoo-primary);
+}
+.activity-calendar-browser .activity-month-navigation .ant-btn .ant-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.activity-calendar-browser .activity-calendar-weekdays {
+  min-height: 36px;
+  font-size: 16px;
+}
+.activity-calendar-browser .activity-calendar-week {
+  height: 184px;
+  min-height: 184px;
+  max-height: 184px;
+}
+.activity-calendar-browser .activity-calendar-day {
+  padding: 4px;
+  gap: 4px;
+  overflow: hidden;
+}
+.activity-calendar-browser .activity-calendar-date-heading {
+  display: flex;
+  justify-content: center;
+  flex: none;
+  min-height: 30px;
+}
+.activity-calendar-browser .activity-day-number.ant-btn {
+  align-self: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 3px;
+  font-size: 20px;
+  line-height: 28px;
+}
+.activity-calendar-browser .activity-day-number.activity-today.ant-btn,
+.activity-calendar-browser .activity-day-number.activity-today.ant-btn:is(:hover, :active, :focus) {
+  background: var(--artzoo-primary);
+  color: var(--artzoo-surface);
+}
+.activity-calendar-browser .activity-calendar-event.ant-btn {
+  height: 42px;
+  min-height: 42px;
+  padding: 2px 5px;
+  box-shadow: none;
+}
+.activity-calendar-browser .activity-calendar-event.ant-btn:is(:hover, :active) {
+  filter: brightness(0.93);
+}
+.activity-calendar-browser .activity-calendar-more.ant-btn {
+  position: relative;
+  z-index: 1;
+  display: block;
+  flex: none;
+  width: 100%;
+  height: auto;
+  min-height: 16px;
+  max-width: 100%;
+  padding: 0;
+  overflow: visible;
+  white-space: normal;
+  text-align: left;
+  font-size: 12px;
+  line-height: 16px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.activity-calendar-browser .activity-calendar-more.ant-btn > span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+.activity-calendar-browser .activity-outside-month > * {
+  opacity: 0.76;
+}
+.activity-calendar-overflow-popover {
+  width: 416px;
+  max-width: calc(100vw - 32px);
+  border: 1px solid var(--artzoo-primary);
+}
+.activity-calendar-overflow {
+  display: grid;
+  gap: 12px;
+  padding: 8px;
+  min-width: 0;
+}
+.activity-calendar-overflow h3 {
+  font-size: 22px;
+  line-height: 30px;
+  overflow-wrap: anywhere;
+}
+.activity-calendar-overflow-list {
+  display: grid;
+  gap: 12px;
+  max-height: min(420px, 60dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-width: 0;
+}
+.activity-calendar-overflow-item {
+  display: grid;
+  gap: 6px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--artzoo-line);
+  color: var(--artzoo-text);
+  min-width: 0;
+  border-radius: 6px;
+}
+.activity-calendar-overflow-item:last-child {
+  border-bottom: 0;
+}
+.activity-calendar-overflow-item:hover {
+  background: var(--artzoo-fill);
+  color: var(--artzoo-primary);
+}
+.activity-calendar-overflow-item .activity-title-row > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1100px) {
+  .activity-calendar-browser .activity-calendar-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .activity-calendar-browser .activity-calendar-toolbar > .activity-month-navigation {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .activity-calendar-browser .activity-calendar-publish.ant-btn {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .activity-calendar-browser .activity-calendar-page-heading,
+  .activity-calendar-browser .activity-calendar-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(250px, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .activity-calendar-browser .activity-calendar-page-heading,
+  .activity-calendar-browser .activity-calendar-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .activity-calendar-browser .activity-calendar-page-heading .activity-day-heading {
+    display: none;
+  }
+  .activity-calendar-browser .activity-current-mobile-heading {
+    display: block;
+  }
+  .activity-calendar-browser .activity-calendar-day {
+    padding: 2px;
+    gap: 4px;
+  }
+  .activity-calendar-browser .activity-calendar-event.ant-btn {
+    padding: 2px;
+    font-size: 12px;
+    line-height: 17px;
+  }
+  .activity-calendar-browser .activity-month-navigation {
+    gap: 18px;
+  }
+  .activity-calendar-browser .activity-month-navigation h3 {
+    font-size: 26px;
+  }
+  .activity-calendar-browser .activity-calendar-page-heading .activity-page-heading {
+    flex-wrap: wrap;
+  }
+}
+
+.activity-calendar-browser .activity-calendar-paper .official-calendar-legend {
+  margin: 0 0 12px;
+}
+
+/* Narrow calendars expose the existing complete day popover instead of unreadable teasers.
+   Keep one month grid and lazy popover content; all wider calendar geometry is unchanged. */
+.activity-calendar-browser .activity-calendar-more-compact-only.ant-btn,
+.activity-calendar-browser .activity-calendar-more.ant-btn > .activity-calendar-more-compact {
+  display: none;
+}
+@media (max-width: 600px) {
+  .activity-calendar-browser .activity-calendar-week {
+    height: 92px;
+    min-height: 92px;
+    max-height: 92px;
+  }
+  .activity-calendar-browser .activity-calendar-event.ant-btn {
+    display: none;
+  }
+  .activity-calendar-browser .activity-calendar-more.ant-btn {
+    display: block;
+    min-height: 30px;
+    text-align: center;
+    line-height: 24px;
+  }
+  .activity-calendar-browser .activity-calendar-more.ant-btn > .activity-calendar-more-expanded {
+    display: none;
+  }
+  .activity-calendar-browser .activity-calendar-more.ant-btn > .activity-calendar-more-compact {
+    display: block;
+    white-space: nowrap;
+  }
+}

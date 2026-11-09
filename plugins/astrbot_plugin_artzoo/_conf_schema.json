@@ -1,0 +1,128 @@
+{
+  "enabled": {
+    "description": "启用插件；默认关闭",
+    "type": "bool",
+    "default": false
+  },
+  "simulation": {
+    "description": "模拟模式；仅 mock_ 范围，绝不调用 QQ 发送",
+    "type": "bool",
+    "default": true
+  },
+  "allow_real_send": {
+    "description": "另行批准测试群后才可允许实际发送；默认禁止",
+    "type": "bool",
+    "default": false
+  },
+  "platform_id": {
+    "description": "AstrBot 中唯一官方 QQ 平台实例 ID",
+    "type": "string",
+    "default": ""
+  },
+  "app_id": {
+    "description": "现有官方平台 AppID；不填任何密钥",
+    "type": "string",
+    "default": ""
+  },
+  "bot_id": {
+    "description": "现有 client.robot.id；禁止 qq_official 占位值",
+    "type": "string",
+    "default": ""
+  },
+  "allow_groups": {
+    "description": "精确 group_openid 白名单，最多 20 个",
+    "type": "list",
+    "default": []
+  },
+  "approved_test_groups": {
+    "description": "已另行获准外发的精确测试群，默认空",
+    "type": "list",
+    "default": []
+  },
+  "bridge_origin": {
+    "description": "桥接 HTTPS origin，不含路径、凭据或查询",
+    "type": "string",
+    "default": ""
+  },
+  "bridge_secret_env": {
+    "description": "操作员已有 HMAC 密钥的环境变量名；不保存密钥值",
+    "type": "string",
+    "default": "ARTZOO_QQ_BRIDGE_SECRET"
+  },
+  "allow_loopback_http": {
+    "description": "仅供独立本机 mock 的显式 HTTP 放行",
+    "type": "bool",
+    "default": false
+  },
+  "poll_seconds": {
+    "description": "轮询间隔：production 10–3600秒，test_batch 30–3600秒",
+    "type": "int",
+    "default": 60
+  },
+  "per_minute": {
+    "description": "主动每群每分钟尝试上限；test_batch仍为两方向共同上限",
+    "type": "int",
+    "default": 3
+  },
+  "per_day": {
+    "description": "主动每群滚动24小时尝试上限；test_batch仍为两方向共同上限",
+    "type": "int",
+    "default": 20
+  },
+  "allow_passive_replies": {
+    "description": "允许同群同事件被动回复；仍需总开关与剩余额度",
+    "type": "bool",
+    "default": false
+  },
+  "allow_proactive_send": {
+    "description": "允许领取与主动发送；默认禁止",
+    "type": "bool",
+    "default": false
+  },
+  "max_proactive_attempts": {
+    "description": "该测试批次主动尝试总额度，0至7，0禁止",
+    "type": "int",
+    "default": 0
+  },
+  "max_passive_attempts": {
+    "description": "SID1后剩余被动尝试总额度，0至11，0禁止",
+    "type": "int",
+    "default": 0
+  },
+  "diagnostic_mode": {
+    "description": "仅输出一条非秘密身份诊断；覆盖enabled，不建桥接/日志库/轮询",
+    "type": "bool",
+    "default": false
+  },
+  "bridge_secret_from_data_file": {
+    "description": "仅从插件私有数据目录固定bridge.secret读取HMAC密钥，不接受任意路径；默认关闭",
+    "type": "bool",
+    "default": false
+  },
+  "operation_mode": {
+    "description": "test_batch保留7/11总额度；production须显式且simulation=false，保留限速/去重/急停",
+    "type": "string",
+    "default": "test_batch",
+    "options": ["test_batch", "production"]
+  },
+  "group_per_minute": {
+    "description": "production两方向合计每群每分钟保护上限，1–10",
+    "type": "int",
+    "default": 10
+  },
+  "passive_per_user_minute": {
+    "description": "production每用户每分钟被动回复尝试上限，1–10",
+    "type": "int",
+    "default": 3
+  },
+  "management_enabled": {
+    "description": "启用网站版本化管理同步；仅production，120秒失联停止新命令/发送，保留账本与安全暂停",
+    "type": "bool",
+    "default": false
+  },
+  "managed_groups_enabled": {
+    "description": "按网站超管已确认群列表运行；未知群仅精确短效绑定挑战，默认关闭",
+    "type": "bool",
+    "default": false
+  }
+}

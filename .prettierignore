@@ -1,0 +1,51 @@
+# Rules, upstream skills, local configuration and documentation are preserved.
+**/AGENTS.md
+**/.agents/**
+**/.codex/**
+**/.aws/**
+docs/**
+**/.env
+**/.env.*
+**/.npmrc
+**/.local/**
+**/.git/**
+
+# Public assets, generated code/resources, dependencies and build products.
+**/public/**
+**/node_modules/**
+**/dist/**
+**/build/**
+**/generated/**
+**/.next/**
+**/.cache/**
+**/coverage/**
+**/*.tsbuildinfo
+apps/web/app/static-assets.css
+apps/web/static-assets.json
+apps/web/components/stickers/manifest.json
+
+# Package manager files are generated only by the package manager.
+pnpm-lock.yaml
+pnpm-workspace.yaml
+**/package-lock.json
+**/npm-shrinkwrap.json
+**/yarn.lock
+**/bun.lock
+**/bun.lockb
+
+# Schema/SQL have separate owners; no formatter plugins are installed.
+**/*.prisma
+**/*.sql
+
+# Preserve historical execution receipts, including already tracked evidence.
+**/*.tap
+**/*.log
+**/*.har
+**/*.sha256
+**/*-results.json
+**/results.json
+**/*summary*.json
+**/*receipt*.json
+**/*evidence*.json
+**/*metrics*.json
+**/*coverage*.json

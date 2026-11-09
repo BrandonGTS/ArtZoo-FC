@@ -1,0 +1,15 @@
+.album-modal .ant-modal-container {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  border-radius: 0;
+  isolation: isolate;
+}
+.album-modal .ant-modal-container::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: -10px -17px -23px;
+  background: var(--artzoo-bg-album-upload-paper) center/100% 100% no-repeat;
+}

@@ -1,0 +1,200 @@
+.my-activities-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+.my-activities-content .my-activity-row .activity-paper-body {
+  min-height: 134px;
+  display: grid;
+  grid-template-columns: 118px repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  padding: 20px;
+  align-items: center;
+}
+.my-activity-date {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-self: stretch;
+  gap: 4px;
+  padding-right: 16px;
+  border-right: 1px solid var(--artzoo-line);
+}
+.my-activity-date > time {
+  color: var(--artzoo-heading);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 30px;
+}
+.my-activity-date > span {
+  color: var(--artzoo-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
+.my-activity-summary {
+  min-width: 0;
+}
+.my-activities-content h3 {
+  color: var(--artzoo-heading);
+  font-size: 22px;
+  line-height: 30px;
+  overflow-wrap: anywhere;
+}
+.my-activities-content h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+.my-activity-fact {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--artzoo-secondary);
+  font-size: 16px;
+  line-height: 26px;
+}
+.my-activity-fact > svg,
+.my-activity-fact > img {
+  flex: none;
+  color: var(--artzoo-heading);
+}
+.my-activity-fact > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.my-activity-registration > img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.my-activity-time-range {
+  white-space: nowrap;
+}
+.my-activities-empty {
+  padding: 8px 0;
+}
+.my-activities-refresh-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.my-activities-period-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.my-activities-period-panel {
+  overflow: visible;
+  padding-top: 24px;
+}
+@media (max-width: 760px) {
+  .my-activities-content .my-activity-row .activity-paper-body {
+    grid-template-columns: 104px repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    padding: 16px;
+  }
+  .my-activities-content h3 {
+    font-size: 18px;
+    line-height: 28px;
+  }
+  .my-activity-date {
+    padding-right: 12px;
+  }
+  .my-activity-fact {
+    font-size: 14px;
+    line-height: 22px;
+  }
+}
+@media (max-width: 560px) {
+  .my-activities-content .my-activity-row .activity-paper-body {
+    grid-template-columns: 84px repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    padding: 12px;
+  }
+  .my-activity-date > time {
+    font-size: 18px;
+    line-height: 28px;
+  }
+  .my-activity-date > span {
+    font-size: 11px;
+  }
+  .my-activity-date {
+    padding-right: 8px;
+  }
+  .my-activity-fact {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .my-activity-fact > span {
+    max-width: 100%;
+  }
+  .my-activities-content h3 {
+    font-size: 16px;
+    line-height: 24px;
+  }
+  .my-activity-summary .activity-title-row {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .my-activities-content .my-activity-summary .activity-title-row > .ant-tag {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    padding-inline: 4px;
+    font-size: 12px;
+    line-height: 18px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+    text-align: center;
+  }
+}
+
+/* Preserve the desktop time + four facts row. Narrow cards give the title real space. */
+@media (max-width: 600px) {
+  .my-activities-content .my-activity-row .activity-paper-body {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px;
+    padding: 16px;
+  }
+  .my-activity-date {
+    grid-column: span 2;
+    grid-row: 1;
+    min-width: 0;
+    padding-right: 8px;
+  }
+  .my-activity-summary {
+    grid-column: span 4;
+    grid-row: 1;
+  }
+  .my-activity-summary .activity-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .my-activities-content h3 {
+    width: 100%;
+    font-size: 18px;
+    line-height: 28px;
+  }
+  .my-activities-content .my-activity-summary .activity-title-row > .ant-tag {
+    white-space: nowrap;
+  }
+  .my-activity-fact {
+    grid-column: span 3;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+  .my-activity-fact:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+}

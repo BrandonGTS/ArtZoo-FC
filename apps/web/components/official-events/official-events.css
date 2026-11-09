@@ -1,0 +1,427 @@
+.official-admin-content {
+  min-width: 0;
+}
+.official-admin-heading,
+.official-detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.official-admin-filterbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-width: 0;
+}
+.official-admin-filterbar > .collection-filterbar {
+  flex: 1;
+  min-width: 0;
+}
+.official-admin-filterbar > .ant-btn {
+  flex: none;
+}
+.official-admin-layout {
+  overflow-anchor: none;
+  display: grid;
+  grid-template-columns: minmax(250px, 400px) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.official-admin-sidebar,
+.official-admin-detail {
+  min-width: 0;
+}
+.official-admin-sidebar > .activity-paper-body > section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.official-admin-detail-body {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  min-width: 0;
+}
+.official-admin-detail h3 {
+  margin: 0;
+  font: 400 24px/32px var(--artzoo-body-font);
+  overflow-wrap: anywhere;
+}
+.official-admin-item.ant-btn {
+  height: auto;
+  min-height: 96px;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  text-align: left;
+  white-space: normal;
+  border-radius: 0;
+  border-bottom: 1px solid var(--artzoo-line);
+}
+.official-admin-item.ant-btn[aria-current='true'] {
+  background: var(--artzoo-fill);
+  border: 1px solid var(--artzoo-primary);
+  border-radius: 8px;
+}
+.official-admin-item-title {
+  color: var(--artzoo-text);
+  font-size: 20px;
+  line-height: 30px;
+  overflow-wrap: anywhere;
+}
+.official-source {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.official-source > .ant-btn-link {
+  justify-self: start;
+  padding-inline: 0;
+  text-decoration: underline;
+}
+.official-source-url {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--artzoo-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
+.official-source-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 360px;
+  overflow: auto;
+  padding: 16px;
+  background: var(--artzoo-fill);
+  border: 1px solid var(--artzoo-line);
+  border-radius: 8px;
+}
+.official-editor-fields {
+  display: grid;
+  gap: 20px;
+}
+.official-editor-fields label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.official-time-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.official-time-fields .ant-picker {
+  width: 100%;
+}
+.official-admin-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.official-audit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  border-top: 1px solid var(--artzoo-line);
+  padding-top: 24px;
+  min-width: 0;
+}
+.official-audit .ant-table-cell {
+  overflow-wrap: anywhere;
+}
+.official-admin-sidebar > .activity-paper-body > section > .collection-page-navigation,
+.official-audit > .collection-page-navigation {
+  justify-self: center;
+  max-width: 100%;
+  margin-top: 8px;
+}
+.official-calendar-bars {
+  position: absolute;
+  inset: 38px 5px auto;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 22px);
+  gap: 4px 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.official-calendar-bar.ant-btn {
+  pointer-events: auto;
+  width: calc(100% - 2px);
+  min-width: 0;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 5px;
+  border: 1px solid #628894;
+  border-radius: 4px;
+  color: #355c68;
+  background: #e5eeee;
+  text-align: left;
+  justify-content: flex-start;
+  font-size: 14px;
+  line-height: 20px;
+  overflow: hidden;
+}
+.official-calendar-bar.ant-btn > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.official-day-card .official-calendar-meta {
+  color: #355c68;
+  font-size: 14px;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+.official-day-card .official-calendar-summary {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.official-day-card .ant-btn-link {
+  width: fit-content;
+  height: auto;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.official-calendar-load-state {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+@media (max-width: 1100px) {
+  .official-admin-layout {
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 24px;
+  }
+  .official-time-fields {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .official-admin-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .official-admin-sidebar > .activity-paper-body,
+  .official-admin-detail > .activity-paper-body {
+    padding: 16px;
+  }
+  .official-admin-actions {
+    gap: 8px;
+  }
+  .official-calendar-bars {
+    inset-inline: 2px;
+  }
+  .official-calendar-bar.ant-btn {
+    font-size: 12px;
+    padding-inline: 2px;
+  }
+}
+
+.official-image-editor,
+.official-current-image {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.official-admin-image {
+  width: 100%;
+  max-width: 360px;
+}
+.official-admin-image .official-image-content {
+  display: block;
+  width: 100%;
+  height: 220px;
+  object-fit: contain;
+}
+.official-image-url-hint {
+  overflow-wrap: anywhere;
+}
+.official-clear-image.ant-btn {
+  justify-self: start;
+}
+.official-calendar-image {
+  width: 100%;
+  max-width: 100%;
+}
+.official-calendar-image .official-image-content {
+  display: block;
+  width: 100%;
+  height: 160px;
+  object-fit: contain;
+}
+
+/* Calendar-only official summaries share the homepage motion with a flat profile. */
+.official-calendar-day-marker {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: none;
+  height: 14px;
+  min-height: 14px;
+  margin-top: auto;
+  pointer-events: none;
+}
+.official-calendar-dot {
+  display: block;
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+}
+.official-calendar-border-filters {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* Restore the original raster ink and its antialiasing for the ongoing green. */
+.official-day-card-ongoing::before {
+  filter: none;
+}
+.official-day-card-upcoming::before {
+  filter: url('#official-calendar-border-upcoming');
+}
+.official-day-card-ending::before {
+  filter: url('#official-calendar-border-ending');
+}
+.official-calendar-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  color: var(--artzoo-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+.official-calendar-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.official-day-card .activity-paper-body {
+  padding: 16px;
+}
+.official-day-card-link {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  color: var(--artzoo-text);
+  text-decoration: none;
+}
+.official-day-card-link:hover {
+  color: var(--artzoo-text);
+}
+.official-day-card .official-calendar-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 200/112;
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: 10px;
+  background: transparent;
+}
+.official-day-card .official-calendar-image .official-image-content {
+  display: block;
+  flex: none;
+  width: auto;
+  max-width: none;
+  height: 100%;
+  aspect-ratio: auto;
+  object-fit: contain;
+}
+.official-day-card-copy {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.official-day-card-title {
+  min-width: 0;
+}
+.official-day-card .official-day-card-title h3 {
+  display: inline;
+  margin: 0;
+  font: 700 24px/34px var(--artzoo-body-font);
+  overflow-wrap: anywhere;
+}
+.official-day-card .official-event-type.ant-tag {
+  display: inline-block;
+  vertical-align: 3px;
+  margin: 0 8px 4px 0;
+  padding: 1px 8px;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.official-event-type-collaboration.ant-tag {
+  background: #ba3e69;
+}
+.official-event-type-seasonal.ant-tag {
+  background: #9b5708;
+}
+.official-event-type-store.ant-tag {
+  background: #247451;
+}
+.official-event-type-special.ant-tag {
+  background: #6b56a0;
+}
+.official-day-card .official-calendar-summary {
+  margin: 0;
+  font-size: 14px;
+  line-height: 24px;
+  color: var(--artzoo-secondary);
+}
+.official-day-card .official-calendar-meta {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: var(--artzoo-secondary);
+  font-size: 13px;
+  line-height: 22px;
+}
+.official-day-card .official-calendar-meta > img {
+  flex: none;
+  margin-top: 3px;
+}
+@media (max-width: 700px) {
+  .official-calendar-legend {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 700px) {
+  .official-admin-filterbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .official-admin-filterbar > .collection-filterbar {
+    flex-basis: 100%;
+  }
+  .official-admin-filterbar > .ant-btn {
+    margin-left: auto;
+  }
+}

@@ -1,0 +1,82 @@
+.account-lifecycle-content {
+  min-width: 0;
+}
+.account-lifecycle-confirm,
+.account-lifecycle-impact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+.account-lifecycle-confirm p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.account-lifecycle-modal {
+  max-width: calc(100vw - 32px);
+}
+.account-lifecycle-modal .ant-modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.account-lifecycle-modal .ant-modal-footer > .ant-btn {
+  margin-inline-start: 0;
+}
+.account-lifecycle-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+  padding: 12px 0;
+  border-block: 1px solid var(--artzoo-line);
+}
+.account-lifecycle-counts > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+.account-lifecycle-counts dt {
+  overflow-wrap: anywhere;
+}
+.account-lifecycle-counts dd {
+  margin: 0;
+  flex: none;
+  color: var(--artzoo-heading);
+}
+.account-lifecycle-impact-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+.account-lifecycle-impact-group h3 {
+  margin: 0;
+  color: var(--artzoo-heading);
+  font: 400 18px/28px var(--artzoo-body-font);
+}
+.account-lifecycle-impact-group ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 22px;
+}
+.account-lifecycle-impact-group li {
+  overflow-wrap: anywhere;
+}
+.account-lifecycle-impact-group li > span {
+  display: block;
+}
+.account-lifecycle-final {
+  padding-top: 16px;
+  border-top: 1px solid var(--artzoo-line);
+  color: var(--artzoo-heading);
+}
+@media (max-width: 420px) {
+  .account-lifecycle-counts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

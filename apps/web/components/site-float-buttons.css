@@ -1,0 +1,43 @@
+.site-float-tools.ant-float-btn-group {
+  inset-inline-end: max(20px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+}
+.site-float-tools.ant-float-btn-group.ant-float-btn-group-individual .site-float-tools-list {
+  gap: 12px;
+}
+.site-float-tools.ant-float-btn-group .ant-float-btn {
+  position: relative;
+  inset: auto;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  box-shadow: none;
+  background-image: none;
+  font-family: var(--artzoo-body-font);
+}
+.site-float-tools .ant-float-btn-icon,
+.site-float-tools .ant-float-btn-icon svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+.site-float-tools .ant-badge-count {
+  font-family: var(--artzoo-body-font);
+  color: var(--artzoo-surface);
+  box-shadow: none;
+}
+.site-float-tools.ant-float-btn-group .ant-float-btn.ant-btn:focus-visible {
+  outline: 2px solid var(--artzoo-primary);
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .site-float-tools.ant-float-btn-group {
+    inset-inline-end: max(12px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  .site-float-tools.ant-float-btn-group.ant-float-btn-group-individual .site-float-tools-list {
+    gap: 8px;
+  }
+}

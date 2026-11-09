@@ -1,0 +1,183 @@
+.collection-filterbar {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 32px;
+  min-width: 0;
+}
+.collection-filterbar::after {
+  content: '';
+  position: absolute;
+  top: 49.5px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #c5c9b1;
+  pointer-events: none;
+}
+.collection-tabs {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+}
+.home-content .collection-tabs.ant-tabs > .ant-tabs-nav.collection-tabs-header {
+  margin: 0;
+  height: 52px;
+  min-height: 52px;
+}
+.home-content .collection-tabs.ant-tabs > .ant-tabs-nav.collection-tabs-header::before {
+  border-bottom: 0;
+}
+.home-content .collection-tabs .ant-tabs-tab {
+  padding: 12px 0;
+  font: 700 18px/28px var(--artzoo-body-font);
+  color: var(--artzoo-heading);
+}
+.home-content .collection-tabs .ant-tabs-tab + .ant-tabs-tab {
+  margin-left: 32px;
+}
+.home-content .collection-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--artzoo-heading);
+  text-shadow: none;
+}
+.home-content .collection-tabs .ant-tabs-tab-btn:hover {
+  color: var(--artzoo-primary);
+}
+.home-content .collection-tabs.ant-tabs .ant-tabs-ink-bar.collection-tabs-indicator {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--artzoo-heading);
+}
+.collection-tabs .ant-tabs-nav-list {
+  min-height: 52px;
+}
+.collection-tabs-body {
+  display: none;
+}
+.collection-search {
+  flex: 0 1 360px;
+  min-width: 220px;
+  padding-bottom: 8px;
+}
+.collection-search .ant-input-search {
+  width: 100%;
+  max-width: none;
+}
+.collection-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--artzoo-heading);
+  font:
+    700 24px/1 Arial,
+    sans-serif;
+}
+.collection-search-clear:hover {
+  color: var(--artzoo-primary);
+}
+.collection-page-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 24px;
+}
+.collection-page-navigation > span {
+  font: 700 24px/40px var(--artzoo-body-font);
+  color: var(--artzoo-text);
+}
+.collection-page-navigation .ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: 1;
+  background: transparent;
+  color: var(--artzoo-text);
+}
+.collection-page-navigation .ant-btn,
+.collection-page-navigation .ant-btn:is(:hover, :active) {
+  border: 0 solid transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: none !important;
+}
+.collection-page-navigation .ant-btn:not(:focus-visible) {
+  outline: none !important;
+}
+.collection-page-navigation .ant-btn::before,
+.collection-page-navigation .ant-btn::after {
+  content: none !important;
+  display: none !important;
+}
+.collection-page-navigation .ant-btn:is(:hover, :active):not(:disabled) {
+  color: var(--artzoo-primary);
+}
+.collection-page-navigation .ant-btn:disabled {
+  color: var(--artzoo-secondary);
+  opacity: 0.35;
+}
+.collection-page-navigation .ant-btn .ant-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 1320px) {
+  .collection-filterbar {
+    gap: 24px;
+  }
+  .collection-search {
+    flex-basis: 300px;
+  }
+}
+@media (max-width: 1000px) {
+  .collection-filterbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .collection-tabs {
+    flex-basis: 100%;
+  }
+  .collection-search {
+    flex-basis: 360px;
+    margin-left: auto;
+    padding-bottom: 12px;
+  }
+}
+@media (max-width: 600px) {
+  .home-content .collection-tabs .ant-tabs-tab {
+    font-size: 16px;
+    line-height: 26px;
+  }
+  .home-content .collection-tabs .ant-tabs-tab + .ant-tabs-tab {
+    margin-left: 24px;
+  }
+  .collection-search {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .collection-page-navigation {
+    gap: 18px;
+  }
+}
+
+/* Appeals subcategories keep the shared typography/ink motion without a full baseline. */
+.collection-filterbar-secondary::after {
+  content: none;
+}
+
+/* Match the icon-only selector priority, including Modal portals outside main. */
+.collection-page-navigation .ant-btn.ant-btn-icon-only {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+}

@@ -1,0 +1,197 @@
+.bot-management {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.bot-management .management-paper-panel > .activity-paper-body {
+  gap: 24px;
+}
+.bot-management h2,
+.bot-management h3 {
+  margin: 0;
+  color: var(--artzoo-heading);
+}
+.bot-state .ant-tag {
+  margin: 0;
+}
+.bot-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.bot-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--artzoo-line);
+}
+.bot-parameters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+.bot-parameter {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.bot-parameter .ant-input-number {
+  width: 100%;
+  max-width: 240px;
+}
+.bot-advanced {
+  border-top: 1px solid var(--artzoo-line);
+  padding-top: 20px;
+}
+.bot-advanced > summary {
+  cursor: pointer;
+  color: var(--artzoo-heading);
+  font-weight: 700;
+}
+.bot-advanced[open] > .bot-parameters {
+  margin-top: 20px;
+}
+.bot-variables {
+  display: grid;
+  gap: 12px;
+}
+.bot-variable {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+.bot-variable .ant-btn {
+  justify-self: start;
+}
+.bot-variable span {
+  overflow-wrap: anywhere;
+}
+.bot-preview {
+  border-left: 1px solid var(--artzoo-line);
+  padding-left: 24px;
+  min-width: 0;
+}
+.bot-preview-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.bot-preview pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  line-height: 1.8;
+  margin: 20px 0 0;
+}
+@media (max-width: 900px) {
+  .bot-template-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bot-parameters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .bot-preview {
+    border-left: 0;
+    border-top: 1px solid var(--artzoo-line);
+    padding: 20px 0 0;
+  }
+}
+@media (max-width: 600px) {
+  .bot-parameters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bot-variable {
+    grid-template-columns: 135px minmax(0, 1fr);
+  }
+}
+
+.bot-reminder-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.bot-reminders {
+  display: grid;
+  gap: 18px;
+}
+.bot-reminder-row {
+  display: flex;
+  align-items: end;
+  gap: 20px;
+}
+.bot-reminder-row .bot-parameter {
+  flex: 1;
+  max-width: 240px;
+}
+.bot-reminder-row .ant-switch {
+  align-self: end;
+  margin-bottom: 8px;
+}
+.bot-state .ant-tag {
+  border-color: transparent;
+}
+@media (max-width: 600px) {
+  .bot-reminder-row {
+    gap: 12px;
+  }
+  .bot-reminder-row .bot-parameter {
+    min-width: 0;
+  }
+}
+
+.bot-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+.bot-group-panel {
+  display: grid;
+  gap: 20px;
+}
+.bot-group-list {
+  display: grid;
+  gap: 12px;
+}
+.bot-group-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--artzoo-line);
+}
+.bot-group-row > span:first-child {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.bot-group-create {
+  display: flex;
+  gap: 16px;
+  max-width: 520px;
+}
+.bot-group-proof {
+  display: grid;
+  gap: 16px;
+  max-width: 680px;
+}
+.bot-group-proof p {
+  margin: 0;
+}
+.bot-preview > p[role='status'] {
+  margin: 20px 0 0;
+  color: var(--artzoo-heading);
+}
+@media (max-width: 600px) {
+  .bot-group-row {
+    flex-wrap: wrap;
+  }
+  .bot-preview-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}

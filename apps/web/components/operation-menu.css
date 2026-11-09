@@ -1,0 +1,63 @@
+.operation-menu-entry {
+  display: inline-flex;
+  flex: none;
+  align-self: flex-start;
+  margin-left: auto;
+}
+.operation-menu-entry .operation-menu-trigger.ant-btn {
+  width: 32px;
+  height: 32px;
+  color: var(--artzoo-secondary);
+  border-color: transparent;
+  box-shadow: none;
+}
+.operation-menu-entry .operation-menu-trigger.ant-btn:hover,
+.operation-menu-entry .operation-menu-trigger.ant-btn:active,
+.operation-menu-entry .operation-menu-trigger.ant-btn:focus,
+.operation-menu-entry .operation-menu-trigger.ant-btn:disabled {
+  border-color: transparent;
+  box-shadow: none;
+}
+.operation-menu-chevron {
+  display: block;
+  width: 9px;
+  height: 9px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+.operation-menu-popup {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  min-width: 152px;
+  max-width: min(320px, calc(100vw - 32px));
+}
+.operation-menu-popup[role='menu'] .ant-btn {
+  width: 100%;
+  height: auto;
+  min-height: 36px;
+  white-space: normal;
+  box-shadow: none;
+  text-align: center;
+  border-color: transparent;
+  background: transparent;
+}
+.operation-menu-popup[role='menu'] .ant-btn:not(:disabled):hover,
+.operation-menu-popup[role='menu'] .ant-btn:not(:disabled):active,
+.operation-menu-popup[role='menu'] .ant-btn:focus-visible {
+  background: var(--operation-menu-hover-bg);
+  border-color: transparent;
+  box-shadow: none;
+}
+.messages-content .message-item > .operation-menu-entry {
+  position: absolute;
+  top: 16px;
+  right: 12px;
+}
+@media (max-width: 600px) {
+  .messages-content .message-item > .operation-menu-entry {
+    right: 6px;
+    top: 12px;
+  }
+}

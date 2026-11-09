@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+  - '!tools/**'
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true
+  unrs-resolver: true
+  sharp: true
+  '@swc/core': true
+patchedDependencies:
+  minimatch@10.2.6: patches/minimatch@10.2.6.patch

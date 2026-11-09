@@ -1,0 +1,321 @@
+.knowledge-editor-form-v2.knowledge-editor {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+.knowledge-editor-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 260px);
+  gap: 20px;
+}
+.knowledge-editor-fields .ant-form-item {
+  margin-bottom: 0;
+}
+.knowledge-editor-fields .ant-select {
+  width: 100%;
+}
+.knowledge-editor-v2.knowledge-rich-editor {
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+  border: 1px solid var(--knowledge-input-border);
+  border-radius: var(--knowledge-input-radius);
+  background: var(--knowledge-input-bg);
+}
+.knowledge-rich-toolbar-v2 {
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--knowledge-input-split);
+  border-radius: var(--knowledge-input-radius) var(--knowledge-input-radius) 0 0;
+  background: var(--knowledge-input-bg);
+}
+.knowledge-toolbar-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-height: 36px;
+}
+.knowledge-toolbar-row + .knowledge-toolbar-row {
+  padding-top: 5px;
+  border-top: 1px solid var(--knowledge-input-split);
+  margin-top: 5px;
+}
+.knowledge-toolbar-row .ant-btn {
+  height: 30px;
+  padding-inline: 7px;
+  font-size: 13px;
+  box-shadow: none;
+}
+.knowledge-toolbar-row .ant-btn[aria-pressed='true'] {
+  background: var(--knowledge-input-active-bg);
+  color: var(--artzoo-primary, #436b4e);
+}
+.knowledge-font-select {
+  width: 64px;
+}
+.knowledge-line-select {
+  width: 74px;
+}
+.knowledge-toolbar-row .ant-select {
+  margin-inline: 3px;
+}
+.knowledge-editor-v2 .knowledge-rich-input {
+  min-height: 420px;
+  padding: 22px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  color: var(--knowledge-input-text);
+}
+.knowledge-editor-v2 .knowledge-rich-input p {
+  margin: 0 0 0.65em;
+}
+.knowledge-rich-input table,
+.knowledge-rich-body table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  max-width: 100%;
+}
+.knowledge-rich-input td,
+.knowledge-rich-input th,
+.knowledge-rich-body td,
+.knowledge-rich-body th {
+  border: 1px solid #c9cec5;
+  padding: 8px;
+  min-width: 28px;
+  vertical-align: top;
+  position: relative;
+  overflow-wrap: anywhere;
+}
+.knowledge-rich-input .selectedCell:after {
+  position: absolute;
+  inset: 0;
+  background: #436b4e26;
+  pointer-events: none;
+  content: '';
+}
+.knowledge-rich-input details,
+.knowledge-rich-body details {
+  border: 1px solid #dedfd7;
+  border-radius: 6px;
+  padding: 10px;
+  margin-block: 12px;
+}
+.knowledge-rich-input summary,
+.knowledge-rich-body summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.knowledge-rich-input details > div,
+.knowledge-rich-body details > div {
+  padding-top: 10px;
+}
+.knowledge-table-scroll {
+  max-width: 100%;
+  overflow: auto;
+}
+.knowledge-color-picker {
+  width: 218px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.knowledge-color-grid {
+  display: grid;
+  grid-template-columns: repeat(11, 16px);
+  gap: 4px;
+}
+.knowledge-color-grid .ant-btn {
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid #ddd;
+  border-radius: 2px;
+}
+.knowledge-color-picker label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.knowledge-font-color {
+  border-bottom: 3px solid #a34335;
+}
+.knowledge-highlight-color {
+  background: #fff2cc;
+  padding-inline: 3px;
+}
+.knowledge-table-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 18px);
+  gap: 2px;
+}
+.knowledge-table-grid .ant-btn {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #d3d7cf;
+  border-radius: 1px;
+}
+.knowledge-table-grid .knowledge-grid-selected {
+  background: #c9d9c5;
+  border-color: #436b4e;
+}
+.knowledge-table-menu {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  max-width: min(360px, 85vw);
+}
+.knowledge-table-menu label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.knowledge-table-menu .ant-select {
+  grid-column: span 3;
+}
+.knowledge-link-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.knowledge-link-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.knowledge-editor-submit {
+  display: flex;
+  justify-content: center;
+  padding-block: 12px 4px;
+}
+.knowledge-editor-submit .ant-btn {
+  min-width: 200px;
+  height: 44px;
+  font-size: 18px;
+}
+.knowledge-draft-status {
+  margin: 0;
+  color: var(--artzoo-secondary, #6c776b);
+  font-size: 13px;
+}
+.knowledge-editor-fullscreen.knowledge-editor-v2 {
+  position: fixed;
+  inset: 12px;
+  z-index: 1100;
+  width: auto;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px #0003;
+}
+.knowledge-editor-fullscreen > .tiptap,
+.knowledge-editor-fullscreen > div:last-child {
+  min-height: 0;
+}
+.knowledge-editor-fullscreen > .tiptap,
+.knowledge-editor-fullscreen > .knowledge-rich-input {
+  flex: 1;
+  overflow: auto;
+}
+.knowledge-editor-fullscreen > div[data-tiptap-root],
+.knowledge-editor-fullscreen > .tiptap {
+  flex: 1;
+  overflow: auto;
+}
+.knowledge-editor-fullscreen .knowledge-rich-input {
+  height: 100%;
+  min-height: 0;
+}
+.knowledge-rich-input img,
+.knowledge-rich-body img {
+  max-width: 100%;
+  height: auto;
+}
+.knowledge-rich-input img.inline-sticker-image,
+.knowledge-rich-body img.artzoo-sticker {
+  display: inline-block;
+  height: 3lh;
+  max-height: 4rem;
+  width: auto;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-inline: 0.15em;
+}
+@media (max-width: 600px) {
+  .knowledge-editor-fields {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .knowledge-editor-v2 .knowledge-rich-input {
+    padding: 14px;
+    min-height: 360px;
+  }
+  .knowledge-toolbar-row .ant-btn {
+    padding-inline: 5px;
+    font-size: 12px;
+  }
+  .knowledge-editor-fullscreen.knowledge-editor-v2 {
+    inset: 4px;
+  }
+  .knowledge-editor-submit .ant-btn {
+    min-width: 220px;
+  }
+}
+.knowledge-editor-fullscreen.knowledge-editor-v2 > div:has(> .knowledge-rich-input) {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.knowledge-editor-fullscreen .knowledge-rich-toolbar-v2 {
+  flex-shrink: 0;
+}
+.knowledge-rich-body h1,
+.knowledge-rich-input h1 {
+  font-family: var(--artzoo-body-font);
+  font-size: 28px;
+  line-height: 1.3;
+}
+
+/* Rich defaults match the editor; legacy plain text retains its existing typography. */
+.knowledge-body.knowledge-rich-typography {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Match the title Input's theme surface; preserve the rich text content styles. */
+.knowledge-editor-v2.knowledge-rich-editor:hover {
+  border-color: var(--knowledge-input-hover-border);
+}
+.knowledge-editor-v2.knowledge-rich-editor:focus-within {
+  border-color: var(--knowledge-input-active-border);
+}
+.knowledge-toolbar-row .knowledge-toolbar-button.ant-btn {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.knowledge-toolbar-icon {
+  display: block;
+  flex: none;
+}
+.knowledge-toolbar-button .ant-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.knowledge-toolbar-row .knowledge-toolbar-button.ant-btn:focus-visible {
+  outline: 2px solid var(--knowledge-input-active-border);
+  outline-offset: 1px;
+}
+.knowledge-toolbar-row .knowledge-toolbar-button.ant-btn:not(:disabled):hover {
+  background: var(--knowledge-input-active-bg);
+}

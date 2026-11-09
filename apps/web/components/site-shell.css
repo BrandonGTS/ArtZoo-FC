@@ -1,0 +1,21 @@
+.site-skip-link {
+  position: fixed;
+  top: 12px;
+  left: 16px;
+  z-index: 1200;
+  padding: 8px 16px;
+  border-radius: var(--artzoo-radius, 12px);
+  background: var(--artzoo-surface);
+  color: var(--artzoo-primary);
+  transform: translateY(calc(-100% - 16px));
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.site-skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid var(--artzoo-primary);
+  outline-offset: 2px;
+}
+#site-main-content:focus {
+  outline: none;
+}

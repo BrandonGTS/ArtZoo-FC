@@ -1,0 +1,18 @@
+/* Generated static resources. Original assets remain available. */
+@font-face{font-family:'Patrick Hand';src:url('/artzoo/fonts/PatrickHand-Regular.woff2?v=48401b8c03644fc5321f') format('woff2');font-style:normal;font-weight:400;font-display:swap;unicode-range:U+0000-2E7F;}
+:root{
+  --artzoo-bg-paper-texture: url("/artzoo/optimized/paper-texture.70768c3efe394769.webp");
+  --artzoo-bg-login-paper: url("/artzoo/optimized/login-paper.a0ad1e9b68e0bba3.webp");
+  --artzoo-bg-register-paper: url("/artzoo/optimized/register-paper.e5df4ded8618edf5.webp");
+  --artzoo-bg-profile-paper: url("/artzoo/optimized/profile-paper.4c24838311114b5e.webp");
+  --artzoo-bg-directory-paper: url("/artzoo/optimized/directory-paper.cdbc219dbe291d99.webp");
+  --artzoo-bg-album-preview-paper: url("/artzoo/optimized/album-preview-paper.d8a0b24034503f3b.webp");
+  --artzoo-bg-album-upload-paper: url("/artzoo/optimized/album-upload-paper.17c9d5e21698d1d5.webp");
+  --artzoo-bg-knowledge-history-paper: url("/artzoo/optimized/knowledge-history-paper.2992ae58d079f400.webp");
+  --artzoo-bg-team-left: url("/artzoo/optimized/team-left.1605dd202a6636cb.webp");
+  --artzoo-bg-team-right: url("/artzoo/optimized/team-right.59309ee4517aa4b1.webp");
+  --artzoo-bg-team-session: url("/artzoo/optimized/team-session.31a3c17f6031574f.webp");
+  --artzoo-bg-team-seat: url("/artzoo/optimized/team-seat.98cfd0e469a99bdc.webp");
+  --artzoo-bg-album-card: url("/artzoo/optimized/album-card.2fff852c7ddec2b8.webp");
+  --artzoo-bg-paper-optimized: url("/artzoo/optimized/paper-rendered.3c547e6a8e82c71c.webp");
+}

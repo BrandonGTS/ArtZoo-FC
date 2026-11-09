@@ -1,0 +1,17 @@
+{
+  "name": "@artzoo/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "start": "node dist/index.js",
+    "smoke": "node dist/index.js --once --require-db"
+  },
+  "dependencies": {
+    "@artzoo/domain": "workspace:*",
+    "@artzoo/db": "workspace:*",
+    "@artzoo/media": "workspace:*"
+  }
+}

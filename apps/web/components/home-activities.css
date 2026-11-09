@@ -1,0 +1,162 @@
+.home-content .activity-grid {
+  align-items: stretch;
+  grid-auto-rows: 1fr;
+}
+.home-activity-card {
+  display: flex;
+  min-width: 0;
+}
+.home-activity-card .home-activity-card-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 218px;
+  padding: 24px;
+}
+.home-activity-title {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 0;
+  min-width: 0;
+}
+.home-activity-title > .ant-tag {
+  flex: none;
+  margin-inline-end: 0;
+}
+.home-activity-title h3 {
+  min-width: 0;
+  font-size: 24px;
+  line-height: 34px;
+  overflow-wrap: anywhere;
+}
+.home-activity-title h3 a {
+  color: var(--artzoo-heading);
+  text-decoration: none;
+}
+.home-activity-title h3 a:hover {
+  color: var(--artzoo-primary);
+}
+.home-activity-context {
+  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-activity-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--artzoo-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
+.home-activity-time > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.home-activity-time img,
+.home-activity-count img {
+  flex: none;
+}
+.home-activity-participants {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 28px;
+}
+.home-activity-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  font-size: 16px;
+  line-height: 26px;
+}
+.home-activity-count > span {
+  min-width: 80px;
+}
+.home-activity-people {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.home-activity-people .activity-avatars {
+  padding-left: 6px;
+  max-width: none;
+}
+.home-activity-people .activity-avatars a {
+  margin-left: -6px;
+}
+.home-activity-people .activity-avatars a:nth-child(even) .ant-avatar {
+  background: var(--artzoo-surface);
+}
+/* AntD keeps the icon class when a photo is present; size only the fallback. */
+.home-activity-people .activity-avatars .ant-avatar-icon:not(.ant-avatar-image) > img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+.home-activity-people .activity-avatars a:focus-visible {
+  position: relative;
+  z-index: 1;
+  border-radius: 50%;
+}
+.home-activity-more {
+  flex: none;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--artzoo-secondary);
+}
+.home-activity-detail.ant-btn {
+  margin-top: auto;
+  align-self: flex-start;
+  justify-content: flex-start;
+  width: 96px;
+  height: 40px;
+  padding: 7px 0;
+  font-size: 16px;
+  line-height: 26px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.home-activities-state .home-activities-state-body {
+  flex-wrap: wrap;
+  gap: 12px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1120px) {
+  .home-content .activity-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .home-content .activity-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.home-activity-fact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.home-activity-fact-icon {
+  flex: none;
+  color: var(--artzoo-heading);
+}
+.home-activity-fact > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

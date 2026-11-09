@@ -1,0 +1,101 @@
+.member-job-picker {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.member-job-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.member-job-role {
+  flex: 0 0 38px;
+  padding-top: 9px;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--artzoo-secondary);
+}
+.member-job-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.member-job-button.ant-btn {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+}
+.member-job-button img {
+  filter: grayscale(1);
+  opacity: 0.65;
+}
+.member-job-button.ant-btn:not(:disabled):hover,
+.member-job-button.ant-btn:not(:disabled):active,
+.member-job-selected.ant-btn {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.member-job-selected img {
+  filter: none;
+  opacity: 1;
+}
+.member-job-button.ant-btn:focus-visible,
+.member-selected-job:focus-visible {
+  outline: 2px solid var(--artzoo-primary);
+  outline-offset: 2px;
+}
+.member-job-legacy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.member-job-legacy .ant-btn {
+  white-space: normal;
+  height: auto;
+  min-height: 32px;
+  overflow-wrap: anywhere;
+}
+.member-selected-job {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: flex-start;
+  border-radius: 4px;
+}
+.member-legacy-job {
+  overflow-wrap: anywhere;
+}
+.member-editor-heading {
+  max-width: 960px;
+}
+.member-selected-jobs {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-left: 0;
+  margin-left: 0;
+}
+.member-selected-job-row,
+.member-selected-job-legacy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  padding-left: 0;
+  margin-left: 0;
+}
+.member-selected-job-row {
+  row-gap: 4px;
+  column-gap: 6px;
+  min-height: 24px;
+}
