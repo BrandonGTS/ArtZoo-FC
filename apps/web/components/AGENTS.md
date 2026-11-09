@@ -4,8 +4,8 @@
 
 ## 动手前
 
-- 先读 `docs/working-rules/ui-and-business-reuse.md` 里和这次改动相关的章节。
-- 先找现成的组件和写法，例如 `components/shared/`、`discussion-comments.tsx` 以及各模块已有的卡片和弹窗。不要重复造轮子。
+- 先读 `docs/design/ui-guidelines.md` 里和这次改动相关的章节，找到对应的基准组件。
+- 列表控件用 `collection-controls.tsx`，菜单用 `operation-menu.tsx`，评论用 `discussion-comments.tsx`，弹窗用 `ui/paper-modal.tsx`，提示用 `use-feedback-message.ts`。不要重复造轮子。
 
 ## 样式
 

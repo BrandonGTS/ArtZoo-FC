@@ -1,6 +1,6 @@
 # 账号服务交付与安全配置
 
-本段按 `docs/account-invitation-contract.md` v1 实现；此目录不提供生产 mock 开关。
+业务规则见 `docs/rules/accounts.md`；此目录不提供生产 mock 开关。
 
 ## 尚未连接的外部条件
 
