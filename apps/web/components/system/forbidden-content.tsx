@@ -1,6 +1,6 @@
 'use client';
 import { Button, Result } from 'antd';
-import type { ResultRef } from 'antd/es/result';
+import type { ResultRef } from 'antd';
 import '../../app/forbidden.css';
 
 // AntD 6.6.5's built-in 403 SVG has a 251x294 viewport but no viewBox.

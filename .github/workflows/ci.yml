@@ -1,0 +1,66 @@
+name: CI
+
+# 每次推送到 main、每次开 PR 或更新 PR、PR 标签变化时运行。
+# 永远只检查当前提交，不检出任何固定的历史版本。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: 检查
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      # 站长在 PR 上加对应标签，表示同意放行。
+      ALLOW_DEPENDENCY_CHANGE: ${{ contains(github.event.pull_request.labels.*.name, 'deps-approved') && '1' || '0' }}
+      ALLOW_MIGRATION_REWRITE: ${{ contains(github.event.pull_request.labels.*.name, 'migration-rewrite-approved') && '1' || '0' }}
+      ALLOW_LARGE_CHANGE: ${{ contains(github.event.pull_request.labels.*.name, 'large-change-approved') && '1' || '0' }}
+      # PR：和目标分支比；直接推送：和推送前的提交比。
+      RULES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+    steps:
+      - name: 检出当前提交
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: '12.9.1'
+          run_install: false
+      - name: 安装 Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+      - name: 仓库规则
+        run: node scripts/check-rules.mjs --base "$RULES_BASE"
+      - name: 密钥扫描
+        run: pnpm secret:check
+      - name: 生成代码
+        run: pnpm prepare:code
+      - name: 格式
+        run: pnpm format:check
+      - name: 代码规范
+        run: pnpm lint
+      - name: 类型检查
+        run: pnpm typecheck
+      # 阶段 2 接入测试后，在这里加入：
+      # - name: 测试
+      #   run: pnpm test
+      - name: 构建
+        run: pnpm build
