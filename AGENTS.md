@@ -16,7 +16,7 @@
 | `packages/media/` | 图片处理与存储 |
 | `plugins/astrbot_plugin_artzoo/` | QQ 机器人插件 |
 
-3. 架构见 `docs/ARCHITECTURE.md`。业务规则见 `docs/activity-management-rules.md`、`docs/account-invitation-contract.md`、`docs/wishes-confirmed-rules.md`。这些是从旧仓库带过来的文档，里面提到旧数据、旧发布号或已不存在文件的地方，一律忽略。
+3. 架构见 `docs/ARCHITECTURE.md`，业务规则见 `docs/rules/`（账号、活动、心愿、删除与治理），界面规范见 `docs/design/ui-guidelines.md`。每份规则文档末尾的"已知的问题与待定事项"是尚未决定的事项，不要擅自"修好"它们。
 
 ## 角色分工
 
