@@ -15,6 +15,8 @@
     "build": "pnpm prepare:code && pnpm --filter @artzoo/worker build && pnpm --filter @artzoo/web build",
     "lint": "pnpm --filter @artzoo/web lint",
     "typecheck": "pnpm -r typecheck",
+    "test": "node scripts/run-tests.mjs",
+    "test:pg": "node scripts/run-tests.mjs --pg",
     "dev:web": "pnpm --filter @artzoo/web dev",
     "dev:worker": "pnpm --filter @artzoo/worker start",
     "worker:smoke": "pnpm --filter @artzoo/worker smoke",
