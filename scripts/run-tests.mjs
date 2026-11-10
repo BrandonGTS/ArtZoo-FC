@@ -63,6 +63,7 @@ function run(file) {
   const argv = [
     ...imports.flatMap((i) => ['--import', pathToFileURL(i).href]),
     '--test',
+    '--test-timeout=60000',
     '--test-reporter=tap',
     file
   ];
@@ -71,7 +72,8 @@ function run(file) {
     let out = '';
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (out += d));
-    const timer = setTimeout(() => child.kill('SIGKILL'), 180_000);
+    // 单个用例超过 60 秒判失败；整个文件超过 150 秒强制结束，防止卡住的测试拖住整轮。
+    const timer = setTimeout(() => child.kill('SIGKILL'), 150_000);
     child.on('close', (code) => {
       clearTimeout(timer);
       const count = (k) => Number(out.match(new RegExp(`^# ${k} (\\d+)$`, 'm'))?.[1] ?? 0);
