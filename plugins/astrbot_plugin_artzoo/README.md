@@ -212,7 +212,7 @@ fixes or claim historical code passes that optional tool.
 From the repository root:
 
 ```sh
-python3 -B -m unittest discover -s tests/qq-official-plugin -v
+python3 -B -m unittest discover -s tests/qq-plugin -v
 ```
 
 Tests use standard Python, temporary SQLite and fake SDK/bridge/event objects.
