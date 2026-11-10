@@ -39,37 +39,82 @@ CI 每次都会在当前提交上运行全部单元测试和数据库测试。
 
 ## 关键功能与测试对照
 
-关键功能清单见 `docs/PLAN.md`。下表随每批测试补充。
+关键功能清单见 `docs/PLAN.md`。
 
-| 优先级 | 功能             | 测试文件                                                                                                                                                                                | 守住的行为（举例）                                                                                                                         |
-| ------ | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| P0     | 登录与会话       | `auth/service-rules.test.mjs`、`auth/rate-limits.test.mjs`、`auth/auth-regression.test.mjs`、`auth/concurrency.pg.test.mjs`                                                             | 统一的"手机号或密码不正确"；停用账号不能登录；改密、重置后所有旧会话失效；锁等待后重新核对权限                                             |
-| P0     | 注册与邀请       | `auth/service-rules.test.mjs`、`auth/invitation-usage.test.mjs`、`auth/invitation-usage.pg.test.mjs`、`auth/admin-and-invitations.test.mjs`、`auth/invitation-cipher.test.mjs`          | 无效 / 已用 / 已撤销 / 过期邀请被拒；两个连接同时注册时单次邀请只成功一次；验证码一次性、5 次错误作废；同服昵称唯一                        |
-| P0     | 写请求防护       | `auth/http-policy.test.mjs`、`auth/http-write-quota.test.mjs`、`write-guards/write-quota.test.mjs`、`public-endpoints/guest-and-avatar.test.mjs`、`write-guards/error-logging.test.mjs` | 错误来源、缺 `x-artzoo-request`、错误类型的写请求被拒；各模块写接口先校验再计额度；只信任可信代理传来的最后一段 IP；错误日志不泄露请求内容 |
-| P0     | 手机号与短信     | `auth/phone-input.test.mjs`、`auth/client-api.test.mjs`、`auth/aliyun-sms.test.mjs`、`auth/http-sms-config.test.mjs`、`auth/sms-provider.pg.test.mjs`、`auth/concurrency.pg.test.mjs`   | 只收大陆手机号；发送频率与全站日预算（并发下也不超）；未注册号码找回不发短信但响应一致；短信适配器签名正确且日志不泄露密钥                 |
-| P0     | 超管初始化与配置 | `auth/owner-initialization.test.mjs`、`auth/configuration.test.mjs`                                                                                                                     | 只能初始化一次超级管理员；短信等配置缺失时安全失败                                                                                         |
+| 优先级 | 功能                 | 测试文件                                                                                                                                                      | 守住的行为（举例）                                                                                                                             |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0     | 登录与会话           | `auth/service-rules`、`auth/rate-limits`、`auth/auth-regression`、`auth/password-change-expiry`、`auth/concurrency.pg`                                        | 统一的"手机号或密码不正确"；停用账号不能登录；改密、重置后所有旧会话失效；锁等待后重新核对权限                                                 |
+| P0     | 注册与邀请           | `auth/service-rules`、`auth/invitation-usage`、`auth/invitation-usage.pg`、`auth/admin-and-invitations`、`auth/invitation-cipher`                             | 无效 / 已用 / 已撤销 / 过期邀请被拒；两个连接同时注册时单次邀请只成功一次；验证码一次性、5 次错误作废；同服昵称唯一                            |
+| P0     | 写请求防护           | `auth/http-policy`、`auth/http-write-quota`、`write-guards/*`、`public-endpoints/guest-and-avatar`                                                            | 错误来源、缺 `x-artzoo-request`、错误类型的写请求被拒；先校验来源和登录再计额度；只信任可信代理传来的最后一段 IP；错误日志不泄露请求内容       |
+| P0     | 手机号与短信         | `auth/phone-input`、`auth/client-api`、`auth/aliyun-sms`、`auth/http-sms-config`、`auth/sms-provider.pg`、`auth/concurrency.pg`                               | 只收大陆手机号；发送频率与全站日预算（并发下也不超）；未注册号码找回不发短信但响应一致；短信签名正确且日志不泄露密钥                           |
+| P0     | 超管初始化与配置     | `auth/owner-initialization`、`auth/configuration`                                                                                                             | 只能初始化一次超级管理员；短信等配置缺失时安全失败                                                                                             |
+| P0     | 权限：后台管理       | `admin/admin-management.pg`、`admin/account-lifecycle.pg`、`auth/account-changes`                                                                             | 只有超级管理员能任免管理员、停用账号；不能对自己和其他超管操作；停用连带取消活动、报名、队伍关系和会话；审计只追加                             |
+| P0     | 权限：内容归属       | `content/*`                                                                                                                                                   | 普通删除只能删自己的；违规删除只有管理员能做且必须填理由；不能删别人的评论；"仅作者上传"的相册别人传不了；评论图片只能挂在自己的评论上         |
+| P0     | 活动发起与报名       | `activities/activities.pg`、`activities/http`、`activities/domain`、`activities/registration-and-edits`、`activities/duty-service`、`activities/publishing-*` | 朋友不能发起；每人每活动一份有效报名；最后一个席位并发只有一人成功；不能报别的活动的席位；截止时间精确到毫秒；换位与职业要求；写入失败整体回滚 |
+| P0     | 活动退出、取消与管理 | `activities/management-service`、`activities/management-contract`、`activities/activities.pg`                                                                 | 2 小时、4 小时扣分边界；缺人无责取消；只有发起者能修改和取消；跨过边界时不会悄悄扣分；3 点限制；改期规则                                       |
+| P0     | 长期与线下活动       | `activities/offline-series-*`、`activities/series-*`                                                                                                          | 线下截止与人数；长期活动首期招募、成团、自动取消、单期协商取消                                                                                 |
+| P1     | 活动列表与历史       | `activities/history`、`activities/home-upcoming`、`activities/my-activities`、`activities/description`                                                        | 操作历史只给发起者看全部；首页近期活动筛选；我的活动当前 / 历史划分                                                                            |
+| P1     | 积分与限制           | `scoring/standing`、`scoring/completion`、`scoring/completion.pg`、`scoring/auto-absence`、`scoring/auto-absence.pg`                                          | 3 点进入限制、每 7 天减 1 点；正常完成减 1 点且只结算一次；结束后未登记自动记缺席扣 2 点，与签到并发时持锁者胜出                               |
+| P1     | 到场登记             | `scoring/attendance-*`、`scoring/attendance.pg`                                                                                                               | 只有发起者在活动时间内登记；缺席扣 2 点、时间内改回到场撤销                                                                                    |
+| P1     | 申诉                 | `scoring/penalty-appeals*`                                                                                                                                    | 7 天期限；同时只有一条待处理；驳回后换理由可再申诉；批准后撤销处罚并按流水重算                                                                 |
+| P1     | 抽奖                 | `lottery/lottery.pg`、`lottery/eligibility-at-draw-time.pg`、`lottery/durability.pg`、`lottery/cutoff.pg`、`lottery/*`                                        | 开奖只执行一次、结果不可修改；资格按设定开奖时刻判断；通知失败不重抽；洗牌均匀（1 万次抽样）；发起与参加权限                                   |
+| P1     | 图片上传与处理       | `media/photo-processor`、`media/daily-processor`、`media/metadata-*`、`media/pipeline-integration`、`media/bitmap*`、`media/upload-gate`                      | 只接受白名单格式；超像素的"解压炸弹"被拒；去除 EXIF/GPS；BMP 在独立线程解码；全站上传并发上限                                                  |
+| P1     | 图片读取与头像       | `media/avatar`、`media/avatar-http`、`media/knowledge-image-upload`、`lottery/list-media`                                                                     | 头像格式与尺寸；只能挂载自己上传的图片；上传重放与并发只留一份；会话过期回滚并删除新文件；回执拒绝符号链接与硬链接                             |
+| P1     | 后台任务             | `worker/maintenance`、`worker/worker`、`worker/pool-health`、`worker/transaction-retry`                                                                       | 单条出错不影响其他条目和步骤；日志只记白名单字段；停止信号正常退出；连接池与健康检查；只对声明可重放的事务重试                                 |
+
+表中文件名省略了 `.test.mjs` 后缀，`.pg` 表示数据库测试。
 
 ### 验证测试确实能发现问题
 
 在本地临时改坏产品代码，确认对应测试会失败（改动未提交）：
 
-| 故意改坏                                        | 发现它的测试                                                                |
-| ----------------------------------------------- | --------------------------------------------------------------------------- |
-| 去掉 `x-artzoo-request` 请求头校验              | `auth/http-write-quota`、`write-guards/write-quota`、`auth/service-rules`   |
-| 来源 IP 改取 `X-Forwarded-For` 第一段（可伪造） | `auth/rate-limits`、`public-endpoints/guest-and-avatar`                     |
-| 验证码允许输错 50 次                            | `auth/service-rules`                                                        |
-| 登录区分"账号不存在"和"密码错误"                | `auth/rate-limits`、`auth/service-rules`                                    |
-| 重置密码后不作废旧会话                          | `auth/service-rules`                                                        |
-| 手机号放宽到 10/11/12 开头                      | `auth/http-policy`、`auth/phone-input`                                      |
-| 单次邀请用过后仍可注册                          | `auth/admin-and-invitations`、`auth/invitation-usage`、`auth/service-rules` |
-| 短信日预算多放行一条                            | `auth/concurrency.pg`                                                       |
-| 限流不加锁（并发下超额）                        | `auth/concurrency.pg`                                                       |
+| 故意改坏                                        | 发现它的测试                                                                       |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 去掉 `x-artzoo-request` 请求头校验              | `auth/http-write-quota`、`write-guards/write-quota`、`auth/service-rules`          |
+| 来源 IP 改取 `X-Forwarded-For` 第一段（可伪造） | `auth/rate-limits`、`public-endpoints/guest-and-avatar`                            |
+| 验证码允许输错 50 次                            | `auth/service-rules`                                                               |
+| 登录区分"账号不存在"和"密码错误"                | `auth/rate-limits`、`auth/service-rules`                                           |
+| 重置密码后不作废旧会话                          | `auth/service-rules`                                                               |
+| 手机号放宽到 10/11/12 开头                      | `auth/http-policy`、`auth/phone-input`                                             |
+| 单次邀请用过后仍可注册                          | `auth/admin-and-invitations`、`auth/invitation-usage`、`auth/service-rules`        |
+| 短信日预算多放行一条                            | `auth/concurrency.pg`                                                              |
+| 限流不加锁（并发下超额）                        | `auth/concurrency.pg`                                                              |
+| 退出扣分边界从 2 小时改成 1 小时                | `activities/management-service`                                                    |
+| 取消扣分边界从 4 小时改成 3 小时                | `activities/management-service`                                                    |
+| 达到 3 点仍可报名                               | `activities/management-service`                                                    |
+| 报名截止从开始前 30 分钟改成 10 分钟            | `activities/activities.pg`                                                         |
+| 已被占用的席位还能报名                          | `activities/activities.pg`                                                         |
+| 去掉"同一活动只能一份有效报名"检查              | `activities/activities.pg`                                                         |
+| 非发起者也能修改 / 取消活动                     | `activities/management-service`                                                    |
+| 朋友也能发起活动                                | `activities/activities.pg`                                                         |
+| 普通管理员也能任免管理员                        | `admin/admin-management.pg`                                                        |
+| 超管可以停用自己 / 其他超管                     | `admin/account-lifecycle.pg`                                                       |
+| 普通删除不检查是否本人                          | `content/deletion-intent`、`content/albums-permissions`、`content/albums-comments` |
+| 违规删除不要求理由                              | `content/deletion-intent`、`content/albums-*`、`content/knowledge-interactions`    |
+| 知识库非作者也能删除文章                        | `content/deletion-intent`                                                          |
+| 相册"仅作者上传"对所有人开放                    | `content/albums-permissions`                                                       |
+| 正常完成不减分                                  | `scoring/completion`                                                               |
+| 自然减点周期从 7 天改成 3 天                    | `scoring/standing`、`scoring/completion`、`scoring/attendance-contract`            |
+| 自动缺席只扣 1 点                               | `scoring/auto-absence`、`scoring/auto-absence.pg`                                  |
+| 处罚申诉期限改成 30 天                          | `scoring/penalty-appeals`                                                          |
+| 已开奖的抽奖还能再开一次                        | `lottery/lottery.pg`                                                               |
+| 洗牌算法不洗（结果可预测）                      | `lottery/lottery.pg`                                                               |
+| 去掉 EXIF 剥离                                  | `media/metadata-strip`、`media/photo-processor`、`media/daily-processor`           |
+| 去掉图片像素上限                                | `media/photo-processor`                                                            |
+| 不检查文件扩展名                                | `media/photo-processor`                                                            |
+| 后台任务单条出错就中断整轮                      | `worker/maintenance`                                                               |
 
 ### 测试中保留的旧兼容行为
 
-以下用例测试的是阶段 4 计划删除的兼容逻辑，删除那部分代码时一并删除这些用例：
+以下用例测试的是阶段 4 计划删除的兼容逻辑，删除那部分代码时一并删除：
 
-- `auth/concurrency.pg.test.mjs`："existing-six-and-seven-character-passwords-authenticate"（旧 6–7 位密码仍可登录）。
-- `auth/admin-and-invitations.test.mjs`：两条 "legacy cleanup" 用例（旧邀请清理命令）。
-- `activities/` 中名称带 legacy 的用例（旧活动没有副本快照、没有显式截止时间等）。
-- `admin/admin-management.pg.test.mjs` 中写入"公开 QQ"历史审计的准备步骤（公开 QQ 设置已停用）。
+- `auth/concurrency.pg`："existing-six-and-seven-character-passwords-authenticate"（旧 6–7 位密码仍可登录）。
+- `auth/admin-and-invitations`：两条 "legacy cleanup" 用例（旧邀请清理命令）。
+- `activities/`、`scoring/`、`media/` 中名称带 legacy 的用例（旧数据缺字段时的兼容读取）。
+- `admin/admin-management.pg` 中写入"公开 QQ"历史审计的准备步骤（公开 QQ 设置已停用）。
+- `lottery/support/empty-cos-db.mjs`：图片存储查询 COS 位置记录的替身，删除 COS 代码时一并删除。
+
+### 从旧仓库迁移时修正或放弃的测试
+
+- 相册评论、知识库图片上传两个测试的替身补上了"图片是否已进入待清理流程"的查询（产品代码后来新增的），断言未改。
+- 放弃：与某个历史提交逐字对比的抽奖算法测试、读取源码文本做断言的用例、依赖历史版本证明文件的媒体并发测试，以及只对旧数据有意义的"功能上线前的旧活动 / 旧处罚"用例。

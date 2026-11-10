@@ -134,10 +134,9 @@ const isTest = (f) => /\.test\.(m?[jt]sx?|cjs)$/.test(f);
 for (const f of files.filter(isTest)) {
   if (baseline.sourceReadingTests.includes(f)) continue;
   const text = readText(f);
-  if (
-    /readFile(Sync)?\s*\(/.test(text) &&
-    /(apps\/|packages\/|components\/|\.tsx?['"`]|\.css['"`])/.test(text)
-  )
+  // 只拦截"读取产品源码文件"：readFile 的路径参数直接指向 apps/、packages/、plugins/ 下的文件。
+  // 读取测试自己在临时目录里写出的文件不算。
+  if (/readFile(Sync)?\s*\(\s*(new URL\(\s*)?['"`][^'"`]*\b(apps|packages|plugins)\//.test(text))
     fail(
       '测试读源码',
       f,
