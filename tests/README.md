@@ -71,3 +71,5 @@ CI 每次都会在当前提交上运行全部单元测试和数据库测试。
 
 - `auth/concurrency.pg.test.mjs`："existing-six-and-seven-character-passwords-authenticate"（旧 6–7 位密码仍可登录）。
 - `auth/admin-and-invitations.test.mjs`：两条 "legacy cleanup" 用例（旧邀请清理命令）。
+- `activities/` 中名称带 legacy 的用例（旧活动没有副本快照、没有显式截止时间等）。
+- `admin/admin-management.pg.test.mjs` 中写入"公开 QQ"历史审计的准备步骤（公开 QQ 设置已停用）。
