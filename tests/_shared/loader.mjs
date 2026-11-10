@@ -3,8 +3,8 @@
 //   1. .ts 文件转译成 JavaScript；
 //   2. 不带扩展名或写成 .js 的相对导入，解析到同名 .ts 文件；
 //   3. @artzoo/domain、@artzoo/media 等工作区包指向源码；next/* 指向 apps/web 安装的版本；
-//   4. 禁止导入 @artzoo/db 包入口（它负责连接真实数据库），需要时由各目录的 setup.mjs 换成替身；
-//      @artzoo/db/<子模块> 这类纯逻辑子模块直接指向源码。
+//   4. @artzoo/db 及其子模块也指向源码。导入本身不会连接数据库；
+//      单元测试里一旦真的发起连接，会被 no-network.mjs 拦下。需要替身时在 setup.mjs 中替换。
 // 某个目录需要额外替身时，在该目录放 setup.mjs，用 registerHooks 追加规则（后注册的先生效）。
 import { registerHooks, createRequire } from 'node:module';
 import { readFileSync, existsSync } from 'node:fs';
@@ -30,8 +30,6 @@ function sourceFile(pkg, sub) {
 
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier === '@artzoo/db')
-      throw new Error('测试默认禁止导入 @artzoo/db 包入口（真实数据库），请在 setup.mjs 中提供替身');
     const workspace = /^@artzoo\/(domain|media|db)(?:\/(.+))?$/.exec(specifier);
     if (workspace) {
       const url = sourceFile(workspace[1], workspace[2]);

@@ -3,8 +3,9 @@
 //   node scripts/run-tests.mjs --pg         只运行数据库测试（*.pg.test.mjs），需要 ARTZOO_TEST_DATABASE_URL
 //   node scripts/run-tests.mjs tests/auth   只运行某个目录或某个文件
 //
-// 每个测试文件在独立进程中运行，自动加载 tests/_shared/loader.mjs，
-// 以及测试文件所在目录（或上级目录，直到 tests/）中的 setup.mjs。
+// 每个测试文件在独立进程中运行，自动加载 tests/_shared/loader.mjs、
+// 测试文件所在目录（或上级目录，直到 tests/）中的 setup.mjs，
+// 以及与测试文件同名的 <名称>.setup.mjs（只对这一个文件生效的替身）。
 // 单元测试额外加载 tests/_shared/no-network.mjs，禁止任何真实网络连接。
 // 任何文件失败、或者一个用例都没执行，结果都算失败。
 import { spawn } from 'node:child_process';
@@ -48,6 +49,8 @@ function setupFor(file) {
     if (existsSync(setup)) found.unshift(setup);
     if (dir === testsDir) break;
   }
+  const own = file.replace(/(\.pg)?\.test\.mjs$/, '.setup.mjs');
+  if (existsSync(own)) found.push(own);
   return found;
 }
 
