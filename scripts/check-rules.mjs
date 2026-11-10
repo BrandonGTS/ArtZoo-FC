@@ -129,7 +129,8 @@ for (const f of files) {
 }
 
 // ── 5. 测试不读取产品源码做断言 ──────────────────────────────────────
-const isTest = (f) => /\.test\.(m?[jt]sx?|cjs)$/.test(f) || /^tests\/.+\.(m?[jt]sx?|cjs)$/.test(f);
+// 只检查测试用例文件本身；tests/_shared 里的加载器、数据库工具需要读取源码和迁移文件，不在此列。
+const isTest = (f) => /\.test\.(m?[jt]sx?|cjs)$/.test(f);
 for (const f of files.filter(isTest)) {
   if (baseline.sourceReadingTests.includes(f)) continue;
   const text = readText(f);
