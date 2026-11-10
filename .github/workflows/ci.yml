@@ -74,6 +74,9 @@ jobs:
         run: pnpm typecheck
       - name: 单元测试
         run: pnpm test
+      - name: QQ 插件测试
+        # ubuntu-24.04 自带 Python 3.12，插件测试只用标准库，不安装任何依赖。
+        run: pnpm test:plugin
       - name: 数据库测试
         run: pnpm test:pg
         env:

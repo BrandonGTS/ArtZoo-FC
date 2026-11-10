@@ -1,15 +1,16 @@
-// 活动数据库测试的共用夹具：新建空库、跑完迁移，并建 13 个测试账号（第 6 个是朋友，其余是正式成员）。
+// 数据库测试的共用夹具：新建空库、跑完迁移，并建测试账号（默认 13 个；第 6 个是朋友，其余是正式成员）。
+// QQ、固定队等模块也复用它，需要更多账号时传 { accounts: n }。
 import assert from 'node:assert/strict';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { createTestDatabase } from '../../_shared/database.mjs';
-export async function fixture() {
+export async function fixture({ accounts = 13 } = {}) {
   const testDb = await createTestDatabase();
   const db = testDb.db;
   const ids = [],
     tokens = [];
   const { tokenDigest } = await import('../../../apps/web/server/auth/crypto.ts');
   const nonce = randomUUID().replaceAll('-', '');
-  for (let i = 0; i < 13; i++) {
+  for (let i = 0; i < accounts; i++) {
     const account = await db.account.create({
       data: {
         phone: 'activity-fixture-' + nonce + '-' + i,

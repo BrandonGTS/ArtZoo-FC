@@ -32,7 +32,7 @@ tests/single-activity/*.tap
 
 # Python-only plugin test bytecode; never a deliverable
 /plugins/astrbot_plugin_artzoo/__pycache__/
-/tests/qq-official-plugin/__pycache__/
+/tests/qq-plugin/__pycache__/
 
 # Unified test output patterns; tracked artifacts are retained pending review.
 tests/**/*.tap

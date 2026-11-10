@@ -22,7 +22,7 @@
 运行命令：
 
 ```bash
-python3 -B -m unittest discover -s tests/plugin
+pnpm test:plugin   # 等同于 python3 -B -m unittest discover -s tests/qq-plugin
 ```
 
-测试目录以阶段 2 实际确定的为准。
+测试在 `tests/qq-plugin/`，需要 Python 3.11 以上，只用标准库，不联网。CI 每次都会运行。
