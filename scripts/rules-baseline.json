@@ -2,12 +2,6 @@
   "说明": "整理前已存在的问题。检查只拦截新增问题；修好一项就从这里删掉一项，数字只能往下改。",
   "importantCount": 101,
   "unsafeRawSqlCount": 14,
-  "sourceReadingTests": [
-    "apps/web/components/account/hydration.test.mjs",
-    "apps/web/components/control-focus.test.mjs",
-    "apps/web/components/invitation/admin-hooks.test.mjs",
-    "apps/web/components/site-header-compact.test.mjs",
-    "apps/web/components/site-layout.test.mjs"
-  ],
-  "machinePaths": ["docs/wishes-confirmed-rules.md"]
+  "sourceReadingTests": [],
+  "machinePaths": []
 }
