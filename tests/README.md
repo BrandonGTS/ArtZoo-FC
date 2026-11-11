@@ -19,20 +19,28 @@ docker stop artzoo-test-pg
 
 只运行某个目录或文件：`node scripts/run-tests.mjs tests/auth`。
 
+数据库结构快照（同样需要上面的测试库）：
+
+```bash
+ARTZOO_TEST_DATABASE_URL=... pnpm db:snapshot          # 检查：迁移结果是否和 packages/db/prisma/schema-snapshot.txt 一致
+ARTZOO_TEST_DATABASE_URL=... pnpm db:snapshot --write  # 更新：改了迁移后重新生成快照，和迁移一起提交
+```
+
 CI 每次都会在当前提交上运行全部单元测试和数据库测试。
 
 ## 目录与约定
 
-| 位置                           | 内容                                                                   |
-| ------------------------------ | ---------------------------------------------------------------------- |
-| `tests/_shared/loader.mjs`     | 让 Node 直接运行 TypeScript 源码；默认禁止导入真实数据库入口           |
-| `tests/_shared/no-network.mjs` | 单元测试中禁止任何真实网络连接                                         |
-| `tests/_shared/database.mjs`   | 数据库测试：每个文件新建一个空库、跑完全部迁移、用完删除；只允许连本机 |
-| `tests/<模块>/setup.mjs`       | 该目录需要的替身（例如把连接数据库的模块换成假的）                     |
-| `tests/<模块>/support/`        | 该目录的测试辅助文件                                                   |
-| `*.test.mjs`                   | 单元测试                                                               |
-| `*.pg.test.mjs`                | 数据库测试                                                             |
-| `tests/qq-plugin/test_*.py`    | QQ 插件的 Python 测试（unittest），用 `pnpm test:plugin` 运行          |
+| 位置                                | 内容                                                                                          |
+| ----------------------------------- | --------------------------------------------------------------------------------------------- |
+| `tests/_shared/loader.mjs`          | 让 Node 直接运行 TypeScript 源码；默认禁止导入真实数据库入口                                  |
+| `tests/_shared/no-network.mjs`      | 单元测试中禁止任何真实网络连接                                                                |
+| `tests/_shared/database.mjs`        | 数据库测试：每个文件新建一个空库、跑完全部迁移、用完删除；只允许连本机                        |
+| `tests/_shared/schema-snapshot.mjs` | 把数据库结构整理成稳定的文本快照，供 `tests/db/schema-snapshot.pg` 和 `pnpm db:snapshot` 使用 |
+| `tests/<模块>/setup.mjs`            | 该目录需要的替身（例如把连接数据库的模块换成假的）                                            |
+| `tests/<模块>/support/`             | 该目录的测试辅助文件                                                                          |
+| `*.test.mjs`                        | 单元测试                                                                                      |
+| `*.pg.test.mjs`                     | 数据库测试                                                                                    |
+| `tests/qq-plugin/test_*.py`         | QQ 插件的 Python 测试（unittest），用 `pnpm test:plugin` 运行                                 |
 
 - 测试按产品模块放目录，名称里不写工单号、日期、版本号。
 - 测试要调用代码、断言行为，不读取源码文本做匹配。
@@ -74,6 +82,7 @@ CI 每次都会在当前提交上运行全部单元测试和数据库测试。
 | P1     | 日常                  | `content/daily.pg`、`content/daily-comment-media`                                                                                                             | 只有作者能编辑、删除；评论与提及通知去重；图片归属不能被盗用；管理员删除必须填理由                                                             |
 | P1     | 知识库                | `content/knowledge.pg`、`content/knowledge-*`                                                                                                                 | 匿名不能看；只有作者能改设置和删除；审核记录只有管理员能看；富文本只接受白名单内容                                                             |
 | P1     | 相册                  | `content/albums.pg`、`content/albums-*`                                                                                                                       | "仅作者上传"只有作者能传；图片读取权限；点赞查询次数固定                                                                                       |
+| P0     | 数据库结构            | `db/schema-snapshot.pg`                                                                                                                                       | 跑完全部迁移后的结构与保存的快照逐行一致：检查约束、带条件的唯一索引、触发器、函数和初始数据都不能悄悄丢失或改变                               |
 
 表中文件名省略了 `.test.mjs` 后缀，`.pg` 表示数据库测试。
 
@@ -131,6 +140,12 @@ CI 每次都会在当前提交上运行全部单元测试和数据库测试。
 | 知识库：非作者也能改文章设置                    | `content/knowledge-editor`、`content/knowledge.pg`                                 |
 | 知识库：非管理员也能看审核记录                  | `content/knowledge.pg`                                                             |
 | 相册"仅作者上传"对所有人开放（数据库层）        | `content/albums.pg`                                                                |
+| 迁移里去掉一条检查约束（处罚点数规则）          | `db/schema-snapshot.pg`                                                            |
+| 检查约束里的数字改了（迟退扣 1 点改成 2 点）    | `db/schema-snapshot.pg`                                                            |
+| 带条件的唯一索引去掉条件（每人一份有效报名）    | `db/schema-snapshot.pg`                                                            |
+| 去掉一个触发器（账号生命周期只追加）            | `db/schema-snapshot.pg`                                                            |
+| 触发器函数的内容改了（报错改成只提示）          | `db/schema-snapshot.pg`                                                            |
+| 去掉一条迁移写入的初始数据（快捷链接状态行）    | `db/schema-snapshot.pg`                                                            |
 
 ### 测试中保留的旧兼容行为
 

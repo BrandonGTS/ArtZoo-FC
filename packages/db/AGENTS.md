@@ -8,6 +8,7 @@
 - 时间字段一律使用 `@db.Timestamptz(3)`。
 - 大表改列类型时，按三步走：先新增一列，再回填数据，最后切换使用新列。不要直接 `ALTER COLUMN TYPE`，那样会长时间锁表。
 - 新的迁移必须在一个空的 PostgreSQL 上从头跑通，并且 `prisma migrate diff` 检查没有差异。
+- 结构快照 `prisma/schema-snapshot.txt` 记录了跑完全部迁移后的完整结构（含约束、触发器、函数和初始数据）。改了迁移就运行 `pnpm db:snapshot --write` 更新它，和迁移放在同一个提交里；数据库测试会检查两者一致。
 
 ## 写代码
 

@@ -17,6 +17,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "node scripts/run-tests.mjs",
     "test:pg": "node scripts/run-tests.mjs --pg",
+    "db:snapshot": "node --import ./tests/_shared/loader.mjs scripts/db-schema-snapshot.mjs",
     "test:plugin": "python3 -B -m unittest discover -s tests/qq-plugin",
     "dev:web": "pnpm --filter @artzoo/web dev",
     "dev:worker": "pnpm --filter @artzoo/worker start",
