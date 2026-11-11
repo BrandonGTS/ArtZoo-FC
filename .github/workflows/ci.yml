@@ -36,9 +36,12 @@ jobs:
     env:
       NEXT_TELEMETRY_DISABLED: '1'
       # 站长在 PR 上加对应标签，表示同意放行。
-      ALLOW_DEPENDENCY_CHANGE: ${{ contains(github.event.pull_request.labels.*.name, 'deps-approved') && '1' || '0' }}
-      ALLOW_MIGRATION_REWRITE: ${{ contains(github.event.pull_request.labels.*.name, 'migration-rewrite-approved') && '1' || '0' }}
-      ALLOW_LARGE_CHANGE: ${{ contains(github.event.pull_request.labels.*.name, 'large-change-approved') && '1' || '0' }}
+      # 推送到 main 时没有 PR，也就没有标签：这时一律放行。
+      # 理由是 PR 的 CI 已经在同一个提交上把过一道关，标签就是在那时必须加上的；
+      # 合并进 main 之后（squash 合并会生成新提交）不应该再拦一次。
+      ALLOW_DEPENDENCY_CHANGE: ${{ github.event_name == 'push' && '1' || (contains(github.event.pull_request.labels.*.name, 'deps-approved') && '1' || '0') }}
+      ALLOW_MIGRATION_REWRITE: ${{ github.event_name == 'push' && '1' || (contains(github.event.pull_request.labels.*.name, 'migration-rewrite-approved') && '1' || '0') }}
+      ALLOW_LARGE_CHANGE: ${{ github.event_name == 'push' && '1' || (contains(github.event.pull_request.labels.*.name, 'large-change-approved') && '1' || '0') }}
       # PR：和目标分支比；直接推送：和推送前的提交比。
       RULES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
     steps:
