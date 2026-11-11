@@ -2546,15 +2546,13 @@ END) || "objectId"::text) || '.'::text) || part::text))
 
 ## 初始数据（迁移写入的行；随机 ID 和时间用占位符代替）
 
-### "KnowledgeCategory"（8 行）
+### "KnowledgeCategory"（6 行）
   id=<随机ID>, label="举手提问", active=true, revision=0
   id=<随机ID>, label="剧情讨论", active=true, revision=0
   id=<随机ID>, label="同人创作", active=true, revision=0
-  id=<随机ID>, label="建议和 BUG 反馈", active=true, revision=0
   id=<随机ID>, label="建议和BUG反馈", active=true, revision=0
   id=<随机ID>, label="日常杂谈", active=true, revision=0
   id=<随机ID>, label="游戏记录", active=true, revision=0
-  id=<随机ID>, label="生活杂谈", active=true, revision=0
 
 ### "LotteryEligibilityControl"（1 行）
   id=1, enabledAt=<时间>

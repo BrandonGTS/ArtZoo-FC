@@ -143,7 +143,7 @@ ArtZoo 是《最终幻想 XIV》公会的网站，供成员组织活动、管理
 |---|---|---|
 | 1 | 从旧仓库整理出新仓库，确认能构建 | 已完成 - 2026.11.10 |
 | 2 | 列出关键功能，按功能准备测试，接入只测当前代码的 CI | 已完成 - 2026.11.11 |
-| 3 | 把 68 个历史迁移合并为一个初始迁移，验证结构和行为一致 | 进行中 |
+| 3 | 把 68 个历史迁移合并为一个初始迁移，验证结构和行为一致 | 已完成 - 2026.11.11 |
 | 4 | 逐个模块删除兼容旧数据的代码和 COS 代码 | 未开始 |
 | 5 | 简化部署，准备新服务器，用空库内部验证 | 未开始 |
 | 6 | 备案通过后上线，观察几天后停老服务器，旧仓库归档 | 未开始 |
@@ -156,9 +156,9 @@ ArtZoo 是《最终幻想 XIV》公会的网站，供成员组织活动、管理
 
 - **COS**（删除前站长再确认一次）：`packages/media/src/cos-*.ts`、`stock-*.ts`、`packages/db/src/media-cos-objects.ts`、`media-stock-components.ts`、`media-quick-icon-stock.ts`、依赖 `cos-nodejs-sdk-v5`、`ARTZOO_COS_*` 环境变量、运行时的 `cos-routed-storage` 包装层。
 - **"功能上线时刻"字段**（只为不追溯旧活动而存在）：`managementEnabledAt`、`attendanceEnabledAt`、`autoAbsenceEnabledAt`、`appealEnabledAt`，以及把 `completionEnabledAt` 为空视为旧活动的判断。
-- **抽奖资格的历史基线**：迁移里的存量账号回填、`enabledAt` 激活边界、维护任务里的 `to_regclass` 表存在性检查。
+- **抽奖资格的历史基线**：`enabledAt` 激活边界、维护任务里的 `to_regclass` 表存在性检查。（迁移里的存量账号回填已随阶段 3 合并迁移去掉。）
 - **旧账号兼容**：登录时允许 6–7 位旧密码；邀请 `usageMode` 为空时的回退；邀请没有密文时的"链接不可恢复"分支。
-- **旧工具**：本地 QC 工具（`server/local-qc/`、`assertLocalQcDatabaseAllowed`、`qc:*`）、旧邀请清理命令 `retire-legacy-invitations*`、旧短信字段 `ARTZOO_SMS_TEMPLATE_CODE` 的检查。
+- **旧工具**：本地 QC 工具（`server/local-qc/`、`assertLocalQcDatabaseAllowed`、`qc:*`；它要求数据库里恰好有 33 个旧迁移并读取其中一个迁移文件，阶段 2 时就已无法运行，阶段 3 合并迁移后对应文件也不存在了）、旧邀请清理命令 `retire-legacy-invitations*`、旧短信字段 `ARTZOO_SMS_TEMPLATE_CODE` 的检查。
 - **公开 QQ 设置**：`PublicSiteSettings`、`ARTZOO_PUBLIC_ADMIN_QQ` 及对应后台页面（与待定 #6 一起处理）。
 - **QQ 旧协议**：`protocolVersion=1`、`requiresRebind`、`QqOfficialChallenge/Candidate`。
 - **插件历史**：`sender.py` 的旧记录导入、`production_policy.py` 中针对具体事故的恢复函数。
@@ -211,7 +211,6 @@ ArtZoo 是《最终幻想 XIV》公会的网站，供成员组织活动、管理
 | 23 | 心愿 | 留言可以 @ 人但不发通知 | `rules/wishes.md` 第 4 节 |
 | 24 | 心愿 | 心愿留言没有任何人能删除，包括违规留言 | `rules/wishes.md` 第 4 节 |
 | 25 | 心愿 | 服务端允许作者对自己的心愿表达兴趣（界面没有按钮） | `rules/wishes.md` 第 3 节 |
-| 26 | 知识库 | 迁移写入了 8 个分区，代码只认其中 6 个；另外 2 个是旧名字（“生活杂谈”“建议和 BUG 反馈”，后者多一个空格），新站空库起步时也会出现在浏览筛选里。是否在初始迁移里去掉这 2 个 | 阶段 3 盘点发现；代码见 `components/knowledge/category-options.ts` |
 
 ---
 
