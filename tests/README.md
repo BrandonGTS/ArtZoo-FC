@@ -149,10 +149,9 @@ CI 每次都会在当前提交上运行全部单元测试和数据库测试。
 
 ### 测试中保留的旧兼容行为
 
-阶段 4 第一次清理已删除对应代码和用例（旧 6–7 位密码、旧邀请清理命令、功能上线时刻、公开 QQ 设置、QQ 旧绑定流程、插件事故恢复函数等）。仍然保留的：
+阶段 4 的两次清理已删除对应代码和用例（旧 6–7 位密码、旧邀请清理命令、功能上线时刻、公开 QQ 设置、QQ 旧绑定流程、插件事故恢复函数、COS 等）。仍然保留的：
 
-- `lottery/support/empty-cos-db.mjs`：图片存储查询 COS 位置记录的替身，删除 COS 代码时一并删除。
-- 名称带 legacy / historical 的其他用例（如 `activities/home-upcoming`、`activities/duty-service`、`content/daily*`、`content/albums-*`、`content/knowledge-*`、`qq/bot-*`、`qq-plugin/test_management`、`qq-plugin/test_sender`）。它们对应的代码不在阶段 4 第一次清理的清单里，有的是在拒绝旧格式（应当保留），有的是在兼容旧数据（可以删）。逐条核实后列入 `docs/PLAN.md` 阶段 4 备忘，再决定是否删除。
+- 名称带 legacy / historical 的其他用例（如 `activities/home-upcoming`、`activities/duty-service`、`content/daily*`、`content/albums-*`、`content/knowledge-*`、`qq/bot-*`、`qq-plugin/test_management`、`qq-plugin/test_sender`）。它们对应的代码不在阶段 4 第一次清理的清单里，有的是在拒绝旧格式（应当保留），有的是在兼容旧数据（可以删）。核实任务见 `docs/PLAN.md` 第五节 T12。
 
 ### 从旧仓库迁移时修正或放弃的测试
 

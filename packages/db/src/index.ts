@@ -155,5 +155,3 @@ export * from './media-album-comment-orphan.js';
 
 export { processMediaOrphanCompletion } from './media-orphan-completion.js';
 export type { MediaOrphanCompletionOptions, MediaOrphanCompletionResult } from './media-orphan-completion.js';
-
-export * from './media-cos-objects.js';

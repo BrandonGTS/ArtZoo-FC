@@ -34,7 +34,8 @@ test('AES-GCM uses a fresh nonce, round trips with independent instance and bind
     [first, id + 'x', digest],
     [first, id, tokenDigest('X'.repeat(43))],
     ['v2' + first.slice(2), id, digest],
-    [first.slice(0, -2) + 'xx', id, digest],
+    // 改动最后两个字符；原文碰巧以 xx 结尾时改成 yy，避免"改了等于没改"（约 1/4096 的偶发失败）。
+    [first.slice(0, -2) + (first.endsWith('xx') ? 'yy' : 'xx'), id, digest],
     ['x'.repeat(100000), id, digest]
   ]) {
     assert.throws(

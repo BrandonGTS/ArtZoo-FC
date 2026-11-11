@@ -7,16 +7,29 @@ import type { PhotoOutput } from './photo-processor.js';
 import { PHOTO_RULES } from './photo-contract.js';
 import { BoundNamespace, type MediaRetirementNamespace } from './stock-bound-io.js';
 export type PhotoVariant = 'original' | 'preview' | 'thumbnail';
+type BoundPart = Parameters<MediaRetirementNamespace['capture']>[1];
+/** Write proofs for one storage directory may only name the parts that directory holds. */
+export function restrictedWriteNamespace(
+  namespace: MediaRetirementNamespace,
+  parts: readonly BoundPart[]
+): import('./media-write.js').MediaWriteNamespace {
+  return Object.freeze({
+    capture: async (id: string, part: BoundPart, hash: string, bytes: bigint) => {
+      if (!parts.includes(part)) throw Error('MEDIA_BOUND_SCOPE');
+      return namespace.capture(id, part, hash, bytes);
+    }
+  });
+}
 export interface PhotoStorage {
   writePhotoNamespaces?(
     scope: 'daily' | 'wish' | 'lottery-image' | 'knowledge' | 'album-comment' | 'album-photo'
   ): Promise<{
-    original: import('./cos-stock-write.js').MediaWriteNamespace;
-    derived: import('./cos-stock-write.js').MediaWriteNamespace;
+    original: import('./media-write.js').MediaWriteNamespace;
+    derived: import('./media-write.js').MediaWriteNamespace;
   }>;
   writeNamespaces?(): Promise<{
-    original: import('./cos-stock-write.js').MediaWriteNamespace;
-    derived: import('./cos-stock-write.js').MediaWriteNamespace;
+    original: import('./media-write.js').MediaWriteNamespace;
+    derived: import('./media-write.js').MediaWriteNamespace;
   }>;
   boundPhotoNamespaces?(
     scope: 'daily' | 'wish' | 'lottery-image' | 'knowledge' | 'album-comment' | 'album-photo'
@@ -25,6 +38,10 @@ export interface PhotoStorage {
   put(id: string, output: PhotoOutput): Promise<void>;
   read(id: string, variant: PhotoVariant): Promise<Buffer>;
   discardUncommitted(id: string): Promise<void>;
+  /** Removes the three files of a photo whose record is already deleted. Idempotent. */
+  removeDeleted?(id: string): Promise<void>;
+  /** True while any of the three files still exists. */
+  storedExists?(id: string): Promise<boolean>;
 }
 async function safeDirectory(value: string) {
   if (!isAbsolute(value)) throw new Error('Photo directory must be absolute');
@@ -83,6 +100,22 @@ export class LocalPhotoStorage implements PhotoStorage {
       derived: new BoundNamespace(await safeDirectory(this.derivedDirectory), scope)
     };
   }
+  async writePhotoNamespaces(
+    scope: 'daily' | 'wish' | 'lottery-image' | 'knowledge' | 'album-comment' | 'album-photo'
+  ) {
+    const bound = await this.boundPhotoNamespaces(scope);
+    return {
+      original: restrictedWriteNamespace(bound.original, ['photo-original']),
+      derived: restrictedWriteNamespace(bound.derived, ['photo-preview', 'photo-thumbnail'])
+    };
+  }
+  async writeNamespaces() {
+    const bound = await this.boundNamespaces();
+    return {
+      original: restrictedWriteNamespace(bound.original, ['official-original']),
+      derived: restrictedWriteNamespace(bound.derived, ['official-preview', 'official-thumbnail'])
+    };
+  }
   private async path(id: string, variant: PhotoVariant) {
     if (!isMemberId(id) || !['original', 'preview', 'thumbnail'].includes(variant))
       throw new Error('Invalid photo key');
@@ -135,7 +168,7 @@ export class LocalPhotoStorage implements PhotoStorage {
       await file.close();
     }
   }
-  // Only for a proven uncommitted upload. User removals retain bytes and revoke all access in the DB.
+  // A proven uncommitted upload, or (via removeDeleted) a photo whose record is already deleted.
   async discardUncommitted(id: string) {
     for (const variant of ['original', 'preview', 'thumbnail'] as const) {
       const path = await this.path(id, variant);
@@ -148,5 +181,19 @@ export class LocalPhotoStorage implements PhotoStorage {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       }
     }
+  }
+  async removeDeleted(id: string) {
+    await this.discardUncommitted(id);
+  }
+  async storedExists(id: string) {
+    for (const variant of ['original', 'preview', 'thumbnail'] as const) {
+      try {
+        await lstat(await this.path(id, variant));
+        return true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    }
+    return false;
   }
 }

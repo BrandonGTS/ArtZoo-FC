@@ -201,7 +201,7 @@ flowchart LR
 - **存储位置**：只用服务器本地磁盘，见 `DECISIONS.md` 第 2 条。
   - 生产环境默认写到 `/app/storage/original/<类别>`（原图）和 `/app/storage/derived/<类别>`（缩略图、预览图）。每个类别都可以用 `ARTZOO_<类别>_ORIGINAL_DIR` / `_DERIVED_DIR` 单独指定。
   - 头像目录用 `ARTZOO_AVATAR_DIR` 指定，必须是绝对路径。**生产环境一定要设置它**，否则会退回到仓库下的 `.local/avatars`。
-- **COS 代码**：代码里还保留着腾讯云 COS 的实现，只有设置 `ARTZOO_MEDIA_STORAGE=cos` 才会启用，默认是 `local`。这部分会在第 4 阶段删除，在那之前不要扩展它。
+- **删除后的文件**：相册照片被删除（单张、批量或整个相册）后，原图、预览图、缩略图三个文件也会被删掉，仍是其他相册封面的照片除外。开着上传配额时先核对文件是不是当初上传的那个再删，并把容量还给配额；配额关着时按照片 ID 直接删。删除失败的照片可以在相册里查看进度并重试（`albums/service.ts`、`packages/media/src/stock-retirement.ts`）。
 - **上传并发**：`withUploadSlot` 控制同时上传的请求数，用 `ARTZOO_UPLOAD_CONCURRENCY` 设置，范围 1–8，默认 2，超过时返回 503。`withPhotoSlot` 控制同时进行的图片解码，固定为 2。
 - **校验与处理**：
   - 按文件头判断格式，不接受 SVG。
@@ -246,7 +246,6 @@ flowchart LR
 | `ARTZOO_SMS_PROVIDER` | `unconfigured` | 设为 `aliyun-pnvs` 才能发送短信 |
 | `ARTZOO_AVATAR_DIR` | 仓库下的 `.local/avatars` | 生产环境必须设置为绝对路径 |
 | `ARTZOO_UPLOAD_CONCURRENCY` | 2 | 同时上传的请求数，范围 1–8 |
-| `ARTZOO_MEDIA_STORAGE` | `local` | 新站保持 `local` |
 | `ARTZOO_MEDIA_BUDGET_ENABLED` | 关 | 上传配额 |
 | `ARTZOO_MEDIA_CLEANUP_EXECUTE` | 关 | 真正删除孤儿图片 |
 | `ARTZOO_SECURITY_CLEANUP_ENABLED` | 关 | 每天清理过期的认证记录 |
@@ -261,4 +260,4 @@ flowchart LR
 
 ## 九、即将变化的部分
 
-阶段 3（合并迁移）、阶段 4（删除兼容代码和 COS）、阶段 5（新部署）完成后，本文相应章节会同步更新。各阶段的具体备忘见 [PLAN.md](PLAN.md) 第三节。
+阶段 5（新部署）完成后，本文相应章节会同步更新。各阶段的具体备忘见 [PLAN.md](PLAN.md) 第三节。

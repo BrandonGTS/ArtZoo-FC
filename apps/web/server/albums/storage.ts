@@ -1,4 +1,3 @@
-import { createPhotoStorage } from '@artzoo/media/cos-routed-storage';
 import { dirname, join, resolve } from 'node:path';
 import { LocalPhotoStorage as SharedPhotoStorage } from '../media/photo-storage';
 export type { PhotoStorage, PhotoVariant } from '../media/photo-storage';
@@ -26,10 +25,9 @@ export class LocalPhotoStorage extends SharedPhotoStorage {
   }
 }
 
-/** Separate COS locators retain the existing local legacy directory contract. */
 export function albumStorage() {
-  return createPhotoStorage({ scope: 'albums', legacy: new LocalPhotoStorage() });
+  return new LocalPhotoStorage();
 }
 export function albumCommentStorage() {
-  return createPhotoStorage({ scope: 'album-comments', legacy: new LocalPhotoStorage() });
+  return new LocalPhotoStorage();
 }

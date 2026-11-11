@@ -26,13 +26,13 @@ import type {
 import {
   boundHash,
   verifiedBoundWrite,
+  verifiedBoundRemoval,
   type MediaRetirementNamespace,
   type BoundWriteProof,
   type BoundDescription
 } from './stock-bound-io.js';
-import { verifiedMediaRemoval } from './cos-stock-retirement.js';
-import { verifiedMediaWrite, type MediaWriteProof } from './cos-stock-write.js';
-export type { MediaWriteProof, MediaWriteNamespace } from './cos-stock-write.js';
+import { verifiedMediaWrite, type MediaWriteProof } from './media-write.js';
+export type { MediaWriteProof, MediaWriteNamespace } from './media-write.js';
 export { BoundNamespace } from './stock-bound-io.js';
 export type { MediaRetirementNamespace } from './stock-bound-io.js';
 export type { BoundWriteProof } from './stock-bound-io.js';
@@ -725,7 +725,7 @@ async function finishParts(
       for (const p of parts) p.started = true;
       for (const p of parts) {
         const proof = await (p.namespace ?? namespace).remove(p.ticket),
-          d = verifiedMediaRemoval(proof);
+          d = verifiedBoundRemoval(proof);
         if (
           !d ||
           !matches(p.component, d) ||
@@ -735,7 +735,7 @@ async function finishParts(
         proofs.push(proof);
       }
       for (const [index, p] of parts.entries()) {
-        if (!verifiedMediaRemoval(proofs[index]!)) mediaBudgetFail('MEDIA_BOUND_PROOF_REQUIRED');
+        if (!verifiedBoundRemoval(proofs[index]!)) mediaBudgetFail('MEDIA_BOUND_PROOF_REQUIRED');
         const cap = Object.freeze({}) as MediaRetirementEvidence;
         evidences.set(cap, {
           intentId: p.intent!.id,
@@ -1066,7 +1066,7 @@ async function retirePhotoOrphan(
           physical(p.component, before) !== p.component.storageIdentityFingerprint
         )
           mediaBudgetFail('MEDIA_BOUND_PROOF_REQUIRED');
-        const removed = verifiedMediaRemoval(await namespace.remove(ticket));
+        const removed = verifiedBoundRemoval(await namespace.remove(ticket));
         if (
           !removed ||
           !matches(p.component, removed) ||
@@ -1177,7 +1177,10 @@ export async function retireAlbumCommentOrphan(
 }
 
 /** Called only by the authorized current delete transaction, after marking its exact current rows.
- * The old aggregate and all historical soft-deletions stay outside this path. */
+ * The old aggregate and all historical soft-deletions stay outside this path.
+ * - eligible: three committed stored components; files are verified against them before removal.
+ * - unbound: uploaded while the media budget was off, so no component exists; removed directly by id.
+ * - retained: still a live cover, or components exist but cannot be verified (bytes are kept). */
 async function albumPhotoRemovalCandidate(tx: Tx, id: string, albumId: string) {
   requireTransaction(tx);
   if (!isMemberId(id) || !isMemberId(albumId)) mediaBudgetFail('MEDIA_BOUND_OWNER_REQUIRED');
@@ -1185,6 +1188,12 @@ async function albumPhotoRemovalCandidate(tx: Tx, id: string, albumId: string) {
   if (!photo || photo.albumId !== albumId || (!photo.removedAt && !photo.album.removedAt))
     return { status: 'retained' as const };
   // Covers are actual binary references. Comments/likes/audits/notifications are retained metadata.
+  if (await tx.album.count({ where: { coverPhotoId: id, removedAt: null } }))
+    return { status: 'retained' as const };
+  const [known] = await tx.$queryRaw<{ count: bigint }[]>`/*album-removal:any-component*/
+    SELECT COUNT(*)::bigint AS count FROM "MediaStoredComponent"
+    WHERE "receiptScope"='album-photo' AND "objectKey"=${'album-photo:' + id}`;
+  if (!known?.count) return { status: 'unbound' as const };
   const rows = await tx.$queryRaw<Component[]>`/*album-removal:components*/
     SELECT c.* FROM "MediaStoredComponent" c JOIN "MediaUploadReceipt" r
     ON r.scope=c."receiptScope" AND r."operationKey"=c."receiptOperationKey"
@@ -1205,26 +1214,6 @@ async function albumPhotoRemovalCandidate(tx: Tx, id: string, albumId: string) {
     rows.some((c) => !['photo-original', 'photo-preview', 'photo-thumbnail'].includes(c.part)) ||
     rows.find((c) => c.part === 'photo-original')?.chargedBytes !== BigInt(photo.bytes)
   )
-    return { status: 'legacy' as const };
-  const { findCosObjects } = await import('@artzoo/db');
-  const locations = await findCosObjects(tx, { scope: 'albums', objectId: id, accountId: null });
-  if (
-    locations.length !== 3 ||
-    new Set(locations.map((r) => r.part)).size !== 3 ||
-    rows.some((c) => {
-      const locator = locations.find((r) => 'photo-' + r.part === c.part);
-      return (
-        !locator ||
-        !locator.etag ||
-        !locator.identityFingerprint ||
-        locator.bytes !== c.chargedBytes ||
-        locator.sha256 !== c.contentBindingSha256 ||
-        boundHash([c.generation, locator.identityFingerprint]) !== c.storageIdentityFingerprint
-      );
-    })
-  )
-    return { status: 'legacy' as const };
-  if (await tx.album.count({ where: { coverPhotoId: id, removedAt: null } }))
     return { status: 'retained' as const };
   return { status: 'eligible' as const, photo, rows };
 }
@@ -1232,8 +1221,10 @@ async function albumPhotoRemovalCandidate(tx: Tx, id: string, albumId: string) {
 export async function inspectAlbumPhotoRemoval(tx: Tx, id: string, albumId: string) {
   return (await albumPhotoRemovalCandidate(tx, id, albumId)).status;
 }
+/** prepared: durable fences written, verified removal follows. direct: caller removes the files by id. */
 export async function prepareAlbumPhotoRemoval(tx: Tx, id: string, albumId: string) {
   const candidate = await albumPhotoRemovalCandidate(tx, id, albumId);
+  if (candidate.status === 'unbound') return 'direct' as const;
   if (candidate.status !== 'eligible') return candidate.status;
   const { photo, rows } = candidate;
   const authorityFingerprint = boundHash([
@@ -1330,7 +1321,7 @@ async function retireAlbumPhotoRemoval(
           const before = ns.describe(ticket);
           if (!before || !matches(c, before) || physical(c, before) !== c.storageIdentityFingerprint)
             mediaBudgetFail('MEDIA_BOUND_PROOF_REQUIRED');
-          const removed = verifiedMediaRemoval(await ns.remove(ticket));
+          const removed = verifiedBoundRemoval(await ns.remove(ticket));
           if (!removed || !matches(c, removed) || physical(c, removed) !== c.storageIdentityFingerprint)
             mediaBudgetFail('MEDIA_BOUND_PROOF_REQUIRED');
           evidence = Object.freeze({}) as MediaRetirementEvidence;

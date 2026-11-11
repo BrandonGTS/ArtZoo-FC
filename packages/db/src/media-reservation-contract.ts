@@ -12,7 +12,6 @@ export const MEDIA_RESERVATION_SCOPES = [
   'knowledge',
   'daily',
   'wish',
-  'activity-share',
   'lottery-image',
   'official-image'
 ] as const;

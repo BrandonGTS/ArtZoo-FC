@@ -571,25 +571,23 @@ export class AlbumService {
     actorId: string,
     sourceAudits: Readonly<Record<string, string>>
   ) {
+    // A storage port without local files (tests, other ports) has nothing to reclaim.
     if (!this.storage.boundPhotoNamespaces)
       return {
         storageRemovalIds: [] as string[],
+        storageDirectIds: [] as string[],
         storageRetained: 0,
-        storageLegacy: ids.length,
         storageRemovalAuthorizations: [] as { photoId: string; auditId: string }[]
       };
     const { prepareAlbumPhotoRemoval } = await import('@artzoo/media/stock-retirement');
     const prepared: string[] = [],
+      direct: string[] = [],
       authorizations: { photoId: string; auditId: string }[] = [];
-    let retained = 0,
-      legacy = 0;
+    let retained = 0;
     for (const id of ids) {
       const status = await prepareAlbumPhotoRemoval(tx, id, albumId);
-      if (status === 'legacy') {
-        legacy++;
-        continue;
-      }
       if (status === 'prepared') prepared.push(id);
+      else if (status === 'direct') direct.push(id);
       else retained++;
       const photo = await tx.albumPhoto.findUniqueOrThrow({ where: { id }, include: { album: true } });
       const audit = await tx.albumAudit.create({
@@ -611,21 +609,22 @@ export class AlbumService {
     }
     return {
       storageRemovalIds: prepared,
+      storageDirectIds: direct,
       storageRemovalAuthorizations: authorizations,
-      storageRetained: retained,
-      storageLegacy: legacy
+      storageRetained: retained
     };
   }
   private async finishPhotoRemovals<T extends object>(result: T, signal?: AbortSignal) {
     const data = result as T & {
       storageRemovalIds?: string[];
+      storageDirectIds?: string[];
       storageRetained?: number;
-      storageLegacy?: number;
       storageRemovalAuthorizations?: { photoId: string; auditId: string }[];
     };
     if (!data.storageRemovalIds) return result;
     let completed = 0;
     let remainingIds = [...data.storageRemovalIds];
+    const directIds = [...(data.storageDirectIds ?? [])];
     const deadline = Date.now() + 15_000;
     const assertActive = () => {
       if (signal?.aborted || Date.now() >= deadline) throw Error('MEDIA_REMOVAL_BUDGET');
@@ -647,8 +646,19 @@ export class AlbumService {
         /* exact unconfirmed targets remain retryable */
       }
     }
+    // Uploaded while the media budget was off: no stored components, remove the photo's files by id.
+    for (const id of directIds) {
+      try {
+        assertActive();
+        if (!this.storage.removeDeleted) throw Error('MEDIA_BOUND_SCOPE');
+        await this.storage.removeDeleted(id);
+        completed++;
+      } catch {
+        remainingIds.push(id);
+      }
+    }
     const pending = remainingIds.length;
-    const preparedSet = new Set(data.storageRemovalIds);
+    const preparedSet = new Set([...data.storageRemovalIds, ...directIds]);
     const authorizations = (data.storageRemovalAuthorizations ?? []).filter(
       (a) => !preparedSet.has(a.photoId) || remainingIds.includes(a.photoId)
     );
@@ -659,7 +669,6 @@ export class AlbumService {
         completed,
         pending,
         retained: data.storageRetained ?? 0,
-        legacy: data.storageLegacy ?? 0,
         targets: [...new Set([...remainingIds, ...authorizations.map((a) => a.photoId)])],
         authorizations
       }
@@ -767,7 +776,11 @@ export class AlbumService {
           denied();
         await this.validateRemovalMarker(tx, album, photo, marker);
         const status = await inspectAlbumPhotoRemoval(tx, photo.id, albumId);
-        if (status === 'legacy') bad('永久删除请求不匹配');
+        if (status === 'unbound') {
+          if (!(await this.storage.storedExists?.(photo.id))) continue;
+          authorizations.push({ photoId: photo.id, auditId: marker.id });
+          continue;
+        }
         const [ack] = await tx.$queryRaw<{ count: bigint }[]>`/*album-removal:status-ack*/
           SELECT COUNT(*)::bigint AS count FROM "MediaStoredComponent" c
           JOIN "MediaRetirementIntent" i ON i."componentId"=c.id
@@ -799,11 +812,9 @@ export class AlbumService {
           completed: 0,
           pending: authorizations.length - retained,
           retained,
-          legacy: 0,
           targets: authorizations.map((a) => a.photoId),
           authorizations,
-          recovery: { nextCursor, path: `/api/albums/${albumId}` },
-          legacyNotice: true
+          recovery: { nextCursor, path: `/api/albums/${albumId}` }
         }
       };
     });
@@ -823,6 +834,7 @@ export class AlbumService {
       const album = await tx.album.findUnique({ where: { id: albumId } });
       if (!album) missing();
       const prepared: string[] = [],
+        direct: string[] = [],
         retainedAuthorizations: { photoId: string; auditId: string }[] = [];
       let retained = 0;
       for (const id of ids) {
@@ -852,9 +864,9 @@ export class AlbumService {
         const status = await (
           await import('@artzoo/media/stock-retirement')
         ).prepareAlbumPhotoRemoval(tx, id, albumId);
-        if (status === 'legacy') bad('此照片没有可重试的永久删除请求');
         retainedAuthorizations.push({ photoId: id, auditId: validatedMarker.id });
         if (status === 'prepared') prepared.push(id);
+        else if (status === 'direct') direct.push(id);
         else retained++;
       }
       const fresh = await this.account(tx, token);
@@ -868,6 +880,7 @@ export class AlbumService {
       return {
         removed: true,
         storageRemovalIds: prepared,
+        storageDirectIds: direct,
         storageRetained: retained,
         storageRemovalAuthorizations: [
           ...retainedAuthorizations,
