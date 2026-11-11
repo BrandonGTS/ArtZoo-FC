@@ -367,10 +367,6 @@ export class LotteryMaintenance {
 }
 
 export async function processLotteryMaintenance(db: PrismaClient, options: LotteryMaintenanceOptions = {}) {
-  const [ready] = await db.$queryRaw<
-    { ready: boolean }[]
-  >`SELECT to_regclass('"LotteryEligibilityControl"') IS NOT NULL AS ready`;
-  if (!ready?.ready) return { processed: 0, simulated: 0, failed: 0, available: false };
   const worker = new LotteryMaintenance(db, options);
   const processed = await worker.runDueAndEnrollment();
   const simulated = await worker.simulateNotifications();

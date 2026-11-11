@@ -248,10 +248,7 @@ function mineHarness() {
 }
 test('mine requests independent bounded ordered DB pages within one repeatable snapshot', async () => {
   const h = mineHarness(),
-    result = await h.service.mine(
-      null,
-      new URL('http://test?registeredPeriod=history&registeredPage=2&publishedPage=999')
-    );
+    result = await h.service.mine(null, new URL('http://test?registeredPeriod=history&registeredPage=2'));
   assert.deepEqual(result.registeredPagination, {
     page: 2,
     pageSize: 10,
@@ -259,37 +256,31 @@ test('mine requests independent bounded ordered DB pages within one repeatable s
     totalPages: 3,
     period: 'history'
   });
-  assert.deepEqual(result.publishedPagination, {
-    page: 1,
-    pageSize: 10,
-    total: 5,
-    totalPages: 1,
-    period: 'current'
-  });
+  assert.equal('published' in result, false);
+  assert.equal('publishedPagination' in result, false);
   assert.equal(h.transactions[0].isolationLevel, 'RepeatableRead');
-  const published = h.calls.find((c) => c.op === 'find' && c.where.organizerId),
-    registered = h.calls.find((c) => c.op === 'find' && c.where.registrations);
-  assert.deepEqual(published.where, { organizerId: id(9), cancelledAt: null, endsAt: { gt: now } });
+  assert.equal(
+    h.calls.some((c) => c.where?.organizerId),
+    false
+  );
+  const registered = h.calls.find((c) => c.op === 'find' && c.where.registrations);
   assert.deepEqual(registered.where, {
     registrations: { some: { accountId: id(9) } },
     OR: [{ cancelledAt: { not: null } }, { endsAt: { lte: now } }]
   });
   assert.equal(registered.skip, 10);
-  assert.equal(published.skip, 0);
   assert.equal(registered.take, 10);
-  assert.equal(published.take, 10);
   assert.deepEqual(registered.orderBy, [{ startsAt: 'desc' }, { id: 'asc' }]);
-  assert.deepEqual(published.orderBy, [{ startsAt: 'asc' }, { id: 'asc' }]);
 });
 test('mine page inputs are strict positive safe integers and periods stay enumerated', async () => {
   for (const query of [
     'registeredPage=0',
     'registeredPage=-1',
     'registeredPage=1.1',
-    'publishedPage=01',
-    'publishedPage=9007199254740992',
+    'registeredPage=01',
+    'registeredPage=9007199254740992',
     'registeredPeriod=all',
-    'publishedPeriod='
+    'registeredPeriod='
   ])
     await assert.rejects(
       () => mineHarness().service.mine(null, new URL('http://test?' + query)),

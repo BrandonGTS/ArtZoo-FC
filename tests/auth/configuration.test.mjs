@@ -73,12 +73,9 @@ test('SMS values reject whitespace/control characters, invalid template and over
         error.code === 'SMS_UNAVAILABLE' && error.message === '短信配置不完整或无效，请由本机操作者检查配置'
     );
 });
-test('SMS legacy provider and single template, swapped and other gifted templates are rejected', () => {
+test('SMS unknown provider, swapped and other gifted templates are rejected', () => {
   const cases = [
     { ...config, ARTZOO_SMS_PROVIDER: 'aliyun' },
-    { ...config, ARTZOO_SMS_TEMPLATE_CODE: 'SMS_123456' },
-    { ...config, ARTZOO_SMS_TEMPLATE_CODE: '' },
-    { ARTZOO_SMS_TEMPLATE_CODE: '' },
     { ...config, ARTZOO_SMS_REGISTER_TEMPLATE_CODE: 'SMS_123456' },
     { ...config, ARTZOO_SMS_REGISTER_TEMPLATE_CODE: '100003', ARTZOO_SMS_RESET_TEMPLATE_CODE: '100001' },
     { ...config, ARTZOO_SMS_RESET_TEMPLATE_CODE: '100002' }

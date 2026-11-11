@@ -2,18 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { processActivityAutoAbsences } from '../../packages/db/src/activity-auto-absence.ts';
-import {
-  processActivityCompletions,
-  processOptedInActivityCompletions
-} from '../../packages/db/src/activity-completion.ts';
+import { processActivityCompletions } from '../../packages/db/src/activity-completion.ts';
 import { validAttendanceRecord } from '../../packages/db/src/activity-attendance-policy.ts';
 import { harness } from './support/attendance-fixture.mjs';
 import { id } from './support/activity-input.mjs';
 const end = new Date('2030-06-01T14:00:00Z');
 const setup = () => {
   const h = harness();
-  h.state.activity.autoAbsenceEnabledAt = new Date('2030-05-01');
-  h.state.activity.completionEnabledAt = new Date('2030-05-01');
   return h;
 };
 const record = () => ({
@@ -22,7 +17,7 @@ const record = () => ({
   expectedAttendanceRevision: 0,
   status: 'PRESENT'
 });
-test('opt-in exact deadline: absent once, actual later timestamp, exactly one penalty and private notice', async () => {
+test('exact deadline: absent once, actual later timestamp, exactly one penalty and private notice', async () => {
   const h = setup();
   assert.equal(await processActivityAutoAbsences(h.db, new Date(+end - 1)), 0);
   const processedAt = new Date(+end + 30000);
@@ -49,10 +44,8 @@ test('opt-in exact deadline: absent once, actual later timestamp, exactly one pe
   assert.equal(await processActivityAutoAbsences(h.db, processedAt), 0);
   assert.deepEqual(h.state, before);
 });
-test('legacy/null adoption, past-start adoption, cancellation, withdrawn, incomplete, offline and series excluded', async () => {
+test('cancellation, withdrawn, incomplete, offline and series excluded', async () => {
   for (const mutate of [
-    (h) => (h.state.activity.autoAbsenceEnabledAt = null),
-    (h) => (h.state.activity.autoAbsenceEnabledAt = end),
     (h) => (h.state.activity.cancelledAt = end),
     (h) => (h.state.reg.status = 'WITHDRAWN'),
     (h) => (h.state.reg.status = 'CANCELLED'),
@@ -177,31 +170,17 @@ test('foreign user cannot appeal automatic record and unopted malformed source d
     (e) => e.code === 'FORBIDDEN'
   );
   assert.equal(
-    validAttendanceRecord({ ...h.state.activity, autoAbsenceEnabledAt: null }, h.state.reg),
-    false
-  );
-  assert.equal(
     validAttendanceRecord(h.state.activity, { ...h.state.reg, attendanceRecordedAt: new Date(+end - 1) }),
     false
   );
 });
 
-test('restricted completion entry never evaluates legacy records and rechecks opt-in after locking', async () => {
-  for (const afterLock of [false, true]) {
-    const h = setup();
-    h.time(new Date(+end - 1));
-    await h.service.record(id(1), record());
-    if (afterLock)
-      h.atActivityLock(() => {
-        h.state.activity.autoAbsenceEnabledAt = null;
-      });
-    else h.state.activity.autoAbsenceEnabledAt = null;
-    assert.equal(await processOptedInActivityCompletions(h.db, end), 0);
-    assert.equal(h.state.completions.length, 0);
-  }
+test('completion sweep credits an attending registration after the activity ends', async () => {
   const h = setup();
   h.time(new Date(+end - 1));
   await h.service.record(id(1), record());
-  assert.equal(await processOptedInActivityCompletions(h.db, end), 1);
+  assert.equal(await processActivityCompletions(h.db, new Date(+end - 3600000)), 0);
+  assert.equal(h.state.completions.length, 0);
+  assert.equal(await processActivityCompletions(h.db, end), 1);
   assert.equal(h.state.completions.length, 1);
 });

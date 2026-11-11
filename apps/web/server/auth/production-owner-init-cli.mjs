@@ -7,14 +7,13 @@ try {
     stdoutTTY: Boolean(process.stdout.isTTY),
     environment: process.env
   });
-  const { getDatabase, assertLocalQcDatabaseAllowed } = await import('@artzoo/db');
+  const { getDatabase } = await import('@artzoo/db');
   const { mainlandChinaPhone } = await import('./ports.ts');
   const { runOwnerInitialization } = await import('./owner-initialization-console.ts');
   db = getDatabase();
   const identity = await db.$queryRaw`SELECT current_database() AS database, current_user AS role`;
   if (identity.length !== 1 || identity[0].database !== 'artzoo_prod' || identity[0].role !== 'artzoo_app')
     throw new Error('Database identity mismatch');
-  await assertLocalQcDatabaseAllowed(db);
   if (await db.account.count({ where: { adminRole: 'SUPER_ADMIN' } }))
     throw Object.assign(new Error(), { code: 'CONFLICT' });
   process.stdout.write(

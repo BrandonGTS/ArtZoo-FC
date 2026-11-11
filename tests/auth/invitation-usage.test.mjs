@@ -81,7 +81,7 @@ async function fixture() {
     }
   };
 }
-test('omitted mode and migrated legacy default remain single-use; unsupported modes fail closed', async () => {
+test('omitted mode remains single-use; unsupported modes fail closed', async () => {
   const f = await fixture(),
     created = await f.create();
   assert.equal(created.invitation.usageMode, 'SINGLE');

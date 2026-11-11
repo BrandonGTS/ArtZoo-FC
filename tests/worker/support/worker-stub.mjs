@@ -5,7 +5,6 @@ if (scenario === 'repeat')
 let probes = 0;
 const note = (value) => console.log(JSON.stringify({ test: value }));
 export const environmentIdentity = { notifications: 'simulation-only' };
-export class LocalQcDataBlocked extends Error {}
 export const databaseConfigured = () => scenario !== 'unconfigured';
 export const createOfficialImagePorts = () => ({});
 export function createMaintenanceState(stopping = () => false) {
@@ -26,10 +25,6 @@ export async function checkDatabase() {
     await new Promise((resolve) => originalSetTimeout(resolve, 20));
   }
   if (scenario === 'database') throw Error('private');
-}
-export async function assertLocalQcDatabaseAllowed() {
-  note('guard');
-  if (scenario === 'guard') throw new LocalQcDataBlocked();
 }
 export async function processActivityMaintenance() {
   note('activity');

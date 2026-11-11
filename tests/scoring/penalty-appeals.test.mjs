@@ -81,12 +81,7 @@ test('locked cutoff is checked after activity wait and future penalty cannot be 
   future.time('2030-06-01T11:59:59.999Z');
   await assert.rejects(() => send(future), code('FORBIDDEN'));
 });
-test('old adoption-null penalties and NO_SHOW cannot use this flow', async () => {
-  const f = await fixture({ enabled: false });
-  await assert.rejects(() => send(f), code('FORBIDDEN'));
-  const list = await f.service.minePenalties(url(1), owner);
-  assert.equal(list.items[0].canAppeal, false);
-  assert.equal(f.state.audits.length, 0);
+test('NO_SHOW penalties cannot use this flow', async () => {
   const a = await fixture({ reason: 'NO_SHOW', points: 2 });
   await assert.rejects(() => send(a), code('FORBIDDEN'));
   assert.equal((await a.service.minePenalties(url(1), owner)).items.length, 0);

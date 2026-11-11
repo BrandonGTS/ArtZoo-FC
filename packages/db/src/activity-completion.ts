@@ -1,7 +1,7 @@
 import { createMaintenanceState, runMaintenanceItem, type MaintenanceRunState } from './maintenance-run.js';
 import type { Prisma, PrismaClient } from './generated/prisma/client.js';
 import { settleActivityStanding } from './activity-standing.js';
-import { validAttendanceRecord, automaticAbsenceEnabled } from './activity-attendance-policy.js';
+import { validAttendanceRecord } from './activity-attendance-policy.js';
 
 type Tx = Prisma.TransactionClient;
 export interface CompletionActivity {
@@ -11,9 +11,6 @@ export interface CompletionActivity {
   startsAt: Date;
   endsAt: Date;
   cancelledAt: Date | null;
-  autoAbsenceEnabledAt?: Date | null;
-  completionEnabledAt: Date | null;
-  managementEnabledAt: Date;
   continuedAt: Date | null;
   seats: { registration: { id: string } | null }[];
 }
@@ -30,16 +27,13 @@ export function completionEligible(activity: CompletionActivity, row: Completion
   return (
     (activity.scene === undefined || activity.scene === 'GAME') &&
     (activity.mode === undefined || activity.mode === 'SINGLE') &&
-    !!activity.completionEnabledAt &&
     !activity.cancelledAt &&
     now >= activity.endsAt &&
     row.status === 'ACTIVE' &&
     (row.attendanceStatus === 'PRESENT' || row.attendanceStatus === 'ABSENT') &&
     validAttendanceRecord(activity, row) &&
     // A delayed auto-cancel batch must not let an undecided, incomplete activity earn a credit first.
-    (activity.continuedAt !== null ||
-      activity.startsAt < activity.managementEnabledAt ||
-      activity.seats.every((seat) => seat.registration))
+    (activity.continuedAt !== null || activity.seats.every((seat) => seat.registration))
   );
 }
 // Caller already holds recipient Account -> shared activity lock.
@@ -129,22 +123,9 @@ export async function processActivityCompletions(
   now = new Date(),
   state: MaintenanceRunState = createMaintenanceState()
 ) {
-  return processCompletions(db, now, false, state);
+  return processCompletions(db, now, state);
 }
-/** Restricted local QC entry: never evaluates the existing unopted-in activities. */
-export async function processOptedInActivityCompletions(
-  db: PrismaClient,
-  now = new Date(),
-  state: MaintenanceRunState = createMaintenanceState()
-) {
-  return processCompletions(db, now, true, state);
-}
-async function processCompletions(
-  db: PrismaClient,
-  now: Date,
-  optedInOnly: boolean,
-  state: MaintenanceRunState
-) {
+async function processCompletions(db: PrismaClient, now: Date, state: MaintenanceRunState) {
   let completed = 0;
   const candidates = await db.activityRegistration.findMany({
     where: {
@@ -155,15 +136,8 @@ async function processCompletions(
       activity: {
         scene: 'GAME',
         mode: 'SINGLE',
-        completionEnabledAt: { not: null },
         cancelledAt: null,
         endsAt: { lte: now },
-        ...(optedInOnly
-          ? {
-              autoAbsenceEnabledAt: { not: null },
-              startsAt: { gte: db.activity.fields.autoAbsenceEnabledAt }
-            }
-          : {}),
         OR: [{ continuedAt: { not: null } }, { seats: { none: { registration: { is: null } } } }]
       }
     },
@@ -186,7 +160,6 @@ async function processCompletions(
           });
           if (!row || row.accountId !== candidate.accountId || row.activityId !== candidate.activityId)
             return false;
-          if (optedInOnly && !automaticAbsenceEnabled(row.activity)) return false;
           const result = await evaluateActivityCompletion(tx, row.activity, row, now);
           return !!result?.created && result.record.active;
         },

@@ -1,21 +1,17 @@
 export interface AttendanceActivityWindow {
   startsAt: Date;
   endsAt: Date;
-  autoAbsenceEnabledAt?: Date | null;
 }
 export interface AttendanceRecord {
   attendanceStatus: string | null;
   attendanceRecordedAt: Date | null;
   attendanceSource?: string | null;
 }
-export function automaticAbsenceEnabled(activity: AttendanceActivityWindow) {
-  return !!activity.autoAbsenceEnabledAt && activity.startsAt >= activity.autoAbsenceEnabledAt;
-}
 /** A system deadline record retains its real processing timestamp, including after an appeal. */
 export function validAttendanceRecord(activity: AttendanceActivityWindow, row: AttendanceRecord) {
   if (!row.attendanceStatus || !row.attendanceRecordedAt) return false;
   if (row.attendanceSource === 'AUTO_DEADLINE') {
-    return automaticAbsenceEnabled(activity) && row.attendanceRecordedAt >= activity.endsAt;
+    return row.attendanceRecordedAt >= activity.endsAt;
   }
   return (
     (!row.attendanceSource || row.attendanceSource === 'ORGANIZER') &&

@@ -96,7 +96,6 @@ class Service {
 export const DailyService = Service,
   WishService = Service,
   AlbumService = Service,
-  ActivityShareService = Service,
   ActivityService = Service,
   ActivitySeriesService = Service,
   ActivityManagementService = Service,

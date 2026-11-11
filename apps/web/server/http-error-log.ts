@@ -9,7 +9,6 @@ const routes = new Set([
   'bot-management/http',
   'resources/http',
   'checkin/http',
-  'activity-shares/http',
   'knowledge/http',
   'knowledge/image-http',
   'messages/http',

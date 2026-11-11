@@ -1,5 +1,3 @@
-import { LocalQcDataBlocked } from './local-qc-safety.js';
-
 export interface MaintenanceRunState {
   failed: number;
   stopping: () => boolean;
@@ -15,8 +13,7 @@ export function logMaintenanceFailure(step: string, id: string, error: unknown):
     'RangeError',
     'TimeoutError',
     'PrismaClientKnownRequestError',
-    'PrismaClientUnknownRequestError',
-    'LocalQcDataBlocked'
+    'PrismaClientUnknownRequestError'
   ]);
   let name = 'Error';
   let code: string | undefined;
@@ -49,14 +46,6 @@ export async function runMaintenanceItem<T>(
   try {
     return await action();
   } catch (error) {
-    // This is a safety stop, never an item failure that permits the next mutation.
-    let blocked = false;
-    try {
-      blocked = error instanceof LocalQcDataBlocked;
-    } catch {
-      /* Untrusted thrown proxy. */
-    }
-    if (blocked) throw error;
     state.failed++;
     logMaintenanceFailure(step, id, error);
     return undefined;

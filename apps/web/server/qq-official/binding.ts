@@ -1,4 +1,4 @@
-import { AccountError, localQcAccountAllowed } from '@artzoo/domain';
+import { AccountError } from '@artzoo/domain';
 import {
   lockCurrentQqGroup,
   configuredQqGroups,
@@ -41,21 +41,15 @@ export async function resolveBoundActor(
 ): Promise<BoundQqActor> {
   const initial = await tx.qqOfficialBinding.findFirst({ where: { ...scope, memberOpenId } });
   if (!initial) return bad('请先在网站账号设置中完成QQ群身份绑定');
-  if (![1, 2].includes(initial.protocolVersion)) return bad('QQ群绑定版本不可用，请到网站确认后重新绑定');
   const hint = await tx.account.findUnique({ where: { id: initial.accountId } });
   if (!hint) return bad('绑定账号当前不可用，请到网站查看');
   await lockAccount(tx, hint);
   await lock(tx, `qq-identity:${identityKey(scope, memberOpenId)}`);
   const binding = await tx.qqOfficialBinding.findFirst({ where: { ...scope, memberOpenId } });
-  if (
-    !binding ||
-    ![1, 2].includes(binding.protocolVersion) ||
-    binding.id !== initial.id ||
-    binding.accountId !== hint.id
-  )
+  if (!binding || binding.id !== initial.id || binding.accountId !== hint.id)
     return bad('绑定已变化，请到网站重新确认');
   const account = await tx.account.findUnique({ where: { id: hint.id } });
-  if (!account || !localQcAccountAllowed(account) || !(await lotteryAccountActive(tx, account.id)))
+  if (!account || !(await lotteryAccountActive(tx, account.id)))
     return bad('绑定账号当前不可用，请到网站查看');
   void auth;
   return { accountId: account.id, account, bindingId: binding.id, bindingVersion: binding.version };
@@ -70,7 +64,6 @@ export async function revalidateBoundActor(
   const binding = await tx.qqOfficialBinding.findFirst({ where: { ...scope, memberOpenId } });
   if (
     !binding ||
-    ![1, 2].includes(binding.protocolVersion) ||
     binding.id !== expected.bindingId ||
     binding.version !== expected.bindingVersion ||
     binding.accountId !== expected.accountId ||
@@ -119,7 +112,6 @@ export class QqBindingService {
       session.accountId !== request.accountId ||
       session.revokedAt ||
       session.expiresAt <= this.auth.now() ||
-      !localQcAccountAllowed(session.account) ||
       !(await lotteryAccountActive(tx, request.accountId))
     )
       return bad('生成密钥的登录状态已失效，请重新登录后生成');
@@ -140,7 +132,6 @@ export class QqBindingService {
         version: row.version,
         groupOpenId: row.groupOpenId,
         confirmedAt: row.confirmedAt.toISOString(),
-        requiresRebind: ![1, 2].includes(row.protocolVersion),
         label:
           (groups.find((g) => g.groupOpenId === row.groupOpenId)?.label ?? '已绑定群') +
           ' · ' +
@@ -239,7 +230,6 @@ export class QqBindingService {
           groupOpenId: scope.groupOpenId,
           accountId: request.accountId,
           memberOpenId,
-          protocolVersion: 2,
           confirmedAt: now
         }
       });
@@ -273,7 +263,7 @@ export class QqBindingService {
       const binding =
         row.consumedAt && row.bindingId
           ? await tx.qqOfficialBinding.findFirst({
-              where: { id: row.bindingId, accountId: row.accountId, protocolVersion: 2 }
+              where: { id: row.bindingId, accountId: row.accountId }
             })
           : null;
       const state = binding
@@ -298,23 +288,6 @@ export class QqBindingService {
       return { cancelled: true };
     });
   }
-  // Retired public proofs can never create or upgrade a binding.
-  async select(_body: Record<string, unknown>, _token?: string | null): Promise<never> {
-    void _body;
-    void _token;
-    return bad('旧版绑定流程已停用，请重新生成一次性密钥');
-  }
-  async confirm(_body: Record<string, unknown>, _token?: string | null): Promise<never> {
-    void _body;
-    void _token;
-    return bad('旧版绑定流程已停用，请重新生成一次性密钥');
-  }
-  async prove(_scope: QqScope, _member: string, _proof: string): Promise<never> {
-    void _scope;
-    void _member;
-    void _proof;
-    return bad('旧版绑定流程已停用，请重新生成一次性密钥');
-  }
   async unlink(body: Record<string, unknown>, token?: string | null) {
     if (body.confirmed !== true || !Number.isInteger(body.version)) return bad('请明确确认解除QQ群身份绑定');
     return this.auth.transaction(async (tx) => {
@@ -328,10 +301,6 @@ export class QqBindingService {
       await this.auth.requireAccount(tx, token);
       await tx.qqOfficialBinding.delete({ where: { id: row.id } });
       await tx.qqOfficialBindingKey.updateMany({
-        where: { accountId: actor.accountId, consumedAt: null, invalidatedAt: null },
-        data: { invalidatedAt: this.auth.now() }
-      });
-      await tx.qqOfficialChallenge.updateMany({
         where: { accountId: actor.accountId, consumedAt: null, invalidatedAt: null },
         data: { invalidatedAt: this.auth.now() }
       });

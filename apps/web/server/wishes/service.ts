@@ -19,7 +19,6 @@ import {
   publishInput,
   text,
   invalid,
-  wishContent,
   wishCategory,
   WISH_PAGE_SIZE,
   WISH_INTEREST_PAGE_SIZE,
@@ -40,7 +39,6 @@ type Row = {
   title: string;
   category: WishSummary['category'];
   body: string;
-  wantedContent: string;
   convenientTime: string;
   createdAt: Date;
   activityId: string | null;
@@ -177,8 +175,7 @@ export class WishService {
       id: row.id,
       title: row.title,
       category: row.category,
-      body: wishContent(row),
-      wantedContent: '',
+      body: row.body,
       convenientTime: row.convenientTime,
       revision: row.revision,
       author: memberSummary(author),
@@ -328,7 +325,7 @@ export class WishService {
     return this.auth.transaction(async (tx) => {
       const actor = await this.auth.requireAccount(tx, token);
       // Same visibility as list/get: authenticated accounts see undeleted wishes,
-      // including legacy NULL categories. Read IDs only until the sample is chosen.
+      // Read IDs only until the sample is chosen.
       const candidates = await tx.$queryRaw<
         { id: string }[]
       >`SELECT id FROM "Wish" WHERE "deletedAt" IS NULL AND "moderatedAt" IS NULL`;
@@ -375,10 +372,10 @@ export class WishService {
       const actor = await this.auth.requireAccount(tx, token);
       const rows = await tx.$queryRaw<
         Row[]
-      >`SELECT * FROM "Wish" WHERE "deletedAt" IS NULL AND "moderatedAt" IS NULL AND (${category}::text IS NULL OR "category"=${category}) AND position(lower(${query}) in lower("title"||' '||"body"||' '||"wantedContent"))>0 ORDER BY "createdAt" DESC,"id" DESC LIMIT ${WISH_PAGE_SIZE} OFFSET ${(page - 1) * WISH_PAGE_SIZE}`;
+      >`SELECT * FROM "Wish" WHERE "deletedAt" IS NULL AND "moderatedAt" IS NULL AND (${category}::text IS NULL OR "category"=${category}) AND position(lower(${query}) in lower("title"||' '||"body"))>0 ORDER BY "createdAt" DESC,"id" DESC LIMIT ${WISH_PAGE_SIZE} OFFSET ${(page - 1) * WISH_PAGE_SIZE}`;
       const [count] = await tx.$queryRaw<
         { total: number }[]
-      >`SELECT count(*)::int AS total FROM "Wish" WHERE "deletedAt" IS NULL AND "moderatedAt" IS NULL AND (${category}::text IS NULL OR "category"=${category}) AND position(lower(${query}) in lower("title"||' '||"body"||' '||"wantedContent"))>0`;
+      >`SELECT count(*)::int AS total FROM "Wish" WHERE "deletedAt" IS NULL AND "moderatedAt" IS NULL AND (${category}::text IS NULL OR "category"=${category}) AND position(lower(${query}) in lower("title"||' '||"body"))>0`;
       const context = rows.length ? await this.listSummaryContext(tx, rows, actor.accountId) : undefined;
       const items: WishSummary[] = [];
       for (const row of rows) items.push(await this.summary(tx, row, actor.accountId, context));
@@ -422,8 +419,8 @@ export class WishService {
       if (existing && existing.requestFingerprint !== fingerprint) conflict('发布内容已变化，请重新提交');
       const id = existing?.id ?? randomUUID();
       if (!existing)
-        await tx.$executeRaw`INSERT INTO "Wish" ("id","authorId","title","category","body","wantedContent","convenientTime","idempotencyKey","requestFingerprint","createdAt")
-    VALUES (${id},${fresh.accountId},${input.title},${input.category},${input.body},${input.wantedContent},${input.convenientTime},${input.idempotencyKey},${fingerprint},${this.auth.now()})`;
+        await tx.$executeRaw`INSERT INTO "Wish" ("id","authorId","title","category","body","convenientTime","idempotencyKey","requestFingerprint","createdAt")
+    VALUES (${id},${fresh.accountId},${input.title},${input.category},${input.body},${input.convenientTime},${input.idempotencyKey},${fingerprint},${this.auth.now()})`;
       const wish = await this.detail(tx, id, fresh.accountId);
       await this.fresh(tx, token, fresh);
       return { wish, replayed: Boolean(existing) };
@@ -463,15 +460,7 @@ export class WishService {
    VALUES (${randomUUID()},${'wish-converted:' + row.id + ':' + accountId},${row.id},${row.activityId},${accountId},${this.auth.now()}) ON CONFLICT ("eventKey") DO NOTHING`;
   }
   async edit(id: string, body: Record<string, unknown>, token?: string | null) {
-    fields(body, [
-      'idempotencyKey',
-      'expectedRevision',
-      'title',
-      'category',
-      'body',
-      'wantedContent',
-      'convenientTime'
-    ]);
+    fields(body, ['idempotencyKey', 'expectedRevision', 'title', 'category', 'body', 'convenientTime']);
     if (!Number.isSafeInteger(body.expectedRevision) || Number(body.expectedRevision) < 0)
       invalid('心愿版本无效');
     const { expectedRevision, ...payload } = body,
@@ -482,13 +471,12 @@ export class WishService {
       if (await this.previous(tx, id, actor.accountId, input.idempotencyKey, 'EDIT', fingerprint))
         return true;
       if (row.revision !== expectedRevision) conflict('心愿内容已更新，请重新打开修改');
-      await tx.$executeRaw`UPDATE "Wish" SET title=${input.title},"category"=${input.category},body=${input.body},"wantedContent"=${input.wantedContent},"convenientTime"=${input.convenientTime},revision=revision+1,"updatedAt"=${this.auth.now()} WHERE id=${id}`;
+      await tx.$executeRaw`UPDATE "Wish" SET title=${input.title},"category"=${input.category},body=${input.body},"convenientTime"=${input.convenientTime},revision=revision+1,"updatedAt"=${this.auth.now()} WHERE id=${id}`;
       await this.record(tx, id, actor.accountId, input.idempotencyKey, 'EDIT', fingerprint, {
         before: {
           title: row.title,
           category: row.category,
           body: row.body,
-          wantedContent: row.wantedContent,
           convenientTime: row.convenientTime,
           revision: row.revision
         },

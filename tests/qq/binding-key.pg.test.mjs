@@ -82,7 +82,6 @@ test('QQ 一次性密钥绑定与解绑（数据库）', async (t) => {
       firstBinding = await f.db.qqOfficialBinding.findFirstOrThrow({
         where: { accountId: f.ids[0], ...scope }
       });
-      assert.equal(firstBinding.protocolVersion, 2);
       assert.equal(firstBinding.memberOpenId, member(0));
       const key = await row(first);
       assert.ok(key.consumedAt);
@@ -229,44 +228,6 @@ test('QQ 一次性密钥绑定与解绑（数据库）', async (t) => {
         assert.ok((await row(first)).consumedAt);
       }
     );
-    await check(
-      'confirmed legacy binding remains valid without mutation and can explicitly unlink and rebind',
-      async () => {
-        const legacy = await f.db.qqOfficialBinding.create({
-          data: { ...scope, accountId: f.ids[11], memberOpenId: member(11), confirmedAt: now }
-        });
-        assert.equal(legacy.protocolVersion, 1);
-        assert.ok(
-          (await service.status(f.tokens[11])).bindings.some(
-            (x) => x.id === legacy.id && x.groupOpenId === scope.groupOpenId && x.requiresRebind === false
-          )
-        );
-        await reject(() => issue(11));
-        assert.equal(
-          (await f.db.$transaction((tx) => resolveBoundActor(tx, scope, member(11), auth))).bindingId,
-          legacy.id
-        );
-        await f.db.$transaction((tx) =>
-          revalidateBoundActor(tx, scope, member(11), auth, {
-            accountId: f.ids[11],
-            bindingId: legacy.id,
-            bindingVersion: legacy.version
-          })
-        );
-        assert.deepEqual(await f.db.qqOfficialBinding.findUnique({ where: { id: legacy.id } }), legacy);
-        await service.unlink(
-          { bindingId: legacy.id, version: legacy.version, confirmed: true },
-          f.tokens[11]
-        );
-        const k = await issue(11);
-        await bind(k, 11);
-        assert.equal(
-          (await f.db.qqOfficialBinding.findFirstOrThrow({ where: { accountId: f.ids[11] } }))
-            .protocolVersion,
-          2
-        );
-      }
-    );
     async function waitingMutation(i, mutate) {
       const k = await issue(i);
       let release, ready;
@@ -350,14 +311,6 @@ test('QQ 一次性密钥绑定与解绑（数据库）', async (t) => {
     await check('account initiation limit is five per fifteen minutes', async () => {
       for (let i = 0; i < 5; i++) await issue(15);
       await reject(() => issue(15));
-    });
-    await check('retired select prove confirm cannot mutate bindings', async () => {
-      const before = await f.db.qqOfficialBinding.count();
-      for (const name of ['select', 'confirm'])
-        if (typeof service[name] === 'function') await reject(() => service[name]({}, f.tokens[16]));
-      if (typeof service.prove === 'function')
-        await reject(() => service.prove(scope, member(16), 'synthetic_retired_proof'));
-      assert.equal(await f.db.qqOfficialBinding.count(), before);
     });
     await check(
       'trusted bridge binds once caches identical event and rejects fresh replay without storing raw key',

@@ -135,10 +135,8 @@ export class QqBridgeService {
       let message: string;
       try {
         const binding = new QqBindingService(this.auth, this.config);
-        const candidate = /^绑定\s+([A-Za-z0-9_-]{12,64})$/.exec(content),
-          proof = /^确认绑定\s+([A-Za-z0-9_-]{32,64})$/.exec(content);
+        const candidate = /^绑定\s+([A-Za-z0-9_-]{12,64})$/.exec(content);
         if (candidate) message = await binding.bindKey(scope, memberOpenId, candidate[1]!);
-        else if (proof) message = await binding.prove(scope, memberOpenId, proof[1]!);
         else if (/^报名(?:\s|$)/.test(content)) {
           const target = { activityCode: parseQqSignupLocator(content) };
           const refIdx =
@@ -206,7 +204,7 @@ export class QqBridgeService {
       }
       const policy = await currentBotPublication(tx, scope);
       if (policy) {
-        const kind: BotTemplateKind = /^(绑定|确认绑定)\s/.test(content)
+        const kind: BotTemplateKind = /^绑定\s/.test(content)
           ? 'BINDING'
           : /^报名/.test(content)
             ? message.startsWith('报名成功')

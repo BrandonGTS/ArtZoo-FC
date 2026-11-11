@@ -240,7 +240,6 @@ test('duty success replay and saved reads survive catalog rename disable version
       (await h.service.list(new URL('http://test?month=2030-06'))).items[0].duty,
       first.activity.duty
     );
-    assert.deepEqual((await h.service.mine()).published[0].duty, first.activity.duty);
   }
   assert.equal(h.rows.length, 1);
   assert.equal(h.events.length, 1);

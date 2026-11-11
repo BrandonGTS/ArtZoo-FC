@@ -1,8 +1,7 @@
 import { invalid } from './account-contract.js';
 import { activityId } from './activity-contract.js';
 export const PENALTY_APPEAL_WINDOW = 7 * 86400000;
-export type AppealablePenaltyReason =
-  'LATE_WITHDRAWAL' | 'LATE_CANCELLATION' | 'SERIES_UNAGREED_ABSENCE' | 'SERIES_UNCOMMUNICATED_EXIT';
+export type AppealablePenaltyReason = 'LATE_WITHDRAWAL' | 'LATE_CANCELLATION';
 export interface PenaltyAppeal {
   id: string;
   penaltyId: string;

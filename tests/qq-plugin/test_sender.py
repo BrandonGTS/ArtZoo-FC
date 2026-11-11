@@ -593,3 +593,11 @@ class SenderTests(unittest.IsolatedAsyncioTestCase):
         result = await TestWorker(self.journal, {self.scope}).deliver(task, self.scope, self.api)
         self.assertEqual(result["outcome"], "simulated")
         self.assertEqual(self.api.calls, [])
+
+
+class ProviderRefusalCodeTests(unittest.TestCase):
+    def test_typed_http_refusal_distinct_from_network_unknown(self):
+        self.assertTrue(sender.provider_code_40034105(sdk.ProviderHttpError(400, 40034105)))
+        for error in [TimeoutError(), ConnectionResetError(), sdk.ProviderHttpError(500, 40034105),
+                      sdk.ProviderHttpError(429, 40034100)]:
+            self.assertFalse(sender.provider_code_40034105(error))

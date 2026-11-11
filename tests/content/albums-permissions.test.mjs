@@ -255,6 +255,7 @@ const remove = (photos, extra = {}) => ({
   action: 'remove',
   photos: photos.map((p) => ({ id: p.id, revision: p.revision })),
   submissionKey: randomUUID(),
+  intent: 'SELF',
   ...extra
 });
 test('creator deletes without reason; admin moderation requires reason, preserves audit/replay and retains bytes', async () => {
@@ -264,7 +265,9 @@ test('creator deletes without reason; admin moderation requires reason, preserve
       p = await h.upload(a.id),
       q = await h.upload(a.id);
     const moderation =
-      actor === administrator ? { intent: 'MODERATE', reason: 'Synthetic moderator photo removal' } : {};
+      actor === administrator
+        ? { intent: 'MODERATE', reason: 'Synthetic moderator photo removal' }
+        : { intent: 'SELF' };
     if (actor === administrator) {
       const before = structuredClone(h.state);
       await assert.rejects(
@@ -301,7 +304,7 @@ test('deletion keeps forbidden/stale/atomic checks and admin album moderation re
   await h.upload(a.id);
   await h.upload(a.id);
   await assert.rejects(
-    h.service.updatePhoto(h.state.photos[0].id, { action: 'remove', revision: 0 }, stranger),
+    h.service.updatePhoto(h.state.photos[0].id, { action: 'remove', revision: 0, intent: 'SELF' }, stranger),
     error(403)
   );
   await assert.rejects(h.service.mutatePhotos(a.id, remove(h.state.photos), stranger), error(403));
@@ -311,8 +314,14 @@ test('deletion keeps forbidden/stale/atomic checks and admin album moderation re
   );
   assert.ok(h.state.photos.every((p) => !p.removedAt));
   assert.equal(h.state.audits.length, 1);
-  await assert.rejects(h.service.update(a.id, { action: 'remove', revision: 1 }, owner), error(403));
-  await assert.rejects(h.service.update(a.id, { action: 'remove', revision: 0 }, administrator), error(409));
+  await assert.rejects(
+    h.service.update(a.id, { action: 'remove', revision: 1, intent: 'SELF' }, owner),
+    error(403)
+  );
+  await assert.rejects(
+    h.service.update(a.id, { action: 'remove', revision: 0, intent: 'MODERATE', reason: 'r' }, administrator),
+    error(409)
+  );
   const before = structuredClone(h.state);
   await assert.rejects(
     h.service.update(a.id, { action: 'remove', revision: 1, intent: 'MODERATE' }, administrator),
@@ -330,7 +339,7 @@ test('deletion keeps forbidden/stale/atomic checks and admin album moderation re
 test('creator can delete own empty album; explicit public type and selected pool replace the legacy environment gate', async () => {
   const h = harness(),
     a = await h.create();
-  await h.service.update(a.id, { action: 'remove', revision: 0 }, owner);
+  await h.service.update(a.id, { action: 'remove', revision: 0, intent: 'SELF' }, owner);
   assert.equal(h.state.audits.at(-1).reason, '创建者删除本人相册');
   const x = harness(),
     b = await x.create(),

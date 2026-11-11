@@ -48,7 +48,7 @@ export async function processActivityMaintenance(
           mode: 'SINGLE',
           cancelledAt: null,
           continuedAt: null,
-          startsAt: { lte: now, gte: db.activity.fields.managementEnabledAt },
+          startsAt: { lte: now },
           seats: { some: { registration: { is: null } } }
         },
         select: { id: true },
@@ -75,7 +75,6 @@ export async function processActivityMaintenance(
             row.cancelledAt ||
             row.continuedAt ||
             row.startsAt > now ||
-            row.startsAt < row.managementEnabledAt ||
             row.seats.every((seat) => seat.registration)
           )
             return;

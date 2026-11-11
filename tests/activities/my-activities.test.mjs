@@ -95,14 +95,14 @@ function harness() {
   const service = new ActivityService(auth);
   return { rows, calls, read: (query) => service.mine('token', new URL('http://local/me?' + query)) };
 }
-for (const kind of ['registered', 'published'])
+for (const kind of ['registered'])
   test(
     'mine ' +
       kind +
       ' current excludes canceled and history retains future/past cancellations exactly once across pages',
     async () => {
       const h = harness(),
-        other = kind === 'registered' ? 28 : 29;
+        other = 28;
       const current = await h.read(kind + 'Period=current');
       assert.deepEqual(
         current[kind].map((x) => x.id),
@@ -139,11 +139,11 @@ for (const kind of ['registered', 'published'])
         assert.ok(countFilters.includes(JSON.stringify(query.where)));
     }
   );
-test('canceling a future activity moves it from current to history in both sections and clamps stale pages', async () => {
+test('canceling a future activity moves it from current to history and clamps stale pages', async () => {
   const h = harness();
   h.rows.find((x) => x.id === id(24)).cancelledAt = now;
-  const current = await h.read('registeredPage=99&publishedPage=99');
-  for (const kind of ['registered', 'published']) {
+  const current = await h.read('registeredPage=99');
+  for (const kind of ['registered']) {
     assert.deepEqual(
       current[kind].map((x) => x.id),
       [25, 26].map(id)
@@ -151,10 +151,8 @@ test('canceling a future activity moves it from current to history in both secti
     assert.equal(current[kind + 'Pagination'].total, 2);
     assert.equal(current[kind + 'Pagination'].page, 1);
   }
-  const past = await h.read(
-    'registeredPeriod=history&publishedPeriod=history&registeredPage=99&publishedPage=99'
-  );
-  for (const kind of ['registered', 'published'])
+  const past = await h.read('registeredPeriod=history&registeredPage=99');
+  for (const kind of ['registered'])
     assert.deepEqual(past[kind + 'Pagination'], {
       page: 3,
       pageSize: 10,
@@ -162,14 +160,12 @@ test('canceling a future activity moves it from current to history in both secti
       totalPages: 3,
       period: 'history'
     });
-  const archived = { registered: [], published: [] };
+  const archived = { registered: [] };
   for (let page = 1; page <= 3; page++) {
-    const result = await h.read(
-      'registeredPeriod=history&publishedPeriod=history&registeredPage=' + page + '&publishedPage=' + page
-    );
-    for (const kind of ['registered', 'published']) archived[kind].push(...result[kind]);
+    const result = await h.read('registeredPeriod=history&registeredPage=' + page);
+    for (const kind of ['registered']) archived[kind].push(...result[kind]);
   }
-  for (const kind of ['registered', 'published']) {
+  for (const kind of ['registered']) {
     assert.equal(archived[kind].filter((x) => x.id === id(24)).length, 1);
     assert.equal(new Set(archived[kind].map((x) => x.id)).size, 25);
   }

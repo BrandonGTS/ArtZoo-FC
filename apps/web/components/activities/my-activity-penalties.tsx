@@ -16,9 +16,7 @@ import { useActivityResource } from './use-activity-resource';
 import { ActivityLoadState, ActivityPaper, beijingFull } from './activity-ui';
 const labels = {
   LATE_WITHDRAWAL: '临近退出',
-  LATE_CANCELLATION: '临近取消',
-  SERIES_UNAGREED_ABSENCE: '未共识缺席',
-  SERIES_UNCOMMUNICATED_EXIT: '未经沟通永久退出'
+  LATE_CANCELLATION: '临近取消'
 };
 const statuses = { PENDING: '待处理', APPROVED: '已同意撤销', REJECTED: '已驳回' };
 export default function MyActivityPenalties() {

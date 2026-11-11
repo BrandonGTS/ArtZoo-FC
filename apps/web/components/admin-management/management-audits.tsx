@@ -16,7 +16,7 @@ export function ManagementAudits({
   refresh,
   disabled
 }: {
-  scope: 'roles' | 'public-qq';
+  scope: 'roles';
   refresh: number;
   disabled: boolean;
 }) {
@@ -62,17 +62,12 @@ export function ManagementAudits({
             {
               title: '变更',
               key: 'change',
-              render: (_, row) =>
-                scope === 'roles' ? (
-                  <span>
-                    {row.beforeRole ? roleLabels[row.beforeRole] : '—'} →{' '}
-                    {row.afterRole ? roleLabels[row.afterRole] : '—'}
-                  </span>
-                ) : (
-                  <span>
-                    {row.beforeQq || '未配置'} → {row.afterQq || '未配置'}
-                  </span>
-                )
+              render: (_, row) => (
+                <span>
+                  {row.beforeRole ? roleLabels[row.beforeRole] : '—'} →{' '}
+                  {row.afterRole ? roleLabels[row.afterRole] : '—'}
+                </span>
+              )
             },
             { title: '原因', dataIndex: 'reason' }
           ]}

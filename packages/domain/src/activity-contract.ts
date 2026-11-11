@@ -174,9 +174,7 @@ export interface ActivityNotification {
   delivery: 'SIMULATED';
 }
 export interface MyActivities {
-  published: ActivitySummary[];
   registered: ActivitySummary[];
-  publishedPagination: MyActivitiesPagination;
   registeredPagination: MyActivitiesPagination;
   serverNow: string;
   timeZone: 'Asia/Shanghai';

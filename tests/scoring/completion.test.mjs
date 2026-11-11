@@ -18,7 +18,6 @@ const record = (status = 'PRESENT', revision = 0) => ({
 });
 async function setup(status = 'PRESENT', points = 0) {
   const h = harness();
-  h.state.activity.completionEnabledAt = new Date('2030-05-01');
   h.state.accounts[id(7)].activityPoints = points;
   if (points >= 3) h.state.accounts[id(7)].activityDecayAt = new Date('2030-06-08T12:00:00Z');
   if (status) await h.service.record(id(1), record(status));
@@ -93,7 +92,8 @@ test('absent gets only an inactive zero-delta anchor; unrecorded and canceled ge
   assert.equal(absent.state.events.filter((e) => e.kind === 'ACTIVITY_COMPLETED').length, 0);
   for (const mutate of [
     (h) => (h.state.activity.cancelledAt = end),
-    (h) => (h.state.activity.completionEnabledAt = null),
+    (h) => (h.state.activity.scene = 'OFFLINE'),
+    (h) => (h.state.activity.mode = 'SERIES'),
     (h) => (h.state.reg.status = 'WITHDRAWN'),
     (h) => (h.state.reg.attendanceRecordedAt = new Date('2030-06-01T14:00:00Z'))
   ]) {
@@ -205,13 +205,6 @@ test('appeal before first worker evaluates atomically and does not emit a transi
     assert.equal(h.state.events.filter((e) => e.kind === 'ACTIVITY_COMPLETED').length, 0);
     assert.equal(await processActivityCompletions(h.db, end), 0);
   }
-});
-test('adoption-null activity never acquires completion through appeal and pending record is never inserted', async () => {
-  const h = await setup('ABSENT', 1);
-  h.state.activity.completionEnabledAt = null;
-  await correct(h, 'PRESENT');
-  assert.equal(h.state.accounts[id(7)].activityPoints, 1);
-  assert.equal(h.state.completions.length, 0);
 });
 test('attendance DTO exposes only minimal pending, credited, and corrected settlement state', async () => {
   const h = await setup('PRESENT', 1);

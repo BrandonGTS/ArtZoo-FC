@@ -44,7 +44,6 @@ for (const step of ['activity', 'lottery', 'officialEvents', 'cleanup'])
     assert.deepEqual(result.heartbeat.failedSteps, [step]);
     assert.deepEqual(result.notes, [
       'probe',
-      'guard',
       'activity',
       'lottery',
       'officialEvents',
@@ -61,13 +60,6 @@ test('partial item failure is visible without misclassifying DB', () => {
     assert.deepEqual(result.heartbeat.failedSteps, [scenario === 'item' ? 'activity' : 'lottery']);
   }
 });
-test('guard violation stops every mutation and preserves failure exit status', () => {
-  const result = run('guard');
-  assert.equal(result.status, 1);
-  assert.deepEqual(result.notes, ['probe', 'guard', 'disconnected']);
-  assert.equal(result.heartbeat.database, 'ok');
-  assert.deepEqual(result.heartbeat.failedSteps, ['safety']);
-});
 test('database failure skips all maintenance', () => {
   const result = run('database');
   assert.equal(result.status, 1);
@@ -77,7 +69,7 @@ test('database failure skips all maintenance', () => {
 test('SIGTERM waits for in-flight operation and disconnect before stopped log', () => {
   const result = run('signal');
   assert.equal(result.status, 0);
-  assert.deepEqual(result.notes, ['probe', 'guard', 'activity', 'committed', 'disconnected']);
+  assert.deepEqual(result.notes, ['probe', 'activity', 'committed', 'disconnected']);
   assert.equal(result.lines.at(-1), 'Worker stopped');
   assert.ok(result.stdout.indexOf('committed') < result.stdout.indexOf('disconnected'));
 });
@@ -95,14 +87,7 @@ for (const mode of [null, '0'])
     assert.equal(result.heartbeat.cleanupEnabled, false);
     assert.equal(result.heartbeat.cleanup, undefined);
     assert.deepEqual(result.heartbeat.failedSteps, []);
-    assert.deepEqual(result.notes, [
-      'probe',
-      'guard',
-      'activity',
-      'lottery',
-      'officialEvents',
-      'disconnected'
-    ]);
+    assert.deepEqual(result.notes, ['probe', 'activity', 'lottery', 'officialEvents', 'disconnected']);
   });
 test('explicit enable logs enabled state and retains one cleanup per day across heartbeats', () => {
   const result = run('repeat', '1');

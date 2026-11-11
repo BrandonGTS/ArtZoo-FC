@@ -43,9 +43,9 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(core.parse_command("报名"), "register")
         self.assertEqual(core.parse_command("取消报名"), "website_only")
         self.assertEqual(core.parse_command("绑定 ABC_def-123"), "bind")
-        self.assertEqual(core.parse_command("确认绑定 ABC_def-123"), "bind")
+        self.assertIsNone(core.parse_command("确认绑定 ABC_def-123"))
         self.assertEqual(core.parse_command("报名 A队 H1 白魔"), "register")
-        for text in ("绑定 x", "确认绑定", "绑定 ABC_def-123 extra"):
+        for text in ("绑定 x", "绑定 ABC_def-123 extra"):
             self.assertEqual(core.parse_command(text), "invalid")
         for text in ("请报名", "/报名", "hello"):
             self.assertIsNone(core.parse_command(text), text)
@@ -202,7 +202,7 @@ class ParsingTests(unittest.TestCase):
 
     def test_own_mentions_normalize_both_binding_rounds_and_registration(self):
         scope=core.Scope("app","bot","group")
-        commands=["绑定 Synthetic_binding_001","确认绑定 "+"p"*43,"报名 H1 白魔","报名 A队 H1 白魔","报名"]
+        commands=["绑定 Synthetic_binding_001","报名 H1 白魔","报名 A队 H1 白魔","报名"]
         for command in commands:
             for prefix in ('<@bot>','<@!app>','<qqbot-at-user id="native_self"/>','<qqbot-at-user  id="native_self" />'):
                 raw=self.raw();raw["content"]="  "+prefix+"  "+command+"  "
@@ -250,7 +250,6 @@ class ParsingTests(unittest.TestCase):
         for separator in ("\t", "\n", "\u3000"):
             with self.subTest(separator=repr(separator)):
                 self.assertEqual(core.parse_command("绑定" + separator + "mock_code123"), "bind")
-                self.assertEqual(core.parse_command("确认绑定" + separator + "A" * 43), "bind")
                 self.assertEqual(core.parse_command("退出" + separator + "活动"), "website_only")
                 self.assertEqual(core.parse_command("绑定" + separator), "invalid")
         self.assertEqual(core.parse_command("  绑定\ttoo_short?  "), "invalid")

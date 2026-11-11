@@ -284,7 +284,7 @@ export function messageSummary(row: RawMessage): MessageItem {
       break;
     case 'ACTIVITY_PENALTY':
       heading = '活动处罚已记录';
-      body = `「${title}」${payload.reason === 'SERIES_UNAGREED_ABSENCE' ? '长期活动未共识缺席' : payload.reason === 'SERIES_UNCOMMUNICATED_EXIT' ? '长期活动未经沟通永久退出' : payload.reason === 'NO_SHOW' ? '未到场' : payload.reason === 'LATE_CANCELLATION' ? '临近取消' : '临近退出'}记${number(payload.points)}点，当前${number(payload.totalPoints)}点。`;
+      body = `「${title}」${payload.reason === 'NO_SHOW' ? '未到场' : payload.reason === 'LATE_CANCELLATION' ? '临近取消' : '临近退出'}记${number(payload.points)}点，当前${number(payload.totalPoints)}点。`;
       break;
     case 'ACTIVITY_SCORE_CORRECTED':
       heading = '活动记录与点数已更正';

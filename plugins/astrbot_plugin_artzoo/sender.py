@@ -77,7 +77,7 @@ class Journal:
                 direction = "passive" if passive else "proactive"
                 self.db.execute("INSERT OR IGNORE INTO send_budgets VALUES(?,?,?,?,?)",
                                 (key, scope_key, direction, 1, created))
-                if outcome in ("started", "unknown", "permission_denied") and not policy.resolved_placeholder(self.db,key) and not policy.resolved_provider_refusal(self.db,key) and not (
+                if outcome in ("started", "unknown", "permission_denied") and not (
                         outcome == "started" and passive and policy.owns_pending(self.db,key)):
                     policy.pause(self.db,scope_key,direction,"unknown" if outcome == "started" else outcome)
             except (ValueError, TypeError, Rejected):
@@ -96,7 +96,7 @@ class Journal:
             "SELECT COALESCE(SUM(charged),0) FROM send_budgets WHERE scope=? AND direction=?",
             (scope_key, direction)).fetchone()[0]
         paused = self.db.execute(
-            "SELECT reason FROM direction_pauses WHERE scope IN (?, '*') AND direction=? AND reason NOT IN ('resolved_pre_sdk','resolved_provider_refusal')",
+            "SELECT reason FROM direction_pauses WHERE scope IN (?, '*') AND direction=?",
             (scope_key, direction)).fetchone()
         return {"used": used, "maximum": effective_maximum, "paused": bool(paused),
                 "pause_reason": paused[0] if paused else None,
@@ -110,8 +110,7 @@ class Journal:
         if operation_mode == "production":
             scope_key = canonical_json(scope.wire()).decode()
             return not self.db.execute(
-                "SELECT 1 FROM direction_pauses WHERE scope IN (?, '*') AND direction=? "
-                "AND reason NOT IN ('resolved_pre_sdk','resolved_provider_refusal') LIMIT 1",
+                "SELECT 1 FROM direction_pauses WHERE scope IN (?, '*') AND direction=? LIMIT 1",
                 (scope_key, direction)).fetchone()
         return self.budget_status(scope, direction, maximum, operation_mode)["available"]
 
@@ -181,11 +180,6 @@ class Journal:
     def finish(self, key: str, outcome: str, response: dict, pause_reason=None):
         with self.db:
             self.db.execute("BEGIN IMMEDIATE")
-            resolution=self.db.execute('SELECT scope,direction FROM provider_refusal_resolutions WHERE attempt_key=?',(key,)).fetchone()
-            if resolution:
-                self.db.execute('INSERT OR IGNORE INTO provider_resolution_invalidations VALUES(?,?,?)',(key,time.time(),outcome if outcome in ('sent','unknown','permission_denied','started') else 'other'))
-                policy.pause(self.db,*resolution,'late_outcome_after_provider_resolution')
-                return 'unknown'
             prior=self.db.execute("SELECT state FROM reply_slots WHERE attempt_key=?",(key,)).fetchone()
             if prior and prior[0]=='UNKNOWN':
                 self.db.execute("INSERT OR REPLACE INTO reply_late_outcomes VALUES(?,?,?)",(key,outcome,time.time()))

@@ -12,14 +12,6 @@ export type WishCategory = (typeof WISH_CATEGORIES)[number]['value'];
 export const WISH_CONTENT_MAX = 11001;
 export const WISH_PAGE_SIZE = 15;
 export const WISH_INTEREST_PAGE_SIZE = 10;
-// A read-only projection. Never infer an old category or write a legacy row on read.
-export function wishContent(wish: { body?: string; wantedContent?: string }): string {
-  const body = (wish.body ?? '').replace(/\r\n?/g, '\n').trim();
-  const wanted = (wish.wantedContent ?? '').replace(/\r\n?/g, '\n').trim();
-  if (!body) return wanted;
-  if (!wanted || body === wanted || body.endsWith('\n' + wanted)) return body;
-  return body + '\n' + wanted;
-}
 export function wishCategory(value: unknown, optional = false): WishCategory | null {
   if (optional && (value === undefined || value === null || value === '')) return null;
   if (!WISH_CATEGORIES.some((item) => item.value === value)) invalid('请选择心愿分类');
@@ -29,9 +21,8 @@ export type WishPerson = MemberSummary;
 export interface WishSummary {
   id: string;
   title: string;
-  category: WishCategory | null;
+  category: WishCategory;
   body: string;
-  wantedContent: string;
   convenientTime: string;
   revision: number;
   author: WishPerson;
@@ -100,13 +91,9 @@ export function fields(body: Record<string, unknown>, allowed: string[]) {
   if (Object.keys(body).some((k) => !allowed.includes(k))) invalid('请求包含无效字段');
 }
 export function publishInput(body: Record<string, unknown>) {
-  fields(body, ['idempotencyKey', 'title', 'category', 'body', 'wantedContent', 'convenientTime']);
+  fields(body, ['idempotencyKey', 'title', 'category', 'body', 'convenientTime']);
   const content = text(
-    wishContent({
-      body: body.body === undefined ? undefined : text(body.body, '想玩的内容', WISH_CONTENT_MAX, true),
-      wantedContent:
-        body.wantedContent === undefined ? undefined : text(body.wantedContent, '想玩的内容', 1000, true)
-    }),
+    typeof body.body === 'string' ? body.body.replace(/\r\n?/g, '\n') : body.body,
     '想玩的内容',
     WISH_CONTENT_MAX
   );
@@ -115,7 +102,6 @@ export function publishInput(body: Record<string, unknown>) {
     title: text(body.title, '标题', 100),
     category: wishCategory(body.category)!,
     body: content,
-    wantedContent: '',
     convenientTime: text(body.convenientTime, '方便时间', 500)
   };
 }

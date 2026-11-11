@@ -231,9 +231,6 @@
   flex-wrap: wrap;
   gap: 8px 12px;
 }
-.activity-day-meta > .beijing-clock {
-  margin-inline-start: auto;
-}
 .activity-day-aside .heading-2 h2 {
   white-space: normal;
 }

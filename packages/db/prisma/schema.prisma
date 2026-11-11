@@ -33,7 +33,6 @@ model Account {
  botManagementAudits BotManagementAudit[]
   qqOfficialBindings QqOfficialBinding[]
   qqOfficialBindingKeys QqOfficialBindingKey[]
-  qqOfficialChallenges QqOfficialChallenge[]
   qqOfficialBindingAudits QqOfficialBindingAudit[]
   siteAnnouncements SiteAnnouncement[] @relation("AnnouncementAuthor")
   deletedSiteAnnouncements SiteAnnouncement[] @relation("AnnouncementDeleter")
@@ -41,9 +40,6 @@ model Account {
   processedGuestContacts GuestContactMessage[] @relation("GuestContactHandler")
   receivedMessageNotifications MessageNotification[] @relation("MessageRecipient")
   sentMessageNotifications MessageNotification[] @relation("MessageActor")
-  localQcNamespace String?
-  localQcSlot String?
-  @@unique([localQcNamespace, localQcSlot])
  lifecycleCommands AccountLifecycleCommand[] @relation("LifecycleCommandActor")
  lifecycleCommandTargets AccountLifecycleCommand[] @relation("LifecycleCommandTarget")
  lifecycleAudits AccountLifecycleAudit[] @relation("LifecycleAuditActor")
@@ -52,10 +48,6 @@ model Account {
   managementCommands AdminManagementCommand[]
   managementAudits AdminManagementAudit[] @relation("ManagementAuditActor")
   managementTargets AdminManagementAudit[] @relation("ManagementAuditTarget")
- activityShares ActivityShare[]
- activityShareMedia ActivityShareMedia[]
- activityShareAudits ActivityShareAudit[]
- activityShareCommands ActivityShareCommand[]
   officialEventAudits OfficialEventAudit[]
   officialEventCommands OfficialEventCommand[]
   officialSyncRuns OfficialSyncRun[]
@@ -162,7 +154,7 @@ enum InvitationUsageMode {
 }
 model Invitation {
   usageMode InvitationUsageMode @default(SINGLE)
-  tokenCiphertext String?
+  tokenCiphertext String
   id String @id @default(uuid())
   tokenHash String @unique
   membership Membership
@@ -300,7 +292,6 @@ model ActivitySeries {
 }
 model Activity {
   officialDeliveries QqOfficialDelivery[]
- publicShares ActivityShare[]
  sourceWish Wish? @relation("WishLinkedActivity")
  wishConversion WishConversion? @relation("WishConvertedActivity")
  wishNotifications WishNotification[] @relation("WishNotificationActivity")
@@ -327,10 +318,6 @@ model Activity {
   startsAt DateTime @db.Timestamptz(3)
   endsAt DateTime @db.Timestamptz(3)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
-  managementEnabledAt DateTime @default(now()) @db.Timestamptz(3)
-  attendanceEnabledAt DateTime @default(now()) @db.Timestamptz(3)
-  autoAbsenceEnabledAt DateTime? @default(now()) @db.Timestamptz(3)
-  completionEnabledAt DateTime? @default(now()) @db.Timestamptz(3)
   completions ActivityCompletion[]
   revision Int @default(0)
   cancelledAt DateTime? @db.Timestamptz(3)
@@ -443,7 +430,6 @@ model ActivityPenalty {
   scoreChange ActivityScoreChange?
   attendanceRegistration ActivityRegistration? @relation("CurrentAttendancePenalty")
   appeals ActivityPenaltyAppeal[]
-  appealEnabledAt DateTime? @default(now()) @db.Timestamptz(3)
   reversedAt DateTime? @db.Timestamptz(3)
   reversalReason String?
   points Int
@@ -1216,10 +1202,9 @@ model Wish {
  id String @id
  authorId String
  author Account @relation("WishAuthor", fields:[authorId], references:[id], onDelete:Restrict,onUpdate:NoAction)
- category String?
+ category String
  title String
  body String
- wantedContent String @default("")
  convenientTime String @default("")
  createdAt DateTime @default(now()) @db.Timestamptz(3)
  idempotencyKey String
@@ -1490,68 +1475,6 @@ model OfficialSyncRun {
  @@index([createdAt,id])
 }
 
-model ActivityShare {
- id String @id @default(uuid())
- activityId String
- activity Activity @relation(fields:[activityId],references:[id],onDelete:Restrict,onUpdate:NoAction)
- creatorId String
- creator Account @relation(fields:[creatorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
- title String @default("")
- body String @default("")
- mediaIds String[] @default([])
- revision Int @default(0)
- featuredAt DateTime? @db.Timestamptz(3)
- createdAt DateTime @default(now()) @db.Timestamptz(3)
- updatedAt DateTime @default(now()) @db.Timestamptz(3)
- media ActivityShareMedia[]
- audits ActivityShareAudit[]
- commands ActivityShareCommand[]
- @@index([featuredAt,id])
- @@index([activityId,createdAt,id])
-}
-model ActivityShareMedia {
- id String @id @default(uuid())
- shareId String
- share ActivityShare @relation(fields:[shareId],references:[id],onDelete:Restrict,onUpdate:NoAction)
- ownerId String
- owner Account @relation(fields:[ownerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
- batchId String
- batchIndex Int
- fingerprint String
- mime String
- width Int
- height Int
- frames Int
- createdAt DateTime @default(now()) @db.Timestamptz(3)
- @@unique([ownerId,batchId,batchIndex])
- @@index([shareId,createdAt,id])
-}
-model ActivityShareAudit {
- id String @id @default(uuid())
- shareId String
- share ActivityShare @relation(fields:[shareId],references:[id],onDelete:Restrict,onUpdate:NoAction)
- actorId String
- actor Account @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
- action String
- reason String
- before Json
- after Json
- createdAt DateTime @default(now()) @db.Timestamptz(3)
- @@index([shareId,createdAt,id])
-}
-model ActivityShareCommand {
- id String @id @default(uuid())
- shareId String
- share ActivityShare @relation(fields:[shareId],references:[id],onDelete:Restrict,onUpdate:NoAction)
- actorId String
- actor Account @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
- idempotencyKey String
- requestFingerprint String
- action String
- createdAt DateTime @default(now()) @db.Timestamptz(3)
- @@unique([actorId,idempotencyKey])
-}
-
 model AdminManagementCommand {
   id String @id @default(uuid())
   actorId String
@@ -1574,16 +1497,8 @@ model AdminManagementAudit {
   reason String
   beforeRole AdminRole?
   afterRole AdminRole?
-  beforeQq String?
-  afterQq String?
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@index([kind, createdAt, id])
-}
-model PublicSiteSettings {
-  id String @id
-  adminQq String?
-  revision Int
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
 
 model AccountLifecycleCommand {
@@ -1614,24 +1529,6 @@ model AccountLifecycleAudit {
  @@index([targetAccountId,createdAt,id])
  @@index([createdAt,id])
 }
-
-model LocalQcRun {
-  namespace String @id
-  anchor DateTime @db.Timestamptz(3)
-  manifestHash String
-  bindings Json
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-}
-model LocalQcRecord {
-  namespace String
-  slot String
-  kind String
-  entityId String
-  digest String
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  @@id([namespace, slot])
-}
-
 
 model AlbumCommand {
  id String @id @default(uuid())
@@ -1779,7 +1676,6 @@ model SiteAnnouncementCommand {
 }
 
 model QqOfficialBinding {
-  protocolVersion Int @default(1)
   id String @id @default(uuid())
   accountId String
   account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
@@ -1800,36 +1696,6 @@ model QqOfficialBindingAudit {
   action String
   identityDigest String
   createdAt DateTime @default(now()) @db.Timestamptz(3)
-}
-model QqOfficialChallenge {
-  id String @id @default(uuid())
-  accountId String
-  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  sessionId String
-  publicCodeHash String @unique
-  browserProofHash String
-  selectedCandidateId String?
-  expiresAt DateTime @db.Timestamptz(3)
-  invalidatedAt DateTime? @db.Timestamptz(3)
-  consumedAt DateTime? @db.Timestamptz(3)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  candidates QqOfficialCandidate[]
-  @@index([accountId, expiresAt])
-}
-model QqOfficialCandidate {
-  id String @id @default(uuid())
-  challengeId String
-  challenge QqOfficialChallenge @relation(fields: [challengeId], references: [id], onDelete: Restrict)
-  appId String
-  botId String
-  groupOpenId String
-  memberOpenId String
-  receiptCodeHash String @unique
-  finalProofHash String? @unique
-  selectedAt DateTime? @db.Timestamptz(3)
-  provenAt DateTime? @db.Timestamptz(3)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  @@unique([challengeId, appId, botId, groupOpenId, memberOpenId])
 }
 model QqOfficialSignupCode {
   code String @id

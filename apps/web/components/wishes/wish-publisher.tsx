@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Button, Form, Input, Select } from 'antd';
 import {
   WISH_CATEGORIES,
-  wishContent,
   type WishDetail,
   type WishSummary,
   type WishWrite
@@ -41,7 +40,7 @@ export default function WishPublisher({
     : 'OTHER';
   const initialValues = {
     title: initialWish?.title ?? defaultValues?.title ?? '',
-    body: initialWish ? wishContent(initialWish) : (defaultValues?.body ?? ''),
+    body: initialWish ? initialWish.body : (defaultValues?.body ?? ''),
     category: initialWish ? initialCategory : (defaultValues?.category ?? initialCategory),
     convenientTime: initialWish?.convenientTime ?? defaultValues?.convenientTime ?? ''
   };
@@ -50,7 +49,6 @@ export default function WishPublisher({
     title: values?.title ?? initialValues.title,
     category: values?.category ?? initialValues.category ?? null,
     body: values?.body ?? initialValues.body,
-    wantedContent: '',
     convenientTime: values?.convenientTime ?? initialValues.convenientTime,
     interestCount: 0,
     interested: false,

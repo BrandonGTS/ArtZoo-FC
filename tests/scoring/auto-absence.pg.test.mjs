@@ -5,10 +5,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { fixture, noPrivate } from '../activities/support/pg-fixture.mjs';
 import { processActivityAutoAbsences } from '../../packages/db/src/activity-auto-absence.ts';
-import {
-  processActivityCompletions,
-  processOptedInActivityCompletions
-} from '../../packages/db/src/activity-completion.ts';
+import { processActivityCompletions } from '../../packages/db/src/activity-completion.ts';
 import { AccountService } from '../../apps/web/server/auth/service.ts';
 import { ActivityAttendanceService } from '../../apps/web/server/activities/attendance.ts';
 import { mainlandChinaPhone, unavailableSms } from '../../apps/web/server/auth/ports.ts';
@@ -44,8 +41,6 @@ test('自动记缺席：真实 PostgreSQL', async (t) => {
           category: 'SOCIAL',
           startsAt: new Date(+end - 3600000),
           endsAt: end,
-          attendanceEnabledAt: new Date('2029-01-01'),
-          completionEnabledAt: new Date('2029-01-01'),
           ...patch,
           seats: { create: { position: 0, kind: 'ANY' } }
         },
@@ -94,55 +89,47 @@ test('自动记缺席：真实 PostgreSQL', async (t) => {
     await f.db.account.update({ where: { id: f.ids[2] }, data: { adminRole: 'ADMIN' } });
     const first = await make(1);
     const before = await points(first);
+    await check('exact cutoff and concurrent workers charge once with real timestamp', async () => {
+      assert.equal(await processActivityAutoAbsences(f.db, new Date(+end - 1)), 0);
+      const out = await Promise.all([
+        processActivityAutoAbsences(f.db, now),
+        processActivityAutoAbsences(f.db, now)
+      ]);
+      assert.equal(
+        out.reduce((a, b) => a + b, 0),
+        1
+      );
+      const current = await row(first);
+      assert.equal(current.attendanceStatus, 'ABSENT');
+      assert.equal(current.attendanceSource, 'AUTO_DEADLINE');
+      assert.equal(+current.attendanceRecordedAt, +now);
+      assert.equal(current.attendanceRevision, 1);
+      assert.equal(await points(first), before + 2);
+      assert.equal(await f.db.activityPenalty.count({ where: { registrationId: first.reg.id } }), 1);
+      assert.equal(
+        await f.db.activityOutbox.count({
+          where: { registrationId: first.reg.id, kind: 'ACTIVITY_PENALTY' }
+        }),
+        1
+      );
+      const events = await f.db.activityOutbox.findMany({
+        where: { registrationId: first.reg.id },
+        include: { mockDelivery: true }
+      });
+      assert.ok(events.every((e) => e.channel === 'IN_APP' && e.recipientId === f.ids[1] && e.mockDelivery));
+      assert.equal(await processActivityAutoAbsences(f.db, now), 0);
+    });
     await check(
-      'new rows adopt default; exact cutoff and concurrent workers charge once with real timestamp',
-      async () => {
-        assert.ok(first.a.autoAbsenceEnabledAt);
-        assert.equal(await processActivityAutoAbsences(f.db, new Date(+end - 1)), 0);
-        const out = await Promise.all([
-          processActivityAutoAbsences(f.db, now),
-          processActivityAutoAbsences(f.db, now)
-        ]);
-        assert.equal(
-          out.reduce((a, b) => a + b, 0),
-          1
-        );
-        const current = await row(first);
-        assert.equal(current.attendanceStatus, 'ABSENT');
-        assert.equal(current.attendanceSource, 'AUTO_DEADLINE');
-        assert.equal(+current.attendanceRecordedAt, +now);
-        assert.equal(current.attendanceRevision, 1);
-        assert.equal(await points(first), before + 2);
-        assert.equal(await f.db.activityPenalty.count({ where: { registrationId: first.reg.id } }), 1);
-        assert.equal(
-          await f.db.activityOutbox.count({
-            where: { registrationId: first.reg.id, kind: 'ACTIVITY_PENALTY' }
-          }),
-          1
-        );
-        const events = await f.db.activityOutbox.findMany({
-          where: { registrationId: first.reg.id },
-          include: { mockDelivery: true }
-        });
-        assert.ok(
-          events.every((e) => e.channel === 'IN_APP' && e.recipientId === f.ids[1] && e.mockDelivery)
-        );
-        assert.equal(await processActivityAutoAbsences(f.db, now), 0);
-      }
-    );
-    await check(
-      'null opt-in, cancellation, exited enrollment, unformed, series and offline receive no penalty',
+      'cancellation, exited enrollment, unformed, series and offline receive no penalty',
       async () => {
         const cases = [
-          await make(3, { autoAbsenceEnabledAt: null }),
           await make(3, { cancelledAt: now }),
           await make(3, {}, 'WITHDRAWN'),
           await make(3, {}, 'CANCELLED'),
           await make(3, {
             scene: 'OFFLINE',
             location: 'Synthetic',
-            registrationClosesAt: new Date(+end - 7200000),
-            completionEnabledAt: null
+            registrationClosesAt: new Date(+end - 7200000)
           }),
           await make(3, {
             mode: 'SERIES',
@@ -182,7 +169,8 @@ test('自动记缺席：真实 PostgreSQL', async (t) => {
       assert.equal(await points(v), before);
       assert.equal(await f.db.activityPenalty.count({ where: { registrationId: v.reg.id } }), 0);
       assert.equal(await f.db.activityCommand.count({ where: { activityId: v.a.id } }), 0);
-      await f.db.activity.update({ where: { id: v.a.id }, data: { autoAbsenceEnabledAt: null } });
+      // Take the fixture out of later sweeps.
+      await f.db.activity.update({ where: { id: v.a.id }, data: { cancelledAt: now } });
     });
     await check(
       'real sign-in holding shared lock wins over deadline worker without duplicate write',

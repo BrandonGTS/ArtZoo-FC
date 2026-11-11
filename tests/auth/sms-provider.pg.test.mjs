@@ -156,6 +156,7 @@ test('短信：真实阿里云适配器 + 本地假传输 + 完整注册与找�
       row: await db.invitation.create({
         data: {
           tokenHash: tokenDigest(token),
+          tokenCiphertext: 'synthetic',
           membership: 'MEMBER',
           createdById: inviter.id,
           createdAt: now,

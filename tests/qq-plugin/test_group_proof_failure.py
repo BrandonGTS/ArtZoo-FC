@@ -36,55 +36,20 @@ class PreSdkPolicyTests(unittest.TestCase):
         res=self.reserve();self.assertFalse(self.worker_instance.fail_reply({**res,'owner':'wrong'},safe_before_sdk=True))
         policy.start_reply(self.journal,res,res['key'],'d'*64,self.scope,self.now,10)
         self.assertFalse(self.worker_instance.fail_reply(res,safe_before_sdk=True))
-        self.assertFalse(policy.verified_pre_sdk_placeholder(self.journal.db,res['key']))
         self.assertEqual(self.journal.db.execute('SELECT outcome FROM attempts').fetchone()[0],'unknown')
-        with self.assertRaises(core.Rejected):policy.resolve_incident_pre_sdk_pause(self.journal,self.scope,res['key'],self.now)
-    def test_exact_historical_placeholder_resolves_without_delete_or_replay_and_survives_restart(self):
-        res=self.placeholder();before=list(self.journal.db.execute('SELECT * FROM attempts'));charged=list(self.journal.db.execute('SELECT * FROM send_budgets'))
-        self.assertTrue(policy.resolve_incident_pre_sdk_pause(self.journal,self.scope,res['key'],self.now))
-        self.assertEqual(list(self.journal.db.execute('SELECT * FROM attempts')),before)
-        self.assertEqual(list(self.journal.db.execute('SELECT * FROM send_budgets')),charged)
-        self.assertEqual(self.journal.db.execute('SELECT count(*) FROM direction_pauses').fetchone()[0],1)
-        self.assertFalse(self.journal.budget_status(self.scope,'passive',0,'production')['paused'])
-        self.journal.close();self.journal=sender.Journal(self.path);self.worker()
-        self.assertFalse(self.journal.budget_status(self.scope,'passive',0,'production')['paused']);self.assertIsNone(self.reserve())
-        self.assertFalse(policy.resolve_incident_pre_sdk_pause(self.journal,self.scope,res['key'],self.now))
-    def test_future_unknown_and_late_outcome_reactivate_pause(self):
-        res=self.placeholder();policy.resolve_incident_pre_sdk_pause(self.journal,self.scope,res['key'],self.now)
-        self.journal.finish(res['key'],'sent',{})
-        self.assertTrue(self.journal.budget_status(self.scope,'passive',0,'production')['paused'])
-        self.assertFalse(policy.resolved_placeholder(self.journal.db,res['key']))
-    def test_different_future_unknown_reactivates_without_changing_old_audit(self):
-        res=self.placeholder();policy.resolve_incident_pre_sdk_pause(self.journal,self.scope,res['key'],self.now)
-        newer=self.reserve('mock_new_event');self.worker_instance.fail_reply(newer)
-        self.assertTrue(self.journal.budget_status(self.scope,'passive',0,'production')['paused'])
-        self.assertEqual(self.journal.db.execute('SELECT count(*) FROM reply_pause_resolutions').fetchone()[0],1)
-    def test_mixed_real_unknown_permission_and_wildcard_never_resolve(self):
-        one=self.reserve();two=self.reserve('mock_other')
-        policy.start_reply(self.journal,two,two['key'],'d'*64,self.scope,self.now,10)
-        self.worker_instance.fail_reply(one);self.worker_instance.fail_reply(two)
-        with self.assertRaises(core.Rejected):policy.resolve_incident_pre_sdk_pause(self.journal,self.scope,one['key'],self.now)
-        self.assertEqual(self.journal.db.execute('SELECT count(*) FROM reply_pause_resolutions').fetchone()[0],0)
-    def test_permission_reason_and_global_pause_block_even_eligible_placeholder(self):
+    def test_unknown_reply_pause_survives_restart_and_late_outcome(self):
         res=self.placeholder()
-        with self.journal.db:self.journal.db.execute("UPDATE direction_pauses SET reason='permission_denied'")
-        with self.assertRaises(core.Rejected):policy.resolve_incident_pre_sdk_pause(self.journal,self.scope,res['key'],self.now)
-        with self.journal.db:self.journal.db.execute("UPDATE direction_pauses SET reason='reply_outcome_unknown'");policy.pause(self.journal.db,'*','passive','unrecognized_history')
-        with self.assertRaises(core.Rejected):policy.resolve_incident_pre_sdk_pause(self.journal,self.scope,res['key'],self.now)
-
+        self.assertTrue(self.journal.budget_status(self.scope,'passive',0,'production')['paused'])
+        self.journal.close();self.journal=sender.Journal(self.path);self.worker()
+        self.assertTrue(self.journal.budget_status(self.scope,'passive',0,'production')['paused'])
+        self.assertEqual(self.journal.finish(res['key'],'sent',{}),'unknown')
+        self.assertTrue(self.journal.budget_status(self.scope,'passive',0,'production')['paused'])
+        self.assertEqual(self.journal.db.execute('SELECT outcome FROM attempts').fetchone()[0],'unknown')
     def test_pre_send_failure_restart_keeps_terminal_event_and_budget(self):
         res=self.reserve();self.worker_instance.fail_reply(res,safe_before_sdk=True)
         self.journal.close();self.journal=sender.Journal(self.path);self.worker()
         self.assertIsNone(self.reserve());self.assertEqual(self.journal.db.execute('SELECT sum(charged) FROM send_budgets').fetchone()[0],1)
         self.assertEqual(self.journal.db.execute('SELECT state FROM reply_slots').fetchone()[0],'PRE_SEND_FAILED')
-    def test_each_corrupted_evidence_component_refuses_resolution(self):
-        changes=[("UPDATE attempts SET receipt=?",('{"id":"mock_receipt"}',)),("UPDATE attempts SET ack=?",('{"delivery":"mock_ack"}',)),("UPDATE attempts SET created=created+1",()),("UPDATE reply_slots SET scope=?",('mock_changed_scope',)),("UPDATE send_budgets SET scope=?",('mock_changed_scope',)),("INSERT INTO reply_late_outcomes VALUES(?,?,?)",None)]
-        for index,(sql,args)in enumerate(changes):
-            with self.subTest(index=index):
-                self.journal.close();self.path=Path(self.tmp.name)/('corrupt-'+str(index)+'.sqlite3');self.journal=sender.Journal(self.path);self.worker();res=self.placeholder()
-                with self.journal.db:self.journal.db.execute(sql,args if args is not None else(res['key'],'sent',self.now))
-                with self.assertRaises(core.Rejected):policy.resolve_incident_pre_sdk_pause(self.journal,self.scope,res['key'],self.now)
-                self.assertEqual(self.journal.db.execute('SELECT count(*) FROM reply_pause_resolutions').fetchone()[0],0)
     def test_two_connections_sdk_start_and_safe_failure_are_mutually_exclusive(self):
         res=self.reserve();barrier=Barrier(2)
         def perform(start):

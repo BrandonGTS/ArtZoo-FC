@@ -30,13 +30,9 @@ export * from './lottery-contract.js';
 
 export * from './official-event-contract.js';
 
-export * from './activity-share-contract.js';
-
 export * from './admin-management-contract.js';
 
 export * from './account-lifecycle-contract.js';
-
-export * from './local-qc-safety.js';
 
 export * from './bot-management-contract.js';
 

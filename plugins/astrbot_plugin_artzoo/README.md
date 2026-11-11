@@ -41,7 +41,7 @@ for isolated mocks. No redirects or inherited proxy configuration are used.
 
 The group handler checks exact platform identity, stops handled events before
 any await, and reads the native GroupMessage's `raw_data` dict. It forwards
-only `绑定 <public_code>`, `确认绑定 <final_proof>` and content starting
+only `绑定 <one_time_key>` and content starting
 `报名` to the deterministic website parser. Example registration forms:
 `报名 H1 白魔`, `报名 MT 骑士`, `报名 A队 H1 白魔`, or offline `报名`.
 The website decides validity, activity type, qualification, seat and occupation.

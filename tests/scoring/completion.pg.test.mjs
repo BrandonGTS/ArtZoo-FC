@@ -30,7 +30,7 @@ test('正常完成减分：真实 PostgreSQL', async (t) => {
         where: { id: f.ids[i] },
         select: { activityPoints: true, activityDecayAt: true }
       });
-    async function activity(member, status = 'PRESENT', points = 0, { legacy = false, capacity = 1 } = {}) {
+    async function activity(member, status = 'PRESENT', points = 0, { capacity = 1 } = {}) {
       now = new Date('2030-06-01T10:00:00Z');
       const a = (
         await basic.create(
@@ -44,7 +44,6 @@ test('正常完成减分：真实 PostgreSQL', async (t) => {
         )
       ).activity;
       await basic.register(a.id, { seatId: a.seats[0].id, job: null }, token(member));
-      if (legacy) await f.db.activity.update({ where: { id: a.id }, data: { completionEnabledAt: null } });
       await f.db.account.update({
         where: { id: f.ids[member] },
         data: {
@@ -350,18 +349,11 @@ test('正常完成减分：真实 PostgreSQL', async (t) => {
         );
       }
     );
-    const legacy = await activity(12, 'ABSENT', 1, { legacy: true });
-    await check(
-      'appeal on adoption-null activity cannot acquire a completion credit; public DTO is minimal',
-      async () => {
-        await (await correction(legacy, 'PRESENT')).run();
-        assert.equal((await balance(12)).activityPoints, 1);
-        assert.equal(await f.db.activityCompletion.count({ where: { registrationId: legacy.reg.id } }), 0);
-        const view = await attendance.attendance(v.a.id, token(1));
-        noPrivate(view);
-        assert.deepEqual(Object.keys(view.items[0].completion).sort(), ['evaluatedAt', 'status']);
-      }
-    );
+    await check('completion settlement DTO is minimal', async () => {
+      const view = await attendance.attendance(v.a.id, token(1));
+      noPrivate(view);
+      assert.deepEqual(Object.keys(view.items[0].completion).sort(), ['evaluatedAt', 'status']);
+    });
   } finally {
     await f.cleanup();
   }

@@ -350,8 +350,7 @@ function InvitationLink({ invitation }: { invitation: InvitationSummary }) {
     }
   }
   if (invitation.status !== 'ACTIVE') return <p>此邀请已失效，无法复制链接。</p>;
-  if (!invitation.linkAvailable)
-    return <p>邀请链接暂不可用，请检查服务配置；未加密保存的旧邀请需移除后新建。</p>;
+  if (!invitation.linkAvailable) return <p>邀请链接暂不可用，请检查服务配置。</p>;
   return (
     <div className={styles.linkResult}>
       {contextHolder}

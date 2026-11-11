@@ -6,10 +6,9 @@ export function deletionIntent(
   ordinaryEligible: boolean,
   moderationEligible: boolean,
   ordinaryReason: string,
-  limit: number,
-  legacyModeration = moderationEligible
+  limit: number
 ) {
-  const intent = body.intent ?? (legacyModeration ? 'MODERATE' : 'SELF');
+  const intent = body.intent;
   if (intent !== 'SELF' && intent !== 'MODERATE')
     throw new AccountError('VALIDATION_ERROR', '删除操作无效', 400);
   if (intent === 'SELF') {

@@ -5,7 +5,6 @@ import {
   publishInput,
   key,
   pageNumber,
-  wishContent,
   wishCategory,
   WISH_CATEGORIES,
   WISH_CONTENT_MAX
@@ -20,7 +19,7 @@ const valid = () => ({
 test('category, unified content and free text time are required', () => {
   const input = publishInput(valid());
   assert.equal(input.title, '一起钓鱼');
-  assert.equal(input.wantedContent, '');
+  assert.equal('wantedContent' in input, false);
   assert.equal(input.convenientTime, '周末晚上或有空时');
   for (const extra of [
     { category: null },
@@ -36,24 +35,17 @@ test('category, unified content and free text time are required', () => {
   assert.equal(wishCategory(null, true), null);
   assert.equal(WISH_CATEGORIES.length, 6);
 });
-test('legacy content projects without mutation and avoids duplicate merge on edit', () => {
-  const old = { body: '旧想法', wantedContent: '旧内容' },
-    copy = { ...old };
-  assert.equal(wishContent(old), '旧想法\n旧内容');
-  assert.deepEqual(old, copy);
-  assert.equal(wishContent({ body: '同样内容', wantedContent: '同样内容' }), '同样内容');
-  assert.equal(wishContent({ body: '前文\n旧内容', wantedContent: '旧内容' }), '前文\n旧内容');
-  assert.equal(wishContent({ body: '行一\r\n行二', wantedContent: '行一\n行二' }), '行一\n行二');
-  assert.equal(wishContent({ wantedContent: '仅旧内容' }), '仅旧内容');
-  const merged = publishInput({ ...valid(), ...old });
-  assert.equal(merged.body, '旧想法\n旧内容');
-  assert.equal(merged.wantedContent, '');
+test('content is normalized once and the retired second content field is rejected', () => {
+  assert.equal(publishInput({ ...valid(), body: ' 行一\r\n行二 ' }).body, '行一\n行二');
   assert.equal(
-    publishInput({ ...valid(), body: merged.body, wantedContent: old.wantedContent }).body,
-    merged.body
+    publishInput({ ...valid(), body: '甲'.repeat(WISH_CONTENT_MAX) }).body.length,
+    WISH_CONTENT_MAX
   );
-  const largest = publishInput({ ...valid(), body: '甲'.repeat(10000), wantedContent: '乙'.repeat(1000) });
-  assert.equal(largest.body.length, WISH_CONTENT_MAX);
+  for (const wantedContent of ['', '旧内容'])
+    assert.throws(
+      () => publishInput({ ...valid(), wantedContent }),
+      (e) => e.code === 'VALIDATION_ERROR'
+    );
 });
 test('invalid fields, oversized and non-text inputs are rejected', () => {
   for (const extra of [

@@ -8,7 +8,6 @@ import { state, reset, auth, QuickLinkService } from './support/http-stubs.mjs';
 import { handleAlbums } from '../../apps/web/server/albums/http.ts';
 import { handleDaily, readPhotoBody } from '../../apps/web/server/daily/http.ts';
 import { handleWishes } from '../../apps/web/server/wishes/http.ts';
-import { handleActivityShares } from '../../apps/web/server/activity-shares/http.ts';
 import { handleKnowledgeImage } from '../../apps/web/server/knowledge/image-http.ts';
 import { uploadLotteryImage } from '../../apps/web/server/lottery/media-http.ts';
 import { submitQuickIconUpload } from '../../apps/web/server/quick-links/upload-http.ts';
@@ -30,7 +29,6 @@ const routes = [
   ['album-comment', (r) => handleAlbums(r, 'comment-upload', id)],
   ['daily', (r) => handleDaily(r, 'upload')],
   ['wish', (r) => handleWishes(r, 'upload')],
-  ['share', (r) => handleActivityShares(r, 'upload', id)],
   ['knowledge', (r) => handleKnowledgeImage(r)],
   ['lottery', (r) => uploadLotteryImage(r)],
   [
@@ -118,7 +116,7 @@ for (const [name, run] of routes) {
     assert.equal(denied.probe.reads, 0);
   });
 }
-test('all eight route families share two full-lifetime slots before reading bodies', async () => {
+test('all seven route families share two full-lifetime slots before reading bodies', async () => {
   reset();
   let release;
   const held = new Promise((resolve) => {
@@ -145,7 +143,7 @@ test('all eight route families share two full-lifetime slots before reading bodi
   assert.equal((await first).status, 201);
   assert.equal((await second).status, 201);
   assert.equal(globalThis.artzooUploadRequests, 0);
-  assert.equal((await routes[4][1](request(await payload('share')).value)).status, 201);
+  assert.equal((await routes[3][1](request(await payload('wish')).value)).status, 201);
 });
 test('configured limit one and invalid configuration defaults to two', async () => {
   const old = process.env.ARTZOO_UPLOAD_CONCURRENCY;
@@ -344,19 +342,19 @@ test('source failure releases body lock and global slot without changing the ori
   assert.equal(globalThis.artzooUploadRequests, 0);
 });
 
-test('slow album and share body uploads do not occupy image decoder slots', async () => {
+test('slow album and wish body uploads do not occupy image decoder slots', async () => {
   reset();
   let release;
   const held = new Promise((resolve) => {
     release = resolve;
   });
   const album = request(await payload('album'), held),
-    share = request(await payload('share'), held);
+    wish = request(await payload('wish'), held);
   const before = globalThis.artzooPhotoUploads ?? 0;
   const first = handleAlbums(album.value, 'upload', id),
-    second = handleActivityShares(share.value, 'upload', id);
+    second = handleWishes(wish.value, 'upload');
   try {
-    await until(() => album.probe.reads === 1 && share.probe.reads === 1);
+    await until(() => album.probe.reads === 1 && wish.probe.reads === 1);
     assert.equal(globalThis.artzooPhotoUploads ?? 0, before);
   } finally {
     release();

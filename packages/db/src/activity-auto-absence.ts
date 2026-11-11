@@ -1,9 +1,8 @@
 import { createMaintenanceState, runMaintenanceItem, type MaintenanceRunState } from './maintenance-run.js';
 import type { PrismaClient } from './generated/prisma/client.js';
 import { addActivityPenaltyPoints } from './activity-standing.js';
-import { automaticAbsenceEnabled } from './activity-attendance-policy.js';
 
-/** Only new opted-in GAME/SINGLE activities; no legacy scan or external notification. */
+/** Every GAME/SINGLE activity in the empty new site is covered; no external notification. */
 export async function processActivityAutoAbsences(
   db: PrismaClient,
   suppliedNow?: Date,
@@ -20,8 +19,6 @@ export async function processActivityAutoAbsences(
         scene: 'GAME',
         mode: 'SINGLE',
         cancelledAt: null,
-        autoAbsenceEnabledAt: { not: null },
-        startsAt: { gte: db.activity.fields.autoAbsenceEnabledAt },
         endsAt: { lte: cutoff },
         OR: [{ continuedAt: { not: null } }, { seats: { none: { registration: { is: null } } } }]
       }
@@ -53,8 +50,6 @@ export async function processActivityAutoAbsences(
             activity.scene !== 'GAME' ||
             activity.mode !== 'SINGLE' ||
             activity.cancelledAt ||
-            !automaticAbsenceEnabled(activity) ||
-            activity.startsAt < activity.attendanceEnabledAt ||
             now < activity.endsAt ||
             row.status !== 'ACTIVE' ||
             row.attendanceStatus !== null ||

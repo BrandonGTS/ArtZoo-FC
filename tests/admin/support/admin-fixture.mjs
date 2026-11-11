@@ -83,13 +83,6 @@ export const roleBody = (row, adminRole = row.adminRole === 'ADMIN' ? 'NONE' : '
   idempotencyKey: randomUUID(),
   ...extra
 });
-export const settingsBody = (revision, adminQq = null, extra = {}) => ({
-  adminQq,
-  expectedRevision: revision,
-  reason: '合成公开联系设置原因',
-  idempotencyKey: randomUUID(),
-  ...extra
-});
 export function noPrivate(value) {
   if (!value || typeof value !== 'object') return;
   for (const [key, child] of Object.entries(value)) {
@@ -124,7 +117,6 @@ export async function snapshot(db) {
       select: { id: true, adminRole: true, adminRoleRevision: true, membership: true },
       orderBy: { id: 'asc' }
     }),
-    settings: await db.publicSiteSettings.findMany({ orderBy: { id: 'asc' } }),
     audits: await db.adminManagementAudit.findMany({ orderBy: { id: 'asc' } }),
     commands: await db.adminManagementCommand.findMany({ orderBy: { id: 'asc' } })
   };

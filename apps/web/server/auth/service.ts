@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { invitationLinkUnavailable, type InvitationCipher } from './invitation-cipher';
 import {
-  localQcAccountAllowed,
   BEIJING_OFFSET_MS,
   AccountError,
   ACCOUNT_RULES,
@@ -73,7 +72,7 @@ export function invitationSummary(
   return {
     id: invitation.id,
     membership: invitation.membership,
-    usageMode: invitation.usageMode ?? 'SINGLE',
+    usageMode: invitation.usageMode,
     status: invitation.usedAt
       ? 'USED'
       : invitation.revokedAt
@@ -88,7 +87,6 @@ export function invitationSummary(
     createdBy: invitation.createdBy,
     linkAvailable:
       cipherReady &&
-      !!invitation.tokenCiphertext &&
       !invitation.removedAt &&
       !invitation.usedAt &&
       !invitation.revokedAt &&
@@ -255,12 +253,7 @@ export class AccountService {
       where: { tokenHash: tokenDigest(token), revokedAt: null, expiresAt: { gt: this.now() } },
       include: { account: true }
     });
-    if (
-      !session ||
-      !localQcAccountAllowed(session.account) ||
-      !(await lotteryAccountActive(tx, session.accountId))
-    )
-      return null;
+    if (!session || !(await lotteryAccountActive(tx, session.accountId))) return null;
     return session.expiresAt > this.now() ? session : null;
   }
   async requireAccount(tx: Tx, token?: string | null, administrator = false) {
@@ -298,10 +291,12 @@ export class AccountService {
       },
       { key: `login-phone:${phone}`, limit: positiveLimit(this.options.loginPhoneLimit, 50), seconds: 900 }
     ]);
+    // New site starts empty: every stored password met the current minimum when it was set.
+    if (password.length < ACCOUNT_RULES.passwordMin)
+      throw new AccountError('INVALID_CREDENTIALS', '手机号或密码不正确', 401);
     const account = await this.db.account.findUnique({ where: { phone } });
     const valid = await verifySecret(password, account?.passwordHash ?? DUMMY_PASSWORD_HASH);
-    if (!account || !valid || !localQcAccountAllowed(account))
-      throw new AccountError('INVALID_CREDENTIALS', '手机号或密码不正确', 401);
+    if (!account || !valid) throw new AccountError('INVALID_CREDENTIALS', '手机号或密码不正确', 401);
     if (!(await lotteryAccountActive(this.db, account.id)))
       throw new AccountError('FORBIDDEN', '账号已停用', 403);
     const token = opaqueToken();
@@ -309,7 +304,7 @@ export class AccountService {
       await lock(tx, `phone:${phone}`);
       await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id"=${account.id} FOR NO KEY UPDATE`;
       const current = await tx.account.findUnique({ where: { id: account.id } });
-      if (!current || !localQcAccountAllowed(current) || current.passwordVersion !== account.passwordVersion)
+      if (!current || current.passwordVersion !== account.passwordVersion)
         throw new AccountError('INVALID_CREDENTIALS', '手机号或密码不正确', 401);
       if (!(await lotteryAccountActive(tx, current.id)))
         throw new AccountError('FORBIDDEN', '账号已停用', 403);
@@ -338,24 +333,17 @@ export class AccountService {
     checkInvitation(invitation, this.now());
     return { membership: invitation.membership, expiresAt: invitation.expiresAt.toISOString() };
   }
-  private async rejectQcSms(tx: Tx | PrismaClient, phone: string): Promise<void> {
-    const account = await tx.account.findUnique({ where: { phone }, select: { localQcNamespace: true } });
-    if (account?.localQcNamespace)
-      throw new AccountError('FORBIDDEN', 'Local QC accounts cannot use SMS verification', 403);
-  }
   async sendCode(body: Body) {
     const phone = this.phone(body.phone);
     if (body.purpose !== 'REGISTER' && body.purpose !== 'RESET_PASSWORD') invalid('purpose', '验证用途无效');
     const purpose: VerificationPurpose = body.purpose;
     const invitationHash = purpose === 'REGISTER' ? tokenDigest(tokenInput(body.invitationToken)) : null;
-    await this.rejectQcSms(this.db, phone);
     if (!this.options.sms.available) throw new AccountError('SMS_UNAVAILABLE', '短信服务尚未配置', 503);
     const startedAt = performance.now();
     const code = verificationCode(),
       codeHash = await hashSecret(code);
     const reservation = await this.transaction(async (tx) => {
       await lock(tx, `phone:${phone}`);
-      await this.rejectQcSms(tx, phone);
       if (invitationHash) await lock(tx, `invitation:${invitationHash}`);
       const now = this.now();
       const invitation = invitationHash
@@ -557,11 +545,9 @@ export class AccountService {
   async resetPassword(body: Body) {
     const phone = this.phone(body.phone),
       code = codeInput(body.code);
-    await this.rejectQcSms(this.db, phone);
     const passwordHash = await hashSecret(validatePassword(body.password, body.confirmPassword));
     const result = await this.transaction(async (tx) => {
       await lock(tx, `phone:${phone}`);
-      await this.rejectQcSms(tx, phone);
       const verification = await this.checkCode(tx, phone, 'RESET_PASSWORD', code, null);
       if (verification instanceof AccountError) return verification;
       const account = await tx.account.findUnique({ where: { phone } });
@@ -699,12 +685,6 @@ export class AccountService {
       await lock(tx, `invitation:${found.tokenHash}`);
       const invitation = await tx.invitation.findUniqueOrThrow({ where: { id } });
       checkInvitation(invitation, this.now());
-      if (!invitation.tokenCiphertext)
-        throw new AccountError(
-          'INVITATION_LINK_UNAVAILABLE',
-          '此邀请未保存可恢复链接，请移除后新建邀请',
-          410
-        );
       const cipher = this.options.invitationCipher;
       if (!cipher) throw invitationLinkUnavailable();
       const raw = cipher.open(invitation.tokenCiphertext, invitation.id, invitation.tokenHash);

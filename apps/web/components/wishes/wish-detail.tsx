@@ -7,7 +7,6 @@ import { Button, Modal } from 'antd';
 import OperationMenu from '../operation-menu';
 import ContentModerationDialog from '../content-moderation-dialog';
 import {
-  wishContent,
   type WishDelete,
   type WishDetail,
   type WishInterestList,
@@ -188,7 +187,7 @@ export default function WishDetailPage({ id, commentId }: { id: string; commentI
                   </section>
                   <section className="wish-detail-group">
                     <h3>想玩的内容</h3>
-                    <p className="wish-body">{wishContent(wish)}</p>
+                    <p className="wish-body">{wish.body}</p>
                   </section>
                   <section className="wish-detail-group">
                     <h3>方便时间</h3>

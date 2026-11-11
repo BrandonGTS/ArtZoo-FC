@@ -28,28 +28,13 @@ export interface EligibilitySnapshot {
     monthCount: number | null;
   }[];
 }
-export async function lotteryCoverage(tx: Tx): Promise<{ enabledAt: Date; now: Date }> {
-  const rows = await tx.$queryRaw<
-    { enabledAt: Date; now: Date }[]
-  >`SELECT "enabledAt",lottery_eligibility_now() AS now FROM "LotteryEligibilityControl" WHERE "id"=1`;
-  if (!rows[0]) throw new LotteryHistoryUnavailable();
-  return rows[0];
-}
-export async function assertLotteryPublicationCovered(tx: Tx, publishedAt: Date) {
-  const coverage = await lotteryCoverage(tx);
-  if (publishedAt < coverage.enabledAt) throw new LotteryHistoryUnavailable('Lottery predates activation');
-}
 /** Current policy, also usable by AccountService before issuing or accepting a session. */
 export async function lotteryAccountActive(tx: Tx, id: string): Promise<boolean> {
-  const [available] = await tx.$queryRaw<
-    { available: boolean }[]
-  >`SELECT to_regclass('"LotteryAccountStatus"') IS NOT NULL AS available`;
-  if (!available?.available) return true; // Earlier app migrations retain their existing all-active account model.
   const rows = await tx.$queryRaw<
     { active: boolean }[]
   >`SELECT "active" FROM "LotteryAccountStatus" WHERE "accountId"=${id}`;
-  if (!rows[0]) throw new LotteryHistoryUnavailable('Missing activated account policy');
-  return rows[0].active;
+  // No row means the account was never deactivated; deactivation always writes a row.
+  return rows[0]?.active ?? true;
 }
 /** Internal lifecycle integration primitive. Caller supplies its already-authorized transaction; no public route or new permission is invented. */
 export async function setLotteryAccountActive(
@@ -76,10 +61,7 @@ export async function readLotteryEligibilityAt(
   request: EligibilityQuery
 ): Promise<EligibilitySnapshot> {
   const { lottery, accountIds } = request,
-    coverage = await lotteryCoverage(tx),
     at = lottery.drawAt;
-  if (lottery.createdAt < coverage.enabledAt || at < coverage.enabledAt || coverage.now < at)
-    throw new LotteryHistoryUnavailable('No historical facts before activation or before scheduled draw');
   const facts = await tx.$queryRaw<
     {
       accountId: string;

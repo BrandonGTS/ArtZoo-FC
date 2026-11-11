@@ -280,13 +280,20 @@ test('账号：并发限流、短信预算、权限与会话（真实 PostgreSQL
     }
   });
   now = new Date('2030-01-12T08:00:00Z');
-  const old6 = await account('NONE', await hashSecret('six!66')),
-    old7 = await account('NONE', await hashSecret('seven!7'));
+  const short = await account('NONE', await hashSecret('six!66')),
+    old6 = await account('NONE', await hashSecret('first!88')),
+    old7 = await account('NONE', await hashSecret('second!8'));
   const auth = service();
   let sixLogin, sevenLogin;
-  await check('existing-six-and-seven-character-passwords-authenticate', async () => {
-    sixLogin = await auth.instance.login({ phone: old6.phone, password: 'six!66' }, 'ip:legacy-six');
-    sevenLogin = await auth.instance.login({ phone: old7.phone, password: 'seven!7' }, 'ip:legacy-seven');
+  await check('passwords-shorter-than-eight-characters-never-authenticate', async () => {
+    for (const password of ['six!66', 'seven!7'])
+      await assert.rejects(
+        () => auth.instance.login({ phone: short.phone, password }, 'ip:short'),
+        expect('INVALID_CREDENTIALS')
+      );
+    assert.equal(await db.accountSession.count({ where: { accountId: short.id } }), 0);
+    sixLogin = await auth.instance.login({ phone: old6.phone, password: 'first!88' }, 'ip:first');
+    sevenLogin = await auth.instance.login({ phone: old7.phone, password: 'second!8' }, 'ip:second');
     assert.equal(sixLogin.snapshot.user.id, old6.id);
     assert.equal(sevenLogin.snapshot.user.id, old7.id);
   });
@@ -298,6 +305,7 @@ test('账号：并发限流、短信预算、权限与会话（真实 PostgreSQL
       const invitation = await db.invitation.create({
         data: {
           tokenHash: tokenDigest(invite),
+          tokenCiphertext: 'synthetic',
           membership: 'MEMBER',
           createdById: superAdmin.id,
           createdAt: now,
@@ -346,7 +354,7 @@ test('账号：并发限流、短信预算、权限与会话（真实 PostgreSQL
     for (const token of [sixLogin.token, second])
       assert.equal((await auth.instance.session(token)).user, null);
     await assert.rejects(
-      () => auth.instance.login({ phone: old6.phone, password: 'six!66' }, 'ip:old-six'),
+      () => auth.instance.login({ phone: old6.phone, password: 'first!88' }, 'ip:old-six'),
       expect('INVALID_CREDENTIALS')
     );
     assert.equal(
@@ -360,13 +368,13 @@ test('账号：并发限流、短信预算、权限与会话（真实 PostgreSQL
       await assert.rejects(
         () =>
           auth.instance.changePassword(
-            { currentPassword: 'seven!7', password, confirmPassword: password },
+            { currentPassword: 'second!8', password, confirmPassword: password },
             sevenLogin.token
           ),
         expect('VALIDATION_ERROR')
       );
     await auth.instance.changePassword(
-      { currentPassword: 'seven!7', password: 'changep8', confirmPassword: 'changep8' },
+      { currentPassword: 'second!8', password: 'changep8', confirmPassword: 'changep8' },
       sevenLogin.token
     );
     assert.equal((await db.account.findUnique({ where: { id: old7.id } })).passwordVersion, 1);

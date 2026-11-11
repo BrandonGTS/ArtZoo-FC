@@ -1,5 +1,4 @@
 import { location, otherLocation } from './support/game-location.mjs';
-import { retireLegacyInvitations } from '../../apps/web/server/auth/retire-legacy-invitations.ts';
 import { loadInvitationCipher } from '../../apps/web/server/auth/invitation-cipher.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -383,73 +382,16 @@ test('missing/wrong key fails closed without changing data or breaking public in
   );
   assert.deepEqual(f.db.rows, before);
 });
-test('link recovery checks lifecycle and cannot recover legacy hash-only invitations', async () => {
+test('link recovery checks lifecycle', async () => {
   for (const [field, value, code] of [
     ['removedAt', START, 'INVITATION_INVALID'],
     ['usedAt', START, 'INVITATION_USED'],
     ['revokedAt', START, 'INVITATION_REVOKED'],
-    ['expiresAt', START, 'INVITATION_EXPIRED'],
-    ['tokenCiphertext', null, 'INVITATION_LINK_UNAVAILABLE']
+    ['expiresAt', START, 'INVITATION_EXPIRED']
   ]) {
     const f = await fixture(),
       inv = await f.invite();
     await f.db.invitation.update({ where: { id: inv.id }, data: { [field]: value } });
     await assert.rejects(() => f.service.invitationLink(inv.id, f.token), errorCode(code));
   }
-});
-
-test('authorized legacy cleanup is recoverable/idempotent and preserves encrypted invitations/accounts/sessions', async () => {
-  const f = await fixture(),
-    newInvite = await f.invite();
-  await f.db.account.update({ where: { id: f.admin.id }, data: { adminRole: 'SUPER_ADMIN' } });
-  for (const status of ['active', 'used', 'revoked', 'expired']) {
-    const row = await f.db.invitation.create({
-      data: {
-        tokenHash: tokenDigest(status.padEnd(43, 'x')),
-        createdById: f.admin.id,
-        membership: 'MEMBER',
-        createdAt: START,
-        expiresAt: new Date(+START + (status === 'expired' ? -1 : DAY)),
-        usedAt: status === 'used' ? START : null,
-        usedById: status === 'used' ? f.admin.id : null,
-        revokedAt: status === 'revoked' ? START : null
-      }
-    });
-    await f.db.verificationCode.create({
-      data: {
-        phone: 'synthetic',
-        purpose: 'REGISTER',
-        invitationId: row.id,
-        codeHash: 'synthetic',
-        expiresAt: new Date(+START + DAY)
-      }
-    });
-  }
-  const accounts = structuredClone(f.db.rows.account),
-    sessions = structuredClone(f.db.rows.accountSession);
-  assert.deepEqual(await retireLegacyInvitations(f.db, START), { removed: 4, invalidatedCodes: 4 });
-  assert.deepEqual(await retireLegacyInvitations(f.db, START), { removed: 0, invalidatedCodes: 0 });
-  assert.deepEqual(f.db.rows.account, accounts);
-  assert.deepEqual(f.db.rows.accountSession, sessions);
-  assert.equal(f.db.rows.invitation.find((row) => row.id === newInvite.id).removedAt, null);
-  assert.equal(f.db.rows.accountAudit.filter((row) => row.action === 'INVITATION_REMOVED').length, 4);
-  assert.ok(f.db.rows.invitation.find((row) => row.usedAt)?.usedById === f.admin.id);
-});
-test('legacy cleanup requires exactly one owner and rolls back when audit cannot persist', async () => {
-  const f = await fixture();
-  await assert.rejects(() => retireLegacyInvitations(f.db, START));
-  await f.db.account.update({ where: { id: f.admin.id }, data: { adminRole: 'SUPER_ADMIN' } });
-  await f.db.invitation.create({
-    data: {
-      tokenHash: tokenDigest('Z'.repeat(43)),
-      createdById: f.admin.id,
-      membership: 'MEMBER',
-      createdAt: START,
-      expiresAt: new Date(+START + DAY)
-    }
-  });
-  const before = structuredClone(f.db.rows);
-  f.db.fail = 'accountAudit.create';
-  await assert.rejects(() => retireLegacyInvitations(f.db, START));
-  assert.deepEqual(f.db.rows, before);
 });

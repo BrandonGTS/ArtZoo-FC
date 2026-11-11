@@ -39,7 +39,6 @@ test('到场登记：真实 PostgreSQL', async (t) => {
           token(owner)
         )
       ).activity;
-      await f.db.activity.update({ where: { id: a.id }, data: { completionEnabledAt: null } });
       await basic.register(a.id, { seatId: a.seats[0].id, job: null }, token(member));
       const reg = await f.db.activityRegistration.findFirstOrThrow({
         where: { activityId: a.id, accountId: f.ids[member], status: 'ACTIVE' }
@@ -238,7 +237,8 @@ test('到场登记：真实 PostgreSQL', async (t) => {
           ]);
         assert.equal(out.filter((x) => !x.replayed).length, 1);
         const account = await f.db.account.findUniqueOrThrow({ where: { id: f.ids[7] } });
-        assert.equal(account.activityPoints, 1);
+        // Absence reversed; the corrected PRESENT record also earns the normal completion credit.
+        assert.equal(account.activityPoints, 0);
         assert.equal(account.activityDecayAt, null);
         assert.equal(
           (await f.db.activityRegistration.findUniqueOrThrow({ where: { id: n.reg.id } })).attendanceStatus,
@@ -290,20 +290,10 @@ test('到场登记：真实 PostgreSQL', async (t) => {
           );
       }
     );
-    await check(
-      'pre-adoption past activity rejects retroactive recording and admin role is rechecked',
-      async () => {
-        const old = await activity(10, 11);
-        await f.db.activity.update({
-          where: { id: old.a.id },
-          data: { attendanceEnabledAt: new Date('2030-06-02T00:00:00Z') }
-        });
-        now = new Date(old.a.startsAt);
-        await rejects(() => attendance.record(old.a.id, rec(old), token(10)), 'FORBIDDEN');
-        await f.db.account.update({ where: { id: f.ids[2] }, data: { adminRole: 'NONE' } });
-        await rejects(() => attendance.appeals(new URL('http://local'), token(2)), 'FORBIDDEN');
-      }
-    );
+    await check('admin role is rechecked before listing appeals', async () => {
+      await f.db.account.update({ where: { id: f.ids[2] }, data: { adminRole: 'NONE' } });
+      await rejects(() => attendance.appeals(new URL('http://local'), token(2)), 'FORBIDDEN');
+    });
   } finally {
     await f.cleanup();
   }

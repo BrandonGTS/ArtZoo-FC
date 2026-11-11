@@ -79,7 +79,6 @@ export const HOME_WISH_EXAMPLE: WishSummary = {
   title: '想一起看日出',
   category: 'EXPLORE',
   body: '找一个周末，和大家一起出发。',
-  wantedContent: '',
   convenientTime: '周末清晨',
   revision: 0,
   author: HOME_DAILY_MEMBER,

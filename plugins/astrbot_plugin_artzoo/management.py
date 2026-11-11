@@ -181,7 +181,7 @@ class Management:
                           (self.scope_key, now - 86400)).fetchall()
         current = [row for row in rows if row[1] > now - 60 or row[2]]
         pauses = {row[0] for row in db.execute(
-            "SELECT direction FROM direction_pauses WHERE scope IN (?, '*') AND reason NOT IN ('resolved_pre_sdk','resolved_provider_refusal')", (self.scope_key,))}
+            "SELECT direction FROM direction_pauses WHERE scope IN (?, '*')", (self.scope_key,))}
         ready = False
         try:
             self.runtime.adapter()
