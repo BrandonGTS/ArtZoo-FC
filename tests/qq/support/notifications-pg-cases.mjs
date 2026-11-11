@@ -60,8 +60,13 @@ export async function notificationPostgresCases({ db, check, organizerId }) {
     fence: claim.delivery.fence,
     claimToken: claim.claimToken
   });
+  // 入队时产品会把"等锁花掉的真实毫秒数"加到计划时间上（防止补发已到期的提醒）。
+  // 测试传入固定时钟，让计划时间正好等于测试时间；否则机器慢时，领取时刻会早于计划时刻，领不到投递。
+  const fixed = () => now;
   const queue = async (f) =>
-    db.$transaction((tx) => enqueueQqActivityNotifications(tx, f.activity, 'PUBLISHED', f.target, now));
+    db.$transaction((tx) =>
+      enqueueQqActivityNotifications(tx, f.activity, 'PUBLISHED', f.target, now, fixed)
+    );
   const claim = async (f, at = now) => db.$transaction((tx) => claimQqDelivery(tx, f.target, at));
   const begin = async (f, c, at = now, row = f.activity) =>
     db.$transaction((tx) => beginQqDelivery(tx, identity(c), row, f.target, at));
@@ -205,7 +210,9 @@ export async function notificationPostgresCases({ db, check, organizerId }) {
       await queue(f);
       const old = await claim(f);
       const changed = { ...f.activity, revision: 1, title: '合成已修改' };
-      await db.$transaction((tx) => enqueueQqActivityNotifications(tx, changed, 'CHANGED', f.target, now));
+      await db.$transaction((tx) =>
+        enqueueQqActivityNotifications(tx, changed, 'CHANGED', f.target, now, fixed)
+      );
       assert.equal(await begin(f, old), null);
       assert.equal(
         (await db.qqOfficialDelivery.findUniqueOrThrow({ where: { id: old.delivery.id } })).status,
@@ -221,7 +228,8 @@ export async function notificationPostgresCases({ db, check, organizerId }) {
           { ...changed, revision: 2, cancelledAt: now },
           'CANCELLED',
           f.target,
-          now
+          now,
+          fixed
         )
       );
       const remaining = await db.qqOfficialDelivery.findMany({

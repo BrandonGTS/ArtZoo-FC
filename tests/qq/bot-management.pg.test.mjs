@@ -538,7 +538,8 @@ test('机器人管理：配置发布、权限与运行状态（数据库）', as
           ).activity,
           row = await f.db.activity.findUniqueOrThrow({ where: { id: a.id } });
         await f.db.$transaction((tx) =>
-          enqueueQqActivityNotifications(tx, row, 'PUBLISHED', config.target, now)
+          // 固定时钟：计划时间不受等锁耗时影响，紧接着的领取一定能领到。
+          enqueueQqActivityNotifications(tx, row, 'PUBLISHED', config.target, now, () => now)
         );
         const first = await qq.claim(wire);
         assert.ok(first.delivery);
