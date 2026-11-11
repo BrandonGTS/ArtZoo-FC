@@ -386,7 +386,7 @@ test('相册：创建、上传、权限、点赞与管理（数据库）', async
       }
     );
     await check(
-      'moderation requires reason and denies fake SELF, records reason actor/time and revokes media without deleting bytes',
+      'moderation requires reason and denies fake SELF, records reason actor/time, revokes media and deletes its files',
       async () => {
         const before = await db.albumPhoto.findUniqueOrThrow({ where: { id: photo.id } }),
           audits = await db.albumAudit.count({ where: { photoId: photo.id } });
@@ -416,7 +416,9 @@ test('相册：创建、上传、权限、点赞与管理（数据库）', async
         assert.equal(a.actorId, ids[3]);
         assert.equal(a.reason, reason);
         assert.ok(a.createdAt);
-        assert.deepEqual(await service.storage.read(photo.id, 'original'), image);
+        // Uploaded with the media budget off: the three files are removed directly by photo id.
+        assert.equal(await service.storage.storedExists(photo.id), false);
+        await assert.rejects(service.storage.read(photo.id, 'original'));
       }
     );
     await check('all notifications remain local: no QQ or activity outbox', async () => {

@@ -1,4 +1,3 @@
-import { createPhotoStorage } from '@artzoo/media/cos-routed-storage';
 import { join, resolve } from 'node:path';
 import { AccountError, activityId } from '@artzoo/domain';
 import { lotteryMediaFencedTx, type Prisma } from '@artzoo/db';
@@ -17,11 +16,10 @@ export function lotteryStorage(ownerId: string) {
     (process.env.NODE_ENV === 'production'
       ? '/app/storage/derived/lotteries'
       : join(/* turbopackIgnore: true */ base, 'derived'));
-  const legacy = new LocalPhotoStorage(
+  return new LocalPhotoStorage(
     join(/* turbopackIgnore: true */ original, ownerId),
     join(/* turbopackIgnore: true */ derived, ownerId)
   );
-  return createPhotoStorage({ scope: 'lottery', accountId: ownerId, legacy });
 }
 export function lotteryImageParts(url: string) {
   const match = /^\/api\/lotteries\/media\/([a-f0-9-]{36})\/([a-f0-9-]{36})$/i.exec(url);

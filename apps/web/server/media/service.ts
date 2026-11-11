@@ -72,7 +72,6 @@ export class AvatarService {
           localNamespace = await this.storage.boundNamespace();
           namespace = localNamespace;
         }
-        // Local retirement authority is deliberately separate from COS write proofs.
         if (typeof this.storage.boundNamespace === 'function') {
           if (priorId) {
             try {

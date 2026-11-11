@@ -19,8 +19,6 @@ import { mediaBudgetPolicy, type MediaBudgetPolicy } from '@artzoo/domain';
 import { processPhoto, withPhotoSlot } from './photo-processor.js';
 import { bindOfficialWrite, retireOfficialUnusedBatch, type MediaWriteProof } from './stock-retirement.js';
 import { LocalPhotoStorage, type PhotoStorage } from './photo-storage.js';
-import { createPhotoStorage } from './cos-routed-storage.js';
-import { verifiedBoundWrite } from './stock-bound-io.js';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT = 8000;
@@ -272,11 +270,9 @@ function defaultStorage() {
     /* turbopackIgnore: true */ dirname(fileURLToPath(import.meta.url)),
     '../../../.local/official-event-media'
   );
-  const legacy =
-    process.env.NODE_ENV === 'production'
-      ? new LocalPhotoStorage('/app/storage/original/official-events', '/app/storage/derived/official-events')
-      : new LocalPhotoStorage(join(directory, 'original'), join(directory, 'derived'));
-  return createPhotoStorage({ scope: 'official', legacy });
+  return process.env.NODE_ENV === 'production'
+    ? new LocalPhotoStorage('/app/storage/original/official-events', '/app/storage/derived/official-events')
+    : new LocalPhotoStorage(join(directory, 'original'), join(directory, 'derived'));
 }
 export function createOfficialImagePorts(
   options: {
@@ -289,7 +285,6 @@ export function createOfficialImagePorts(
     fetchImage = options.download ?? download,
     budget = options.budget;
   // Process-local recognition supplements the persistent locator check below.
-  const remoteWrites = new Set<string>();
   return {
     storage,
     async stage(
@@ -406,7 +401,6 @@ export function createOfficialImagePorts(
                   )
                 );
               }
-            if (proofs?.some((proof) => !verifiedBoundWrite(proof))) remoteWrites.add(id);
             await db.$transaction(async (tx) => {
               await attempt.commit(tx);
               if (allocation && proofs)
@@ -424,7 +418,6 @@ export function createOfficialImagePorts(
               });
             if (signal?.aborted) {
               // Only this confirmed COMMITTED candidate has never escaped to a business owner.
-              if (remoteWrites.has(id)) throw new Error('COS_DELETE_UNSUPPORTED');
               if (candidate && namespaces && storage.boundNamespaces) {
                 const batch = await db.$transaction((tx) =>
                   prepareOfficialUnusedBatchTx(tx as Prisma.TransactionClient, [candidate], now())
@@ -486,27 +479,13 @@ export function createOfficialImagePorts(
     },
     async discardUnused(batch: OfficialUnusedBatch) {
       if (!storage.boundNamespaces) throw new Error('MEDIA_BOUND_PROOF_REQUIRED');
-      const { getDatabase, verifiedOfficialUnusedBatch, findCosObjects } = await import('@artzoo/db');
+      const { getDatabase, verifiedOfficialUnusedBatch } = await import('@artzoo/db');
       const db = (budget?.db ?? getDatabase()) as Pick<
         PrismaClient,
         '$queryRaw' | '$executeRaw' | '$transaction'
       >;
       const description = verifiedOfficialUnusedBatch(batch);
       if (!description) throw new Error('MEDIA_BOUND_OWNER_REQUIRED');
-      for (const candidate of description.candidates) {
-        if (
-          remoteWrites.has(candidate.id) ||
-          (options.storage === undefined &&
-            (
-              await findCosObjects(db, {
-                scope: 'official',
-                objectId: candidate.id,
-                accountId: null
-              })
-            ).length > 0)
-        )
-          throw new Error('COS_DELETE_UNSUPPORTED');
-      }
       await retireOfficialUnusedBatch(
         db,
         await storage.boundNamespaces(),

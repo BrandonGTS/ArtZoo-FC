@@ -5,7 +5,7 @@ import { isAbsolute, resolve, join } from 'node:path';
 import { PHOTO_RULES } from './photo-contract.js';
 import { isMemberId } from '@artzoo/domain';
 
-import type { MediaWriteNamespace } from './cos-stock-write.js';
+import type { MediaWriteNamespace } from './media-write.js';
 
 export type BoundWriteProof = object & { readonly __boundWriteProof: unique symbol };
 type Kind =

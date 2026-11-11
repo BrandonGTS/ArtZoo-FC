@@ -2038,22 +2038,3 @@ model MediaStorageCredit {
   @@unique([intentId, componentId])
 }
 
-// COS phase 66: immutable physical-part locators only, no business cascades or backfill.
-model MediaCosObject {
-  id String @id @default(uuid()) @db.VarChar(36)
-  scope String @db.VarChar(32)
-  objectId String @db.VarChar(36)
-  part String @db.VarChar(16)
-  accountId String? @db.VarChar(36)
-  bucket String @db.VarChar(71)
-  region String @db.VarChar(32)
-  prefix String @db.VarChar(163)
-  objectKey String @db.VarChar(512)
-  bytes BigInt
-  sha256 String @db.VarChar(64)
-  etag String? @db.VarChar(256)
-  identityFingerprint String? @db.VarChar(64)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  @@unique([scope, objectId, part])
-  @@unique([region, bucket, objectKey])
-}

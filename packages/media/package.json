@@ -47,14 +47,6 @@
     "./album-comment-orphan-maintenance": {
       "types": "./dist/album-comment-orphan-maintenance.d.ts",
       "import": "./dist/album-comment-orphan-maintenance.js"
-    },
-    "./cos-object-storage": {
-      "types": "./dist/cos-object-storage.d.ts",
-      "import": "./dist/cos-object-storage.js"
-    },
-    "./cos-routed-storage": {
-      "types": "./dist/cos-routed-storage.d.ts",
-      "import": "./dist/cos-routed-storage.js"
     }
   },
   "scripts": {
@@ -64,7 +56,6 @@
   "dependencies": {
     "@artzoo/db": "workspace:*",
     "@artzoo/domain": "workspace:*",
-    "cos-nodejs-sdk-v5": "3.0.0",
     "sharp": "0.35.5"
   }
 }

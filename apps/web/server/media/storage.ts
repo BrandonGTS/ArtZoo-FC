@@ -48,6 +48,10 @@ export class LocalAvatarStorage implements AvatarStorage {
     const { BoundNamespace } = await import('@artzoo/media/stock-retirement');
     return new BoundNamespace(this.directory, 'avatar');
   }
+  async writeNamespace() {
+    const { restrictedWriteNamespace } = await import('@artzoo/media/photo-storage');
+    return restrictedWriteNamespace(await this.boundNamespace(), ['avatar-full', 'avatar-small']);
+  }
   private async path(id: string, variant: AvatarVariant): Promise<string> {
     if (!isMemberId(id) || !['full', 'small'].includes(variant))
       throw new Error('Invalid avatar storage key');

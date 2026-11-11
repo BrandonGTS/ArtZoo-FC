@@ -189,36 +189,6 @@ BEGIN
   RETURN NEW;
 END $function$
 
-### guardMediaCosObject()
-CREATE OR REPLACE FUNCTION public."guardMediaCosObject"()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
-BEGIN
-  IF TG_OP = 'DELETE' THEN
-    RAISE EXCEPTION 'COS locator deletion is not supported' USING ERRCODE = '23514';
-  ELSIF TG_OP = 'INSERT' THEN
-    IF NEW."etag" IS NOT NULL OR NEW."identityFingerprint" IS NOT NULL THEN
-      RAISE EXCEPTION 'COS observation requires a separate CAS' USING ERRCODE = '23514';
-    END IF;
-  ELSE
-    IF ROW(NEW."id", NEW."scope", NEW."objectId", NEW."part", NEW."accountId",
-      NEW."bucket", NEW."region", NEW."prefix", NEW."objectKey", NEW."bytes", NEW."sha256", NEW."createdAt")
-      IS DISTINCT FROM
-      ROW(OLD."id", OLD."scope", OLD."objectId", OLD."part", OLD."accountId",
-      OLD."bucket", OLD."region", OLD."prefix", OLD."objectKey", OLD."bytes", OLD."sha256", OLD."createdAt") THEN
-      RAISE EXCEPTION 'COS locator is immutable' USING ERRCODE = '23514';
-    END IF;
-    IF OLD."etag" IS NOT NULL AND
-      ROW(NEW."etag", NEW."identityFingerprint") IS DISTINCT FROM
-      ROW(OLD."etag", OLD."identityFingerprint") THEN
-      RAISE EXCEPTION 'COS observation is immutable' USING ERRCODE = '23514';
-    END IF;
-  END IF;
-  RETURN NEW;
-END
-$function$
-
 ### lottery_capture_account()
 CREATE OR REPLACE FUNCTION public.lottery_capture_account()
  RETURNS trigger
@@ -1539,37 +1509,6 @@ END $function$
   约束 "MediaBudgetState_pkey" PRIMARY KEY (id)
   约束 "MediaBudgetState_singleton" CHECK (id = 'global'::text)
 
-### "MediaCosObject"
-  列 "id" character varying(36) NOT NULL
-  列 "scope" character varying(32) NOT NULL
-  列 "objectId" character varying(36) NOT NULL
-  列 "part" character varying(16) NOT NULL
-  列 "accountId" character varying(36)
-  列 "bucket" character varying(71) NOT NULL
-  列 "region" character varying(32) NOT NULL
-  列 "prefix" character varying(163) NOT NULL
-  列 "objectKey" character varying(512) NOT NULL
-  列 "bytes" bigint NOT NULL
-  列 "sha256" character varying(64) NOT NULL
-  列 "etag" character varying(256)
-  列 "identityFingerprint" character varying(64)
-  列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-  约束 "MediaCosObject_address_check" CHECK (region::text = 'ap-hongkong'::text AND bucket::text ~ '^[a-z0-9][a-z0-9-]{0,49}-[0-9]{5,20}$'::text AND prefix::text ~ '^[a-z0-9][a-z0-9-]{0,39}(/[a-z0-9][a-z0-9-]{0,39}){0,3}$'::text AND "objectKey"::text = (((((((prefix::text || '/'::text) || scope::text) || '/'::text) ||
-CASE
-    WHEN scope::text = 'lottery'::text THEN "accountId"::text || '/'::text
-    ELSE ''::text
-END) || "objectId"::text) || '.'::text) || part::text))
-  约束 "MediaCosObject_content_check" CHECK (bytes > 0 AND bytes <= '9007199254740991'::bigint AND sha256::text ~ '^[0-9a-f]{64}$'::text)
-  约束 "MediaCosObject_created_at_check" CHECK (isfinite("createdAt"))
-  约束 "MediaCosObject_observation_check" CHECK (etag IS NULL AND "identityFingerprint" IS NULL OR etag IS NOT NULL AND "identityFingerprint" IS NOT NULL AND (etag::text COLLATE "C") ~ '^[!-~]+$'::text AND "identityFingerprint"::text ~ '^[0-9a-f]{64}$'::text)
-  约束 "MediaCosObject_owner_check" CHECK (scope::text = 'lottery'::text AND "accountId" IS NOT NULL AND "accountId"::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'::text OR scope::text <> 'lottery'::text AND "accountId" IS NULL)
-  约束 "MediaCosObject_pkey" PRIMARY KEY (id)
-  约束 "MediaCosObject_scope_part_check" CHECK (scope::text = 'avatars'::text AND (part::text = ANY (ARRAY['full'::character varying, 'small'::character varying]::text[])) OR scope::text = 'quick-icons'::text AND part::text = 'icon'::text OR (scope::text = ANY (ARRAY['albums'::character varying, 'album-comments'::character varying, 'daily'::character varying, 'wishes'::character varying, 'lottery'::character varying, 'knowledge'::character varying, 'activity-shares'::character varying, 'official'::character varying]::text[])) AND (part::text = ANY (ARRAY['original'::character varying, 'preview'::character varying, 'thumbnail'::character varying]::text[])))
-  约束 "MediaCosObject_uuid_check" CHECK (id::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'::text AND "objectId"::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'::text)
-  索引 CREATE UNIQUE INDEX "MediaCosObject_region_bucket_objectKey_key" ON public."MediaCosObject" USING btree (region, bucket, "objectKey")
-  索引 CREATE UNIQUE INDEX "MediaCosObject_scope_objectId_part_key" ON public."MediaCosObject" USING btree (scope, "objectId", part)
-  触发器 CREATE TRIGGER "MediaCosObject_immutable" BEFORE INSERT OR DELETE OR UPDATE ON "MediaCosObject" FOR EACH ROW EXECUTE FUNCTION "guardMediaCosObject"()
-
 ### "MediaDailyBudget"
   列 "accountId" text NOT NULL
   列 "day" character varying(10) NOT NULL
@@ -1661,7 +1600,7 @@ END) || "objectId"::text) || '.'::text) || part::text))
   约束 "MediaUploadReceipt_lottery_mount_shape" CHECK ("lotteryMountedAt" IS NULL OR scope::text = 'lottery-image'::text AND "accountId" IS NOT NULL AND "attemptId" IS NOT NULL AND "objectIdentity" IS NOT NULL AND "persistenceStartedAt" IS NOT NULL AND (state::text = ANY (ARRAY['RESERVED'::character varying, 'UNKNOWN'::character varying, 'COMMITTED'::character varying]::text[])) AND isfinite("lotteryMountedAt"))
   约束 "MediaUploadReceipt_pkey" PRIMARY KEY (scope, "operationKey")
   约束 "MediaUploadReceipt_raw_stage" CHECK ("storedBytes" <> 0 OR "storageReservedAt" IS NULL AND "persistenceStartedAt" IS NULL AND state::text <> 'COMMITTED'::text)
-  约束 "MediaUploadReceipt_reservation_protocol_shape" CHECK ("reservationProtocol" IS NULL OR "reservationProtocol"::text = 'prewrite-expiry-v1'::text AND (scope::text = ANY (ARRAY['avatar'::character varying, 'album-photo'::character varying, 'album-comment'::character varying, 'knowledge'::character varying, 'daily'::character varying, 'wish'::character varying, 'activity-share'::character varying, 'lottery-image'::character varying, 'official-image'::character varying]::text[])) AND "attemptId" IS NOT NULL AND "objectIdentity" IS NOT NULL)
+  约束 "MediaUploadReceipt_reservation_protocol_shape" CHECK ("reservationProtocol" IS NULL OR "reservationProtocol"::text = 'prewrite-expiry-v1'::text AND (scope::text = ANY (ARRAY['avatar'::character varying, 'album-photo'::character varying, 'album-comment'::character varying, 'knowledge'::character varying, 'daily'::character varying, 'wish'::character varying, 'lottery-image'::character varying, 'official-image'::character varying]::text[])) AND "attemptId" IS NOT NULL AND "objectIdentity" IS NOT NULL)
   约束 "MediaUploadReceipt_retry_shape" CHECK (("retryHeadKey" IS NULL OR "retryRootKey" IS NULL AND state::text = 'FAILED'::text AND "persistenceStartedAt" IS NULL AND "retryHeadKey"::text <> "operationKey"::text AND "retryHeadKey"::text ~ '^retry:[a-f0-9]{64}$'::text) AND ("retryRootKey" IS NULL OR "retryHeadKey" IS NULL AND "retryRootKey"::text <> "operationKey"::text AND "operationKey"::text ~ '^retry:[a-f0-9]{64}$'::text))
   约束 "MediaUploadReceipt_settled" CHECK ((state::text = ANY (ARRAY['COMMITTED'::character varying, 'FAILED'::character varying]::text[])) = ("settledAt" IS NOT NULL))
   约束 "MediaUploadReceipt_state" CHECK (state::text = ANY (ARRAY['RESERVED'::character varying, 'COMMITTED'::character varying, 'FAILED'::character varying, 'UNKNOWN'::character varying]::text[]))

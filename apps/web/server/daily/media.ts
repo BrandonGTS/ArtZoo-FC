@@ -1,4 +1,3 @@
-import { createPhotoStorage } from '@artzoo/media/cos-routed-storage';
 // Integration seam: both albums and daily can use these byte-only primitives.
 export { processPhoto, withPhotoSlot } from '../media/photo-processor';
 export type { PhotoOutput } from '../media/photo-processor';
@@ -7,7 +6,7 @@ import { LocalPhotoStorage } from '../media/photo-storage';
 import { resolve, join } from 'node:path';
 export function dailyStorage() {
   const base = resolve(/* turbopackIgnore: true */ process.cwd(), '.local', 'daily-media');
-  const legacy = new LocalPhotoStorage(
+  return new LocalPhotoStorage(
     process.env.ARTZOO_DAILY_ORIGINAL_DIR ??
       (process.env.NODE_ENV === 'production'
         ? '/app/storage/original/daily'
@@ -17,5 +16,4 @@ export function dailyStorage() {
         ? '/app/storage/derived/daily'
         : join(/* turbopackIgnore: true */ base, 'derived'))
   );
-  return createPhotoStorage({ scope: 'daily', legacy });
 }

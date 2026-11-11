@@ -149,21 +149,14 @@ ArtZoo 是《最终幻想 XIV》公会的网站，供成员组织活动、管理
 
 状态由站长更新（未开始 / 进行中 / 已完成，完成时注明日期）。
 
-### 阶段 4 备忘：删除候选
-
-兼容旧数据的代码（上线时刻字段、旧账号兼容、本地 QC 等旧工具、QQ 旧协议、插件里的事故恢复函数、其他旧数据分支、无人使用的代码，以及待定 #1、#3、#6）已在阶段 4 第一次清理中删除。剩下：
-
-- **COS**（站长已于 2026-11-11 确认删除，需要 `deps-approved`）：`packages/media/src/cos-*.ts`、`stock-*.ts`、`packages/db/src/media-cos-objects.ts`、`media-stock-components.ts`、`media-quick-icon-stock.ts`、依赖 `cos-nodejs-sdk-v5`、`ARTZOO_COS_*` 环境变量、运行时的 `cos-routed-storage` 包装层。
-- **清单外的旧兼容分支**（待核实后列给站长决定）：官方活动同步的 legacy 分支、QQ 机器人的旧群和旧模板、成员资料里保留的旧职业、知识库旧分类，以及 `tests/README.md` 里仍保留的、名称带 legacy 的用例对应的代码。
-- **与 COS 一起处理**：相册删除照片时"旧存储路径不删文件"的分支（`albums/service.ts` 的 `storageLegacy`，依赖 `stock-retirement`）；图片存储范围里已删除功能的名称 `activity-share` / `activity-shares`（`media-reservation-contract.ts` 和两条数据库检查约束）。
-
 ### 阶段 5 备忘：部署必须注意
 
 - `ARTZOO_TRUSTED_PROXY=caddy`，前面必须是会覆盖 `X-Forwarded-For` 的 Caddy；否则全站共用一个限流桶。新部署不用 Caddy 就要改 `server/auth/request-source.ts`。
 - `ARTZOO_AVATAR_DIR` 必须设为挂载卷里的绝对路径，否则头像写进容器、重启丢失。
 - worker 也要挂载媒体目录，否则孤儿图片清理找不到文件。
 - 开启 `ARTZOO_SECURITY_CLEANUP_ENABLED=1`，否则限流、会话、验证码表只增不减。
-- 决定是否开启上传配额 `ARTZOO_MEDIA_BUDGET_ENABLED`，并按磁盘大小设置上限（默认总量 10 GB、每天 2 GB）。
+- 决定是否开启上传配额 `ARTZOO_MEDIA_BUDGET_ENABLED`，并按磁盘大小设置上限（默认总量 10 GB、每天 2 GB）。**开启前必须先初始化配额基线**（新站是 0 字节），否则所有图片上传都会返回"图片上传暂时不可用"。目前代码里只有 `initializeMediaBudgetBaseline` 函数，没有可以运行的命令，阶段 5 要补一个。
+- 媒体目录及它的每一级上级目录都不能被其他用户写入（不能放在 `/tmp` 这类目录下），并且属于运行网站的用户或 root。开着配额时，上传和删除前都会检查这一点，不满足会拒绝。
 - 其余必需配置见 `ARCHITECTURE.md` 第八节（站点地址、邀请密钥、短信、QQ 默认关闭等）。
 
 ---
@@ -218,3 +211,4 @@ ArtZoo 是《最终幻想 XIV》公会的网站，供成员组织活动、管理
 | T9 | 日常的违规删除改走 `deletion-intent` 统一判断（目前是单独的 `moderate` 接口） |
 | T10 | 界面组件测试：引入组件测试工具（如 `@testing-library/react` + `jsdom`，属于新增依赖，PR 需加 `deps-approved`），重做阶段 2 没有迁移的界面测试——固定队工作台（`components/teams/team-*.tsx`）、相册编辑（`albums/album-editor.tsx`）、日常首页与详情的交互（`components/daily/*`）、后台邀请与账号管理的操作反馈（`invitation-manager.tsx`、`account-manager.tsx`）、知识库编辑器“未选分区”时保留内容、富文本全屏时按 Esc 退出。旧仓库的做法是读源码文本再编译运行，不要沿用 |
 | T11 | 端到端测试：启动真实网站，用真浏览器测几条主流程（登录、发起并报名活动、发日常）。阶段 2 没有迁移旧仓库的 `*-browser`、`*-http` 测试，可以等阶段 5 部署方式定下来后再做 |
+| T12 | 核实清单外的旧兼容分支：官方活动同步的 legacy 分支、QQ 机器人的旧测试群和旧模板、成员资料里保留的旧职业、知识库旧分类，以及 `tests/README.md` 里仍保留的、名称带 legacy 的用例对应的代码。逐条说明是"兼容旧数据（新站可删）"还是"拒绝旧格式（应保留）"，列表给站长决定后再删。建议上线后再做 |

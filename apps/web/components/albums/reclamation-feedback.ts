@@ -10,15 +10,13 @@ export interface ReclamationResponse {
     status: string;
     pending: number;
     retained: number;
-    legacy: number;
     targets: string[];
     authorizations?: { photoId: string; auditId: string }[];
     recovery?: { nextCursor: string | null; path: string };
-    legacyNotice?: boolean;
   };
 }
 /** Every click owns a finite run. Stop prevents further rounds and aborts the current HTTP request;
- * already issued COS calls retain their finite timeout and are never claimed to be undone. */
+ * file removals already issued are never claimed to be undone. */
 export function showReclamationFeedback(
   result: ReclamationResponse,
   path: string,
@@ -121,9 +119,7 @@ export function showReclamationFeedback(
                 state = {
                   ...n,
                   targets: [...(n.targets ?? [])],
-                  authorizations: [...(n.authorizations ?? [])],
-                  legacy: Math.max(state.legacy ?? 0, n.legacy ?? 0),
-                  legacyNotice: state.legacyNotice || n.legacyNotice
+                  authorizations: [...(n.authorizations ?? [])]
                 };
                 if (batchIncomplete || (!state.targets.length && !state.recovery?.nextCursor)) break;
                 if (
@@ -163,8 +159,6 @@ export function showReclamationFeedback(
     );
     return true;
   }
-  if (reclamation?.legacy || reclamation?.legacyNotice)
-    notify('info', '本轮可回收的新照片已处理；旧照片文件按原规则保留。');
-  else if (reclamation?.retained) notify('info', '已移除照片，仍被其他内容使用的文件已保留。');
+  if (reclamation?.retained) notify('info', '已移除照片，仍被其他内容使用的文件已保留。');
   return false;
 }

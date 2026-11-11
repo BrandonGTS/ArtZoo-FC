@@ -3,7 +3,6 @@ import { mediaBudgetPolicy } from '@artzoo/domain';
 import { dirname, join, resolve } from 'node:path';
 import type { AccountService } from '../auth/service';
 import { processPhoto, withPhotoSlot } from '../media/photo-processor';
-import { createPhotoStorage } from '@artzoo/media/cos-routed-storage';
 import { LocalPhotoStorage } from '../media/photo-storage';
 import { KnowledgeImageService } from './images';
 export function getKnowledgeImageService(auth: AccountService): KnowledgeImageService {
@@ -13,7 +12,7 @@ export function getKnowledgeImageService(auth: AccountService): KnowledgeImageSe
     '.local',
     'knowledge-media'
   );
-  const legacy = new LocalPhotoStorage(
+  const store = new LocalPhotoStorage(
     process.env.ARTZOO_KNOWLEDGE_ORIGINAL_DIR ??
       (process.env.NODE_ENV === 'production'
         ? '/app/storage/original/knowledge'
@@ -23,7 +22,6 @@ export function getKnowledgeImageService(auth: AccountService): KnowledgeImageSe
         ? '/app/storage/derived/knowledge'
         : join(/* turbopackIgnore: true */ base, 'derived'))
   );
-  const store = createPhotoStorage({ scope: 'knowledge', legacy });
   const enabled = process.env.ARTZOO_MEDIA_BUDGET_ENABLED;
   const budget: ReturnType<typeof createMediaBudgetAdapter> | null =
     (enabled ?? '0') === '0'
