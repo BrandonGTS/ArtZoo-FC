@@ -44,13 +44,12 @@ for (const [time, allowed] of [
       assert.equal(h.state.penalties.length, 0);
     }
   });
-test('only organizer records; canceled withdrawn and pre-adoption historical activities cannot accrue attendance penalties', async () => {
+test('only organizer records; canceled and withdrawn registrations cannot accrue attendance penalties', async () => {
   for (const change of [
     (h) => h.actor(7),
     (h) => h.actor(8),
     (h) => (h.state.activity.cancelledAt = new Date()),
-    (h) => (h.state.reg.status = 'WITHDRAWN'),
-    (h) => (h.state.activity.attendanceEnabledAt = new Date('2030-06-02'))
+    (h) => (h.state.reg.status = 'WITHDRAWN')
   ]) {
     const h = harness();
     change(h);
@@ -140,7 +139,7 @@ test('deadline-unfilled stays pending and neither a member nor administrator can
   assert.equal(h.state.reg.attendanceStatus, null);
   assert.equal(h.state.penalties.length, 0);
 });
-test('admin approval corrects an existing absence after natural decay and retains the unrelated point', async () => {
+test('admin approval corrects an existing absence after natural decay and grants normal completion', async () => {
   const h = harness();
   h.state.accounts[id(7)].activityPoints = 1;
   await h.service.record(id(1), record());
@@ -154,10 +153,12 @@ test('admin approval corrects an existing absence after natural decay and retain
   const body = decision();
   await h.service.decide(a.id, body);
   assert.equal(h.state.reg.attendanceStatus, 'PRESENT');
-  assert.equal(h.state.accounts[id(7)].activityPoints, 1);
+  // 1 earlier point, absence reversed, then the now-present member earns the normal completion credit.
+  assert.equal(h.state.accounts[id(7)].activityPoints, 0);
   assert.equal(h.state.accounts[id(7)].activityDecayAt, null);
   assert.equal(h.state.appeals[0].status, 'APPROVED');
   assert.ok(h.state.scores.some((s) => s.reason === 'NATURAL_DECAY'));
+  assert.equal(h.state.completions.length, 1);
   assert.ok(h.state.penalties[0].reversedAt);
   assert.equal((await h.service.decide(a.id, body)).replayed, true);
   assert.equal(h.state.events.filter((e) => e.kind === 'ATTENDANCE_APPEAL_RESULT').length, 1);

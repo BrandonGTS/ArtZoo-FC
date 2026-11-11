@@ -155,12 +155,14 @@ test('membership and audit roll back together on storage failure', async () => {
   assert.equal(f.db.rows.accountAudit.length, 0);
 });
 for (const password of ['six!66', 'seven!7'])
-  test(`existing ${password.length}-character password still logs in`, async () => {
+  test(`stored ${password.length}-character password never logs in`, async () => {
     const f = fixture(),
       actor = await f.account('NONE', await hashSecret(password));
-    const login = await f.service.login({ phone: actor.phone, password }, 'synthetic-source');
-    assert.equal(login.snapshot.user.id, actor.id);
-    assert.equal(f.db.rows.accountSession.length, 1);
+    await assert.rejects(
+      () => f.service.login({ phone: actor.phone, password }, 'synthetic-source'),
+      (e) => e.code === 'INVALID_CREDENTIALS'
+    );
+    assert.equal(f.db.rows.accountSession.length, 0);
   });
 test('all three new-password entry points reject six/seven characters before writing', async () => {
   const f = fixture(),

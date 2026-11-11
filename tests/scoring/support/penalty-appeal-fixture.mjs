@@ -5,7 +5,7 @@ import { addActivityPenaltyPoints } from '../../../packages/db/src/activity-stan
 import { ActivityPenaltyAppealService } from '../../../apps/web/server/activities/penalty-appeals.ts';
 import { harness } from './attendance-fixture.mjs';
 import { id } from './activity-input.mjs';
-export async function fixture({ reason = 'LATE_WITHDRAWAL', points = 1, base = 0, enabled = true } = {}) {
+export async function fixture({ reason = 'LATE_WITHDRAWAL', points = 1, base = 0 } = {}) {
   const h = harness();
   h.state.penaltyAppeals = [];
   h.state.audits = [];
@@ -172,8 +172,7 @@ export async function fixture({ reason = 'LATE_WITHDRAWAL', points = 1, base = 0
       registrationId: reason === 'LATE_CANCELLATION' ? null : id(2),
       reason,
       points,
-      createdAt,
-      appealEnabledAt: enabled ? createdAt : null
+      createdAt
     }
   });
   await addActivityPenaltyPoints(h.tx, id(7), points, createdAt, penalty.eventKey, penalty.id);

@@ -28,8 +28,6 @@ function harness({ full = false } = {}) {
     title: 'Synthetic series',
     startsAt,
     endsAt: new Date('2030-06-01T14:00:00Z'),
-    managementEnabledAt: new Date('2030-01-01'),
-    completionEnabledAt: new Date('2030-01-01'),
     cancelledAt: null,
     cancellationReason: null,
     continuedAt: null,
@@ -114,7 +112,6 @@ function harness({ full = false } = {}) {
       }
     },
     activity: {
-      fields: { managementEnabledAt: 'managementEnabledAt' },
       findMany: async ({ where }) => {
         queries.push(['single', where]);
         return state.series ? [{ id: 'first' }] : [];
@@ -381,8 +378,6 @@ for (const fields of [
       startsAt,
       endsAt: startsAt,
       cancelledAt: null,
-      completionEnabledAt: cutoff,
-      managementEnabledAt: cutoff,
       continuedAt: cutoff,
       seats: [],
       ...fields

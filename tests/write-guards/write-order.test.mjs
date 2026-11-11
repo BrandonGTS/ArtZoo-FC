@@ -4,7 +4,6 @@ import { state } from './support/write-order-stubs.mjs';
 import { handleAlbums } from '../../apps/web/server/albums/http.ts';
 import { handleDaily } from '../../apps/web/server/daily/http.ts';
 import { handleWishes } from '../../apps/web/server/wishes/http.ts';
-import { handleActivityShares } from '../../apps/web/server/activity-shares/http.ts';
 import { handleKnowledgeImage } from '../../apps/web/server/knowledge/image-http.ts';
 import { uploadLotteryImage } from '../../apps/web/server/lottery/media-http.ts';
 import { handleAttendance } from '../../apps/web/server/activities/attendance-http.ts';
@@ -26,7 +25,6 @@ for (const [name, run] of [
   ['album comment upload', (r) => handleAlbums(r, 'comment-upload', id)],
   ['daily upload', (r) => handleDaily(r, 'upload')],
   ['wishes upload', (r) => handleWishes(r, 'upload')],
-  ['activity shares upload', (r) => handleActivityShares(r, 'upload', id)],
   ['knowledge images upload', (r) => handleKnowledgeImage(r)],
   ['lottery upload', (r) => uploadLotteryImage(r)]
 ])

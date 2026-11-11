@@ -90,11 +90,9 @@ export function safeAccountReturnTo(value: string): string {
   if (
     [
       '/admin/quick-links',
-      '/admin/activity-shares/new',
       '/admin/announcements',
       '/admin/contact-requests',
       '/admin/roles',
-      '/admin/public-settings',
       '/admin/official-events',
       '/',
       '/resources',
@@ -121,16 +119,8 @@ export function safeAccountReturnTo(value: string): string {
       '/me/teams/history',
       '/albums',
       '/featured',
-      '/admin/featured',
-      '/admin/album-categories'
+      '/admin/featured'
     ].includes(value)
-  )
-    return value;
-  if (/^\/admin\/activity-shares\/[0-9a-f-]{36}$/i.test(value) && isMemberId(value.split('/')[3]!))
-    return value;
-  if (
-    /^\/admin\/activity-shares\/new\?activityId=[0-9a-f-]{36}$/i.test(value) &&
-    isMemberId(value.split('=')[1]!)
   )
     return value;
   if (value.startsWith('/albums/')) {

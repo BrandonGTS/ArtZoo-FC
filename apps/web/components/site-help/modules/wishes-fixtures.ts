@@ -33,7 +33,6 @@ export const WISH_DEMO_ITEMS: WishSummary[] = WISH_CATEGORIES.map((category, ind
   title: titles[index]!,
   category: category.value,
   body: '想和朋友们一起体验这个主题，轻松交流，互相帮助。',
-  wantedContent: '',
   convenientTime: '周末晚上 20:00 后',
   revision: 1,
   author,

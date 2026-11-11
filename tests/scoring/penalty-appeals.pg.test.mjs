@@ -107,27 +107,29 @@ test('处罚申诉：真实 PostgreSQL', async (t) => {
       return { a, r, p, member };
     }
     const v = await make(1);
-    await check('real withdrawal creates enabled penalty and member sees only own public DTO', async () => {
-      assert.ok(v.p.appealEnabledAt);
-      const list = await service.minePenalties(new URL('http://local/?page=99'), token(1));
-      noPrivate(list);
-      assert.equal(list.page, 1);
-      assert.equal(list.items[0].canAppeal, true);
-      assert.equal((await service.minePenalties(new URL('http://local/'), token(3))).items.length, 0);
-      await assert.rejects(
-        () =>
-          service.appeal(
-            v.p.id,
-            { idempotencyKey: randomUUID(), expectedLatestAppealId: null, reason: 'Not mine' },
-            token(3)
-          ),
-        (e) => e.code === 'NOT_FOUND'
-      );
-      await assert.rejects(
-        () => service.appeals(new URL('http://local/'), token(1)),
-        (e) => e.code === 'FORBIDDEN'
-      );
-    });
+    await check(
+      'real withdrawal creates appealable penalty and member sees only own public DTO',
+      async () => {
+        const list = await service.minePenalties(new URL('http://local/?page=99'), token(1));
+        noPrivate(list);
+        assert.equal(list.page, 1);
+        assert.equal(list.items[0].canAppeal, true);
+        assert.equal((await service.minePenalties(new URL('http://local/'), token(3))).items.length, 0);
+        await assert.rejects(
+          () =>
+            service.appeal(
+              v.p.id,
+              { idempotencyKey: randomUUID(), expectedLatestAppealId: null, reason: 'Not mine' },
+              token(3)
+            ),
+          (e) => e.code === 'NOT_FOUND'
+        );
+        await assert.rejects(
+          () => service.appeals(new URL('http://local/'), token(1)),
+          (e) => e.code === 'FORBIDDEN'
+        );
+      }
+    );
     let a;
     await check(
       'parallel duplicate/different-key submissions create one pending and one private audit',
@@ -420,8 +422,6 @@ test('处罚申诉：真实 PostgreSQL', async (t) => {
       });
       assert.equal((await balance(8)).activityPoints, 0);
     });
-    const old = await make(10);
-    await f.db.activityPenalty.update({ where: { id: old.p.id }, data: { appealEnabledAt: null } });
   } finally {
     await f.cleanup();
   }

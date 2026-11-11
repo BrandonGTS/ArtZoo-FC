@@ -163,8 +163,7 @@ export async function fixture() {
             ? {
                 location: '合成地点',
                 capacityUnlimited: true,
-                registrationClosesAt: new Date(startsAt.getTime() - 3600000),
-                completionEnabledAt: null
+                registrationClosesAt: new Date(startsAt.getTime() - 3600000)
               }
             : {}),
           ...(cancelled ? { cancelledAt: time(-5), cancellationReason: '合成已取消' } : {})
@@ -387,7 +386,6 @@ export async function effects(db) {
     'dailyPost',
     'dailyMedia',
     'albumPhoto',
-    'activityShareMedia',
     'knowledgeImage',
     'knowledgeComment'
   ];

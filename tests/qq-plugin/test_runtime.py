@@ -113,7 +113,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_website_only_and_invalid_commands_never_forward(self):
         for text in ("退出", "取消报名", "换职业 白魔", "换位置 H2", "绑定 x",
-                     "确认绑定", "报名 " + "x" * 600):
+                     "报名 " + "x" * 600):
             event = Event(text)
             self.assertTrue(await self.runtime().handle(event), text)
             self.assertTrue(event.stopped)
@@ -127,7 +127,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.bridge.calls, [])
 
     async def test_binding_strict_and_no_private_identity_fallback(self):
-        event = Event("确认绑定 mock_proof123")
+        event = Event("绑定 mock_proof123")
         del event.message_obj.raw_message.raw_data["message_scene"]["ext"][1]
         await self.runtime().handle(event)
         self.assertNotIn("ref_idx", self.bridge.calls[-1][1])
@@ -272,10 +272,8 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         for separator in ("\t", "\n", "\u3000"):
             for text, forwarded in (
                     ("绑定" + separator + "mock_code123", True),
-                    ("确认绑定" + separator + "A" * 43, True),
                     ("退出" + separator + "活动", False),
-                    ("绑定" + separator, False),
-                    ("确认绑定" + separator + "short", False)):
+                    ("绑定" + separator, False)):
                 event = Event(text)
                 trace = []
                 def adapter_lookup(platform_id):

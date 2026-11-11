@@ -4,7 +4,6 @@ import {
   reconcileActivityStanding,
   evaluateActivityCompletion,
   validAttendanceRecord,
-  automaticAbsenceEnabled,
   type Prisma
 } from '@artzoo/db';
 import {
@@ -58,10 +57,6 @@ const activityFields = {
   startsAt: true,
   endsAt: true,
   cancelledAt: true,
-  attendanceEnabledAt: true,
-  autoAbsenceEnabledAt: true,
-  completionEnabledAt: true,
-  managementEnabledAt: true,
   continuedAt: true,
   seats: { select: { registration: { select: { id: true } } } }
 } as const;
@@ -128,7 +123,7 @@ export class ActivityAttendanceService extends ActivityService {
     if (!activity) missing();
     if (activity.scene === 'OFFLINE' || activity.mode === 'SERIES') forbidden('该活动不支持普通单次到场操作');
     const now = this.auth.now(),
-      eligible = activity.startsAt >= activity.attendanceEnabledAt;
+      eligible = true;
     const windowOpen = eligible && !activity.cancelledAt && now >= activity.startsAt && now < activity.endsAt;
     return {
       activityId: key,
@@ -138,7 +133,7 @@ export class ActivityAttendanceService extends ActivityService {
       isOrganizer: activity.organizerId === actorId,
       eligible,
       windowOpen,
-      autoAbsence: automaticAbsenceEnabled(activity),
+      autoAbsence: true,
       cancelled: !!activity.cancelledAt,
       items: activity.registrations.map((row) => ({
         registrationId: row.id,
@@ -155,7 +150,7 @@ export class ActivityAttendanceService extends ActivityService {
         recordedAt: row.attendanceRecordedAt?.toISOString() ?? null,
         updatedAt: row.attendanceUpdatedAt?.toISOString() ?? null,
         completion:
-          activity.completionEnabledAt && !activity.cancelledAt && row.attendanceStatus
+          !activity.cancelledAt && row.attendanceStatus
             ? {
                 status: row.completion
                   ? row.completion.active
@@ -245,7 +240,6 @@ export class ActivityAttendanceService extends ActivityService {
       if (activity.scene === 'OFFLINE' || activity.mode === 'SERIES')
         forbidden('该活动不支持普通单次到场操作');
       if (activity.cancelledAt || row.status !== 'ACTIVE') forbidden('仅未取消活动的有效报名可以登记或申诉');
-      if (activity.startsAt < activity.attendanceEnabledAt) forbidden('此历史活动不追补到场记录或处罚');
       if (row.attendanceRevision !== input.expectedAttendanceRevision)
         conflict('到场记录已变化，请刷新后确认');
       const now = this.auth.now();

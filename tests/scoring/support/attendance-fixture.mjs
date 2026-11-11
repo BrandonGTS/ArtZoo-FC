@@ -13,16 +13,12 @@ export function harness() {
     activity: {
       scene: 'GAME',
       mode: 'SINGLE',
-      autoAbsenceEnabledAt: null,
       id: id(1),
       organizerId: id(9),
       startsAt: new Date('2030-06-01T12:00:00Z'),
       endsAt: new Date('2030-06-01T14:00:00Z'),
-      attendanceEnabledAt: new Date('2030-05-01T00:00:00Z'),
       cancelledAt: null,
       revision: 0,
-      completionEnabledAt: null,
-      managementEnabledAt: new Date('2030-05-01'),
       continuedAt: null,
       seats: [{ registration: { id: id(2) } }]
     },
@@ -77,7 +73,6 @@ export function harness() {
     },
     account: { update: async ({ where, data }) => patch(state.accounts[where.id], data) },
     activity: {
-      fields: { autoAbsenceEnabledAt: 'autoAbsenceEnabledAt' },
       findUnique: async (q) =>
         q.where.id !== id(1)
           ? null
@@ -124,8 +119,6 @@ export function harness() {
             q.attendanceStatus === null &&
             q.attendanceRecordedAt === null &&
             q.attendancePenaltyId === null &&
-            a.autoAbsenceEnabledAt &&
-            a.startsAt >= a.autoAbsenceEnabledAt &&
             !a.cancelledAt &&
             a.endsAt <= where.activity.endsAt.lte &&
             (a.continuedAt || a.seats.every((s) => s.registration))
@@ -135,7 +128,6 @@ export function harness() {
           ['PRESENT', 'ABSENT'].includes(q.attendanceStatus) &&
           q.attendanceRecordedAt &&
           !state.completions.length &&
-          a.completionEnabledAt &&
           !a.cancelledAt &&
           a.endsAt <= where.activity.endsAt.lte &&
           (a.continuedAt || a.seats.every((s) => s.registration))
@@ -278,7 +270,6 @@ export function harness() {
               activity: {
                 scene: 'GAME',
                 mode: 'SINGLE',
-                autoAbsenceEnabledAt: null,
                 id: id(1),
                 title: 'Fixture'
               }

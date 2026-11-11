@@ -23,8 +23,6 @@ const fixed = new Set([
   '/admin',
   '/admin/account-lifecycle',
   '/admin/accounts',
-  '/admin/activity-shares/new',
-  '/admin/album-categories',
   '/admin/announcements',
   '/admin/attendance-appeals',
   '/admin/bot-management',
@@ -34,7 +32,6 @@ const fixed = new Set([
   '/admin/knowledge-categories',
   '/admin/official-events',
   '/admin/penalty-appeals',
-  '/admin/public-settings',
   '/admin/quick-links',
   '/admin/resources',
   '/admin/roles'
@@ -56,9 +53,7 @@ const dynamic = new RegExp(
     uuid +
     '|wishes/' +
     uuid +
-    '(?:/edit|/activity)?|admin/activity-shares/' +
-    uuid +
-    ')$'
+    '(?:/edit|/activity)?)$'
 );
 export function isProtectedSessionPath(pathname: string | null): boolean {
   return typeof pathname === 'string' && (fixed.has(pathname) || dynamic.test(pathname));

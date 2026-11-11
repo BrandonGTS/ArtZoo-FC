@@ -349,24 +349,21 @@ export async function managementPostgresCases({ f, check }) {
     }
   );
   await check(
-    'MANAGEMENT PG background auto cancel is idempotent and excludes legacy history full and continued activities',
+    'MANAGEMENT PG background auto cancel is idempotent and excludes full and continued activities',
     async () => {
       const pending = await signup(await create());
       const full = await signup(await create(1));
       const continued = await signup(await create());
       now = new Date('2030-06-01T11:30:00Z');
       await manage.continueActivity(continued.id, cmd(continued.revision), token(10));
-      const legacy = await create();
-      await f.db.activity.update({
-        where: { id: legacy.id },
-        data: { managementEnabledAt: new Date('2030-06-02T00:00:00Z') }
-      });
+      const empty = await create();
       now = new Date('2030-06-01T12:00:00Z');
       await processActivityMaintenance(f.db, now);
       assert.equal((await basic.detail(pending.id, token(7))).status, 'CANCELLED');
       assert.equal((await basic.detail(full.id, token(7))).status, 'IN_PROGRESS');
       assert.equal((await basic.detail(continued.id, token(7))).status, 'IN_PROGRESS');
-      assert.equal((await basic.detail(legacy.id, token(10))).status, 'IN_PROGRESS');
+      // An unfilled activity with no registrations is cancelled too: no activity predates the rules.
+      assert.equal((await basic.detail(empty.id, token(10))).status, 'CANCELLED');
       const count = await f.db.activityOutbox.count({ where: { activityId: pending.id } });
       await processActivityMaintenance(f.db, now);
       assert.equal(await f.db.activityOutbox.count({ where: { activityId: pending.id } }), count);

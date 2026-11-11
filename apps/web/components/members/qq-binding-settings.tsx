@@ -13,7 +13,6 @@ type Binding = {
   groupOpenId: string;
   confirmedAt: string;
   label: string;
-  requiresRebind: boolean;
 };
 type Status = {
   enabled: boolean;
@@ -300,15 +299,7 @@ export function QqBindingSettings() {
       <h3>QQ群身份绑定</h3>
       {status?.bindings.map((binding) => (
         <div key={binding.id} className="qq-binding-row">
-          <span>
-            {binding.label}
-            {binding.requiresRebind ? (
-              <>
-                <br />
-                <span className="member-note">旧版绑定需重新绑定，请先解绑后再生成密钥。</span>
-              </>
-            ) : null}
-          </span>
+          <span>{binding.label}</span>
           <Button danger disabled={busy || !statusReady || !!pending} onClick={() => setUnlink(binding)}>
             解绑
           </Button>
@@ -335,13 +326,7 @@ export function QqBindingSettings() {
                   setNotice('');
                 }}
               />
-              {occupied ? (
-                <p>
-                  {occupied.requiresRebind
-                    ? '所选群的旧版绑定需重新绑定，请先由本人确认解绑。'
-                    : '所选群已绑定，请先解绑后再生成密钥。'}
-                </p>
-              ) : null}
+              {occupied ? <p>所选群已绑定，请先解绑后再生成密钥。</p> : null}
               <Button
                 type="primary"
                 disabled={busy || !statusReady || !selectedGroup || !!occupied}
@@ -438,7 +423,6 @@ export function QqBindingSettings() {
         }
       >
         <p>解绑后，此QQ群身份不能通过机器人报名。网站已有报名保持不变。</p>
-        {unlink?.requiresRebind ? <p>此记录为旧版绑定；解绑后可为所选群重新生成一次性密钥。</p> : null}
       </Modal>
     </MemberPaper>
   );

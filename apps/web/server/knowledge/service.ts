@@ -763,8 +763,7 @@ export class KnowledgeService {
         owner,
         admin(actor.account.adminRole),
         '作者删除本人评论',
-        1000,
-        !owner
+        1000
       );
       if (c!.removedAt) return { removed: true, replayed: true };
       if (body.revision !== undefined && c!.revision !== revision(body.revision)) conflict();

@@ -5,7 +5,7 @@ import { getAccountService } from '../auth/runtime';
 import { AdminManagementService } from './service';
 export async function handleAdminManagement(
   request: Request,
-  action: 'accounts' | 'role' | 'settings' | 'audits',
+  action: 'accounts' | 'role' | 'audits',
   id = ''
 ) {
   try {
@@ -16,9 +16,8 @@ export async function handleAdminManagement(
       const url = new URL(request.url);
       if (action === 'accounts') return success(await service.accounts(url, token));
       if (action === 'audits') return success(await service.audits(url, token));
-      if (action === 'settings') return success(await service.settings(token));
     }
-    if (request.method !== 'PATCH' || !['role', 'settings'].includes(action))
+    if (request.method !== 'PATCH' || action !== 'role')
       throw new AccountError('NOT_FOUND', '接口不存在', 404);
     validateOrigin(request);
     const body = await readBody(request),
@@ -26,9 +25,7 @@ export async function handleAdminManagement(
     if (actor.account.adminRole !== 'SUPER_ADMIN')
       throw new AccountError('FORBIDDEN', '仅超级管理员可以执行此操作', 403);
     await auth.limitWriteSource(resolveRequestSource(request), token);
-    return success(
-      action === 'role' ? await service.changeRole(id, body, token) : await service.saveSettings(body, token)
-    );
+    return success(await service.changeRole(id, body, token));
   } catch (error) {
     return failure(error, 'admin-management/http');
   }

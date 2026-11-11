@@ -16,8 +16,6 @@ function invalidConfiguration(): never {
 
 /** Server-only configuration. No dotenv discovery, logging, test mode or network request. */
 export function loadSmsSender(environment: SmsEnvironment, transport: typeof fetch = fetch): SmsSender {
-  // Presence, including an empty legacy field, is an explicit migration error.
-  if (environment.ARTZOO_SMS_TEMPLATE_CODE !== undefined) invalidConfiguration();
   const mode = environment.ARTZOO_SMS_PROVIDER || 'unconfigured';
   const values = fields.map((field) => environment[field] ?? '');
   if (mode === 'unconfigured' && values.every((value) => value === '')) return unavailableSms;

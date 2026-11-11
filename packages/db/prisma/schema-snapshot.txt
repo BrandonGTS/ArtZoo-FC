@@ -30,12 +30,6 @@ CREATE OR REPLACE FUNCTION public."accountLifecycleAppendOnly"()
  LANGUAGE plpgsql
 AS $function$ BEGIN RAISE EXCEPTION 'Account lifecycle history is append-only'; END; $function$
 
-### activity_share_append_only()
-CREATE OR REPLACE FUNCTION public.activity_share_append_only()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$ BEGIN RAISE EXCEPTION 'Activity share history is append-only'; END; $function$
-
 ### adminManagementAppendOnly()
 CREATE OR REPLACE FUNCTION public."adminManagementAppendOnly"()
  RETURNS trigger
@@ -225,16 +219,6 @@ BEGIN
 END
 $function$
 
-### local_qc_ledger_append_only()
-CREATE OR REPLACE FUNCTION public.local_qc_ledger_append_only()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
-BEGIN
- RAISE EXCEPTION 'Local QC ownership records are append-only' USING ERRCODE='23514';
-END;
-$function$
-
 ### lottery_capture_account()
 CREATE OR REPLACE FUNCTION public.lottery_capture_account()
  RETURNS trigger
@@ -381,17 +365,13 @@ END $function$
   列 "activityPoints" integer NOT NULL DEFAULT 0
   列 "activityDecayAt" timestamp(3) with time zone
   列 "adminRoleRevision" integer NOT NULL DEFAULT 0
-  列 "localQcNamespace" text
-  列 "localQcSlot" text
   约束 "Account_activity_standing_check" CHECK ("activityPoints" >= 0 AND ("activityPoints" < 3 AND "activityDecayAt" IS NULL OR "activityPoints" >= 3 AND "activityDecayAt" IS NOT NULL))
   约束 "Account_adminRoleRevision_check" CHECK ("adminRoleRevision" >= 0)
   约束 "Account_game_location_pair_check" CHECK ("gameRegion" IS NULL AND "gameServer" IS NULL OR "gameRegion" IS NOT NULL AND "gameServer" IS NOT NULL AND "displayName" IS NOT NULL)
-  约束 "Account_local_qc_marker_check" CHECK ("localQcNamespace" IS NULL AND "localQcSlot" IS NULL OR "localQcNamespace" IS NOT NULL AND "localQcSlot" IS NOT NULL AND "localQcNamespace" = 'artzoo-local-qc-v1'::text AND ("localQcSlot" = ANY (ARRAY['member-a'::text, 'member-b'::text, 'friend'::text, 'admin'::text])))
   约束 "Account_pkey" PRIMARY KEY (id)
   索引 CREATE INDEX "Account_createdAt_id_idx" ON public."Account" USING btree ("createdAt", id)
   索引 CREATE INDEX "Account_due_activity_decay_idx" ON public."Account" USING btree ("activityDecayAt", id) WHERE ("activityPoints" >= 3)
   索引 CREATE UNIQUE INDEX "Account_gameServer_displayName_key" ON public."Account" USING btree ("gameServer" COLLATE "C", "displayName" COLLATE "C")
-  索引 CREATE UNIQUE INDEX "Account_localQcNamespace_localQcSlot_key" ON public."Account" USING btree ("localQcNamespace", "localQcSlot")
   索引 CREATE UNIQUE INDEX "Account_phone_key" ON public."Account" USING btree (phone)
   触发器 CREATE TRIGGER "LotteryAccount_capture" AFTER INSERT OR UPDATE OF membership, "displayName" ON "Account" FOR EACH ROW EXECUTE FUNCTION lottery_capture_account()
 
@@ -482,9 +462,6 @@ END $function$
   列 "cancelledAt" timestamp(3) with time zone
   列 "cancellationReason" text
   列 "continuedAt" timestamp(3) with time zone
-  列 "managementEnabledAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-  列 "attendanceEnabledAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-  列 "completionEnabledAt" timestamp(3) with time zone DEFAULT CURRENT_TIMESTAMP
   列 "capacityUnlimited" boolean NOT NULL DEFAULT false
   列 "location" text
   列 "meetingInstructions" text
@@ -493,15 +470,14 @@ END $function$
   列 "registrationClosesAt" timestamp(3) with time zone
   列 "scene" "ActivityScene" NOT NULL DEFAULT 'GAME'::"ActivityScene"
   列 "seriesId" text
-  列 "autoAbsenceEnabledAt" timestamp(3) with time zone DEFAULT CURRENT_TIMESTAMP
-  约束 "Activity_offline_shape_check" CHECK (scene <> 'OFFLINE'::"ActivityScene" OR mode = 'SINGLE'::"ActivityMode" AND category = 'SOCIAL'::"ActivityCategory" AND location IS NOT NULL AND "registrationClosesAt" IS NOT NULL AND "registrationClosesAt" <= "startsAt" AND "dutyId" IS NULL AND "dutySnapshot" IS NULL AND "completionEnabledAt" IS NULL)
+  约束 "Activity_offline_shape_check" CHECK (scene <> 'OFFLINE'::"ActivityScene" OR mode = 'SINGLE'::"ActivityMode" AND category = 'SOCIAL'::"ActivityCategory" AND location IS NOT NULL AND "registrationClosesAt" IS NOT NULL AND "registrationClosesAt" <= "startsAt" AND "dutyId" IS NULL AND "dutySnapshot" IS NULL)
   约束 "Activity_organizerId_fkey" FOREIGN KEY ("organizerId") REFERENCES "Account"(id) ON UPDATE CASCADE ON DELETE RESTRICT
   约束 "Activity_pkey" PRIMARY KEY (id)
   约束 "Activity_seriesId_fkey" FOREIGN KEY ("seriesId") REFERENCES "ActivitySeries"(id) ON UPDATE CASCADE ON DELETE RESTRICT
   约束 "Activity_series_shape_check" CHECK (mode = 'SINGLE'::"ActivityMode" AND "seriesId" IS NULL AND "periodNumber" IS NULL OR mode = 'SERIES'::"ActivityMode" AND scene = 'GAME'::"ActivityScene" AND "seriesId" IS NOT NULL AND "periodNumber" >= 1 AND "periodNumber" <= 10 AND NOT "capacityUnlimited")
   约束 "Activity_text_bounds_check" CHECK (char_length(btrim(title)) >= 1 AND char_length(btrim(title)) <= 100 AND char_length(description) <= 2000)
   约束 "Activity_time_range_check" CHECK ("endsAt" > "startsAt")
-  索引 CREATE INDEX "Activity_autoAbsenceEnabledAt_endsAt_id_idx" ON public."Activity" USING btree ("endsAt", id) WHERE (("autoAbsenceEnabledAt" IS NOT NULL) AND (scene = 'GAME'::"ActivityScene") AND (mode = 'SINGLE'::"ActivityMode") AND ("cancelledAt" IS NULL))
+  索引 CREATE INDEX "Activity_game_single_open_endsAt_id_idx" ON public."Activity" USING btree ("endsAt", id) WHERE ((scene = 'GAME'::"ActivityScene") AND (mode = 'SINGLE'::"ActivityMode") AND ("cancelledAt" IS NULL))
   索引 CREATE UNIQUE INDEX "Activity_organizerId_idempotencyKey_key" ON public."Activity" USING btree ("organizerId", "idempotencyKey")
   索引 CREATE UNIQUE INDEX "Activity_seriesId_periodNumber_key" ON public."Activity" USING btree ("seriesId", "periodNumber")
   索引 CREATE INDEX "Activity_startsAt_id_idx" ON public."Activity" USING btree ("startsAt", id)
@@ -603,11 +579,10 @@ END $function$
   列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
   列 "reversedAt" timestamp(3) with time zone
   列 "reversalReason" text
-  列 "appealEnabledAt" timestamp(3) with time zone DEFAULT CURRENT_TIMESTAMP
   约束 "ActivityPenalty_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"(id) ON UPDATE CASCADE ON DELETE RESTRICT
   约束 "ActivityPenalty_activityId_fkey" FOREIGN KEY ("activityId") REFERENCES "Activity"(id) ON UPDATE CASCADE ON DELETE RESTRICT
   约束 "ActivityPenalty_pkey" PRIMARY KEY (id)
-  约束 "ActivityPenalty_points_check" CHECK (reason = 'LATE_WITHDRAWAL'::text AND points = 1 OR (reason = ANY (ARRAY['LATE_CANCELLATION'::text, 'NO_SHOW'::text, 'SERIES_UNAGREED_ABSENCE'::text, 'SERIES_UNCOMMUNICATED_EXIT'::text])) AND points = 2)
+  约束 "ActivityPenalty_points_check" CHECK (reason = 'LATE_WITHDRAWAL'::text AND points = 1 OR (reason = ANY (ARRAY['LATE_CANCELLATION'::text, 'NO_SHOW'::text])) AND points = 2)
   约束 "ActivityPenalty_registrationId_fkey" FOREIGN KEY ("registrationId") REFERENCES "ActivityRegistration"(id) ON UPDATE CASCADE ON DELETE RESTRICT
   索引 CREATE INDEX "ActivityPenalty_accountId_createdAt_idx" ON public."ActivityPenalty" USING btree ("accountId", "createdAt")
   索引 CREATE UNIQUE INDEX "ActivityPenalty_eventKey_key" ON public."ActivityPenalty" USING btree ("eventKey")
@@ -736,77 +711,6 @@ END $function$
   约束 "ActivitySeries_pkey" PRIMARY KEY (id)
   索引 CREATE INDEX "ActivitySeries_state_createdAt_idx" ON public."ActivitySeries" USING btree (state, "createdAt")
 
-### "ActivityShare"
-  列 "id" text NOT NULL
-  列 "activityId" text NOT NULL
-  列 "creatorId" text NOT NULL
-  列 "title" text NOT NULL DEFAULT ''::text
-  列 "body" text NOT NULL DEFAULT ''::text
-  列 "mediaIds" text[] NOT NULL DEFAULT ARRAY[]::text[]
-  列 "revision" integer NOT NULL DEFAULT 0
-  列 "featuredAt" timestamp(3) with time zone
-  列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-  列 "updatedAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-  约束 "ActivityShare_activityId_fkey" FOREIGN KEY ("activityId") REFERENCES "Activity"(id) ON DELETE RESTRICT
-  约束 "ActivityShare_check" CHECK (char_length(title) <= 100 AND char_length(body) <= 2000)
-  约束 "ActivityShare_check1" CHECK ("featuredAt" IS NULL OR char_length(btrim(title)) > 0 AND char_length(btrim(body)) > 0)
-  约束 "ActivityShare_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "Account"(id) ON DELETE RESTRICT
-  约束 "ActivityShare_pkey" PRIMARY KEY (id)
-  约束 "ActivityShare_revision_check" CHECK (revision >= 0)
-  索引 CREATE INDEX "ActivityShare_activityId_createdAt_id_idx" ON public."ActivityShare" USING btree ("activityId", "createdAt", id)
-  索引 CREATE INDEX "ActivityShare_featuredAt_id_idx" ON public."ActivityShare" USING btree ("featuredAt", id)
-
-### "ActivityShareAudit"
-  列 "id" text NOT NULL
-  列 "shareId" text NOT NULL
-  列 "actorId" text NOT NULL
-  列 "action" text NOT NULL
-  列 "reason" text NOT NULL
-  列 "before" jsonb NOT NULL
-  列 "after" jsonb NOT NULL
-  列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-  约束 "ActivityShareAudit_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "Account"(id) ON DELETE RESTRICT
-  约束 "ActivityShareAudit_pkey" PRIMARY KEY (id)
-  约束 "ActivityShareAudit_shareId_fkey" FOREIGN KEY ("shareId") REFERENCES "ActivityShare"(id) ON DELETE RESTRICT
-  索引 CREATE INDEX "ActivityShareAudit_shareId_createdAt_id_idx" ON public."ActivityShareAudit" USING btree ("shareId", "createdAt", id)
-  触发器 CREATE TRIGGER activity_share_audit_append_only BEFORE DELETE OR UPDATE ON "ActivityShareAudit" FOR EACH ROW EXECUTE FUNCTION activity_share_append_only()
-
-### "ActivityShareCommand"
-  列 "id" text NOT NULL
-  列 "shareId" text NOT NULL
-  列 "actorId" text NOT NULL
-  列 "idempotencyKey" text NOT NULL
-  列 "requestFingerprint" text NOT NULL
-  列 "action" text NOT NULL
-  列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-  约束 "ActivityShareCommand_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "Account"(id) ON DELETE RESTRICT
-  约束 "ActivityShareCommand_actorId_idempotencyKey_key" UNIQUE ("actorId", "idempotencyKey")
-  约束 "ActivityShareCommand_pkey" PRIMARY KEY (id)
-  约束 "ActivityShareCommand_shareId_fkey" FOREIGN KEY ("shareId") REFERENCES "ActivityShare"(id) ON DELETE RESTRICT
-  触发器 CREATE TRIGGER activity_share_command_append_only BEFORE DELETE OR UPDATE ON "ActivityShareCommand" FOR EACH ROW EXECUTE FUNCTION activity_share_append_only()
-
-### "ActivityShareMedia"
-  列 "id" text NOT NULL
-  列 "shareId" text NOT NULL
-  列 "ownerId" text NOT NULL
-  列 "batchId" text NOT NULL
-  列 "batchIndex" integer NOT NULL
-  列 "fingerprint" text NOT NULL
-  列 "mime" text NOT NULL
-  列 "width" integer NOT NULL
-  列 "height" integer NOT NULL
-  列 "frames" integer NOT NULL
-  列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-  约束 "ActivityShareMedia_batchIndex_check" CHECK ("batchIndex" >= 0 AND "batchIndex" < 10)
-  约束 "ActivityShareMedia_frames_check" CHECK (frames > 0)
-  约束 "ActivityShareMedia_height_check" CHECK (height > 0)
-  约束 "ActivityShareMedia_ownerId_batchId_batchIndex_key" UNIQUE ("ownerId", "batchId", "batchIndex")
-  约束 "ActivityShareMedia_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "Account"(id) ON DELETE RESTRICT
-  约束 "ActivityShareMedia_pkey" PRIMARY KEY (id)
-  约束 "ActivityShareMedia_shareId_fkey" FOREIGN KEY ("shareId") REFERENCES "ActivityShare"(id) ON DELETE RESTRICT
-  约束 "ActivityShareMedia_width_check" CHECK (width > 0)
-  索引 CREATE INDEX "ActivityShareMedia_shareId_createdAt_id_idx" ON public."ActivityShareMedia" USING btree ("shareId", "createdAt", id)
-
 ### "AdminManagementAudit"
   列 "id" text NOT NULL
   列 "actorId" text NOT NULL
@@ -815,11 +719,9 @@ END $function$
   列 "reason" text NOT NULL
   列 "beforeRole" "AdminRole"
   列 "afterRole" "AdminRole"
-  列 "beforeQq" text
-  列 "afterQq" text
   列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
   约束 "AdminManagementAudit_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "Account"(id) ON UPDATE CASCADE ON DELETE RESTRICT
-  约束 "AdminManagementAudit_kind_check" CHECK (kind = 'ADMIN_ROLE_CHANGED'::text AND "targetAccountId" IS NOT NULL AND "beforeRole" IS NOT NULL AND "afterRole" IS NOT NULL AND "beforeQq" IS NULL AND "afterQq" IS NULL AND "beforeRole" <> "afterRole" AND ("beforeRole" = ANY (ARRAY['NONE'::"AdminRole", 'ADMIN'::"AdminRole"])) AND ("afterRole" = ANY (ARRAY['NONE'::"AdminRole", 'ADMIN'::"AdminRole"])) OR kind = 'PUBLIC_ADMIN_QQ_CHANGED'::text AND "targetAccountId" IS NULL AND "beforeRole" IS NULL AND "afterRole" IS NULL)
+  约束 "AdminManagementAudit_kind_check" CHECK (kind = 'ADMIN_ROLE_CHANGED'::text AND "targetAccountId" IS NOT NULL AND "beforeRole" IS NOT NULL AND "afterRole" IS NOT NULL AND "beforeRole" <> "afterRole" AND ("beforeRole" = ANY (ARRAY['NONE'::"AdminRole", 'ADMIN'::"AdminRole"])) AND ("afterRole" = ANY (ARRAY['NONE'::"AdminRole", 'ADMIN'::"AdminRole"])))
   约束 "AdminManagementAudit_pkey" PRIMARY KEY (id)
   约束 "AdminManagementAudit_reason_check" CHECK (length(TRIM(BOTH FROM reason)) >= 1 AND length(TRIM(BOTH FROM reason)) <= 1000)
   约束 "AdminManagementAudit_targetAccountId_fkey" FOREIGN KEY ("targetAccountId") REFERENCES "Account"(id) ON UPDATE CASCADE ON DELETE RESTRICT
@@ -836,7 +738,7 @@ END $function$
   列 "result" jsonb NOT NULL
   列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
   约束 "AdminManagementCommand_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "Account"(id) ON UPDATE CASCADE ON DELETE RESTRICT
-  约束 "AdminManagementCommand_kind_check" CHECK (kind = ANY (ARRAY['ADMIN_ROLE_CHANGED'::text, 'PUBLIC_ADMIN_QQ_CHANGED'::text]))
+  约束 "AdminManagementCommand_kind_check" CHECK (kind = 'ADMIN_ROLE_CHANGED'::text)
   约束 "AdminManagementCommand_pkey" PRIMARY KEY (id)
   索引 CREATE UNIQUE INDEX "AdminManagementCommand_actorId_idempotencyKey_key" ON public."AdminManagementCommand" USING btree ("actorId", "idempotencyKey")
   触发器 CREATE TRIGGER "AdminManagementCommand_append_only" BEFORE DELETE OR UPDATE ON "AdminManagementCommand" FOR EACH ROW EXECUTE FUNCTION "adminManagementAppendOnly"()
@@ -1343,7 +1245,7 @@ END $function$
   列 "usedById" text
   列 "revokedAt" timestamp(3) with time zone
   列 "removedAt" timestamp(3) with time zone
-  列 "tokenCiphertext" text
+  列 "tokenCiphertext" text NOT NULL
   列 "usageMode" "InvitationUsageMode" NOT NULL DEFAULT 'SINGLE'::"InvitationUsageMode"
   约束 "Invitation_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "Account"(id) ON UPDATE CASCADE ON DELETE RESTRICT
   约束 "Invitation_pkey" PRIMARY KEY (id)
@@ -1504,27 +1406,6 @@ END $function$
   约束 "KnowledgeVersion_number_check" CHECK (number > 0)
   约束 "KnowledgeVersion_pkey" PRIMARY KEY (id)
   索引 CREATE UNIQUE INDEX "KnowledgeVersion_articleId_number_key" ON public."KnowledgeVersion" USING btree ("articleId", number)
-
-### "LocalQcRecord"
-  列 "namespace" text NOT NULL
-  列 "slot" text NOT NULL
-  列 "kind" text NOT NULL
-  列 "entityId" text NOT NULL
-  列 "digest" text NOT NULL
-  列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-  约束 "LocalQcRecord_digest_check" CHECK (digest ~ '^[a-f0-9]{64}$'::text)
-  约束 "LocalQcRecord_pkey" PRIMARY KEY (namespace, slot)
-  触发器 CREATE TRIGGER local_qc_record_append_only BEFORE DELETE OR UPDATE ON "LocalQcRecord" FOR EACH ROW EXECUTE FUNCTION local_qc_ledger_append_only()
-
-### "LocalQcRun"
-  列 "namespace" text NOT NULL
-  列 "anchor" timestamp(3) with time zone NOT NULL
-  列 "manifestHash" text NOT NULL
-  列 "bindings" jsonb NOT NULL
-  列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-  约束 "LocalQcRun_manifestHash_check" CHECK ("manifestHash" ~ '^[a-f0-9]{64}$'::text)
-  约束 "LocalQcRun_pkey" PRIMARY KEY (namespace)
-  触发器 CREATE TRIGGER local_qc_run_append_only BEFORE DELETE OR UPDATE ON "LocalQcRun" FOR EACH ROW EXECUTE FUNCTION local_qc_ledger_append_only()
 
 ### "Lottery"
   列 "id" text NOT NULL
@@ -1930,16 +1811,6 @@ END) || "objectId"::text) || '.'::text) || part::text))
   索引 CREATE UNIQUE INDEX "OfficialSyncRun_actorId_idempotencyKey_key" ON public."OfficialSyncRun" USING btree ("actorId", "idempotencyKey")
   索引 CREATE INDEX "OfficialSyncRun_createdAt_id_idx" ON public."OfficialSyncRun" USING btree ("createdAt", id)
 
-### "PublicSiteSettings"
-  列 "id" text NOT NULL
-  列 "adminQq" text
-  列 "revision" integer NOT NULL
-  列 "updatedAt" timestamp(3) with time zone NOT NULL
-  约束 "PublicSiteSettings_adminQq_check" CHECK ("adminQq" IS NULL OR "adminQq" ~ '^[1-9][0-9]{4,11}$'::text)
-  约束 "PublicSiteSettings_id_check" CHECK (id = 'public'::text)
-  约束 "PublicSiteSettings_pkey" PRIMARY KEY (id)
-  约束 "PublicSiteSettings_revision_check" CHECK (revision >= 1)
-
 ### "QqOfficialBinding"
   列 "id" text NOT NULL
   列 "accountId" text NOT NULL
@@ -1950,7 +1821,6 @@ END) || "objectId"::text) || '.'::text) || part::text))
   列 "version" integer NOT NULL DEFAULT 1
   列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
   列 "confirmedAt" timestamp(3) with time zone NOT NULL
-  列 "protocolVersion" integer NOT NULL DEFAULT 1
   约束 "QqOfficialBinding_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"(id) ON UPDATE CASCADE ON DELETE RESTRICT
   约束 "QqOfficialBinding_pkey" PRIMARY KEY (id)
   索引 CREATE UNIQUE INDEX "QqOfficialBinding_appId_botId_groupOpenId_accountId_key" ON public."QqOfficialBinding" USING btree ("appId", "botId", "groupOpenId", "accountId")
@@ -1983,40 +1853,6 @@ END) || "objectId"::text) || '.'::text) || part::text))
   约束 "QqOfficialBindingKey_pkey" PRIMARY KEY (id)
   索引 CREATE INDEX "QqOfficialBindingKey_accountId_expiresAt_idx" ON public."QqOfficialBindingKey" USING btree ("accountId", "expiresAt")
   索引 CREATE UNIQUE INDEX "QqOfficialBindingKey_keyHash_key" ON public."QqOfficialBindingKey" USING btree ("keyHash")
-
-### "QqOfficialCandidate"
-  列 "id" text NOT NULL
-  列 "challengeId" text NOT NULL
-  列 "appId" text NOT NULL
-  列 "botId" text NOT NULL
-  列 "groupOpenId" text NOT NULL
-  列 "memberOpenId" text NOT NULL
-  列 "receiptCodeHash" text NOT NULL
-  列 "finalProofHash" text
-  列 "selectedAt" timestamp(3) with time zone
-  列 "provenAt" timestamp(3) with time zone
-  列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-  约束 "QqOfficialCandidate_challengeId_fkey" FOREIGN KEY ("challengeId") REFERENCES "QqOfficialChallenge"(id) ON UPDATE CASCADE ON DELETE RESTRICT
-  约束 "QqOfficialCandidate_pkey" PRIMARY KEY (id)
-  索引 CREATE UNIQUE INDEX "QqOfficialCandidate_challengeId_appId_botId_groupOpenId_mem_key" ON public."QqOfficialCandidate" USING btree ("challengeId", "appId", "botId", "groupOpenId", "memberOpenId")
-  索引 CREATE UNIQUE INDEX "QqOfficialCandidate_finalProofHash_key" ON public."QqOfficialCandidate" USING btree ("finalProofHash")
-  索引 CREATE UNIQUE INDEX "QqOfficialCandidate_receiptCodeHash_key" ON public."QqOfficialCandidate" USING btree ("receiptCodeHash")
-
-### "QqOfficialChallenge"
-  列 "id" text NOT NULL
-  列 "accountId" text NOT NULL
-  列 "sessionId" text NOT NULL
-  列 "publicCodeHash" text NOT NULL
-  列 "browserProofHash" text NOT NULL
-  列 "selectedCandidateId" text
-  列 "expiresAt" timestamp(3) with time zone NOT NULL
-  列 "invalidatedAt" timestamp(3) with time zone
-  列 "consumedAt" timestamp(3) with time zone
-  列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-  约束 "QqOfficialChallenge_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"(id) ON UPDATE CASCADE ON DELETE RESTRICT
-  约束 "QqOfficialChallenge_pkey" PRIMARY KEY (id)
-  索引 CREATE INDEX "QqOfficialChallenge_accountId_expiresAt_idx" ON public."QqOfficialChallenge" USING btree ("accountId", "expiresAt")
-  索引 CREATE UNIQUE INDEX "QqOfficialChallenge_publicCodeHash_key" ON public."QqOfficialChallenge" USING btree ("publicCodeHash")
 
 ### "QqOfficialDelivery"
   列 "deliveryMode" text NOT NULL DEFAULT 'SIMULATION'::text
@@ -2418,7 +2254,6 @@ END) || "objectId"::text) || '.'::text) || part::text))
   列 "authorId" text NOT NULL
   列 "title" text NOT NULL
   列 "body" text NOT NULL
-  列 "wantedContent" text NOT NULL DEFAULT ''::text
   列 "convenientTime" text NOT NULL DEFAULT ''::text
   列 "createdAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
   列 "idempotencyKey" text NOT NULL
@@ -2427,19 +2262,18 @@ END) || "objectId"::text) || '.'::text) || part::text))
   列 "revision" integer NOT NULL DEFAULT 0
   列 "updatedAt" timestamp(3) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
   列 "deletedAt" timestamp(3) with time zone
-  列 "category" text
+  列 "category" text NOT NULL
   列 "moderatedAt" timestamp(3) with time zone
   约束 "Wish_activityId_fkey" FOREIGN KEY ("activityId") REFERENCES "Activity"(id) ON DELETE RESTRICT
   约束 "Wish_activityId_key" UNIQUE ("activityId")
   约束 "Wish_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "Account"(id) ON DELETE RESTRICT
   约束 "Wish_authorId_idempotencyKey_key" UNIQUE ("authorId", "idempotencyKey")
   约束 "Wish_body_check" CHECK (char_length(body) >= 1 AND char_length(body) <= 11001)
-  约束 "Wish_category_check" CHECK (category IS NULL OR (category = ANY (ARRAY['MOUNT'::text, 'CHALLENGE'::text, 'CRAFT_GATHER'::text, 'EXPLORE'::text, 'ACHIEVEMENT'::text, 'OTHER'::text])))
+  约束 "Wish_category_check" CHECK (category = ANY (ARRAY['MOUNT'::text, 'CHALLENGE'::text, 'CRAFT_GATHER'::text, 'EXPLORE'::text, 'ACHIEVEMENT'::text, 'OTHER'::text]))
   约束 "Wish_convenientTime_check" CHECK (char_length("convenientTime") <= 500)
   约束 "Wish_linked_not_deleted_check" CHECK ("deletedAt" IS NULL OR "activityId" IS NULL)
   约束 "Wish_pkey" PRIMARY KEY (id)
   约束 "Wish_title_check" CHECK (char_length(title) >= 1 AND char_length(title) <= 100)
-  约束 "Wish_wantedContent_check" CHECK (char_length("wantedContent") <= 1000)
   索引 CREATE INDEX "Wish_createdAt_id_idx" ON public."Wish" USING btree ("createdAt" DESC, id DESC)
 
 ### "WishCommand"

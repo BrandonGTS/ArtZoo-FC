@@ -170,7 +170,10 @@ test('知识库：发布、编辑、协作、评论与管理（数据库）', as
         const before = await fixedCategorySnapshot(db);
         await reject(() => edit('恶意', tokens[1], { editMode: 'AUTHOR' }), 'FORBIDDEN');
         assert.deepEqual(await fixedCategorySnapshot(db), before);
-        await reject(() => service.remove(a.id, { expectedRevision: 1 }, tokens[1]), 'FORBIDDEN');
+        await reject(
+          () => service.remove(a.id, { expectedRevision: 1, intent: 'SELF' }, tokens[1]),
+          'FORBIDDEN'
+        );
         const input = meta('朋友正文', 'AUTHOR');
         delete input.submissionKey;
         await edit(input.body, tokens[0], input);
@@ -179,7 +182,7 @@ test('知识库：发布、编辑、协作、评论与管理（数据库）', as
         assert.deepEqual(await fixedCategorySnapshot(db), closed);
         const protectedRevision = (await service.detail(a.id, tokens[0])).revision;
         await reject(
-          () => service.remove(a.id, { expectedRevision: protectedRevision }, tokens[0]),
+          () => service.remove(a.id, { expectedRevision: protectedRevision, intent: 'SELF' }, tokens[0]),
           'FORBIDDEN'
         );
       }
@@ -200,7 +203,10 @@ test('知识库：发布、编辑、协作、评论与管理（数据库）', as
         assert.equal(row.hasOtherContributions, true);
         assert.equal(row.canDelete, false);
         assert.equal(await db.knowledgeVersion.count({ where: { articleId: a.id } }), 3);
-        await reject(() => service.remove(a.id, { expectedRevision: row.revision }, tokens[0]), 'FORBIDDEN');
+        await reject(
+          () => service.remove(a.id, { expectedRevision: row.revision, intent: 'SELF' }, tokens[0]),
+          'FORBIDDEN'
+        );
         await reject(
           () => service.restore(a.id, { versionId: authorVersion.id, expectedRevision: 0 }, tokens[0]),
           'CONFLICT'
@@ -292,7 +298,7 @@ test('知识库：发布、编辑、协作、评论与管理（数据库）', as
         tokens[1]
       );
       assert.equal((await service.detail(created.id, tokens[0])).canDelete, true);
-      await service.remove(created.id, { expectedRevision: 0 }, tokens[0]);
+      await service.remove(created.id, { expectedRevision: 0, intent: 'SELF' }, tokens[0]);
       await reject(() => service.detail(created.id, tokens[1]), 'NOT_FOUND');
       assert.equal(await db.knowledgeComment.count({ where: { articleId: created.id } }), 2);
     });
@@ -369,11 +375,19 @@ test('知识库：发布、编辑、协作、评论与管理（数据库）', as
     await check(
       'admin moderation requires reason, preserves data and records actor/time/reason',
       async () => {
-        await reject(() => service.removeComment(a.id, commentId, {}, tokens[2]), 'VALIDATION_ERROR');
-        await service.removeComment(a.id, commentId, { reason: '隔离违规评论处理' }, tokens[2]);
+        await reject(
+          () => service.removeComment(a.id, commentId, { intent: 'MODERATE' }, tokens[2]),
+          'VALIDATION_ERROR'
+        );
+        await service.removeComment(
+          a.id,
+          commentId,
+          { intent: 'MODERATE', reason: '隔离违规评论处理' },
+          tokens[2]
+        );
         const row = await service.detail(a.id, tokens[0]);
         await reject(
-          () => service.remove(a.id, { expectedRevision: row.revision }, tokens[2]),
+          () => service.remove(a.id, { expectedRevision: row.revision, intent: 'MODERATE' }, tokens[2]),
           'VALIDATION_ERROR'
         );
         const audits = await service.audits(a.id, tokens[2]);

@@ -11,8 +11,6 @@ import { resolve, join } from 'node:path';
 import { environmentIdentity } from '@artzoo/domain';
 import { createOfficialImagePorts } from '@artzoo/media/official';
 import {
-  assertLocalQcDatabaseAllowed,
-  LocalQcDataBlocked,
   checkDatabase,
   databaseConfigured,
   getDatabase,
@@ -323,18 +321,10 @@ async function runWorkerMediaOrphans(db: ReturnType<typeof getDatabase>) {
 }
 
 let wake: (() => void) | undefined;
-const safetyStop = (error: unknown): boolean => {
-  try {
-    return error instanceof LocalQcDataBlocked;
-  } catch {
-    return false;
-  }
-};
-
 async function heartbeat() {
   let database = 'unconfigured';
   let maintenance = { reduced: 0, cancelled: 0, completed: 0, autoAbsent: 0, failed: 0 };
-  let lotteries = { processed: 0, simulated: 0, failed: 0, available: false };
+  let lotteries = { processed: 0, simulated: 0, failed: 0, available: true };
   let officialEvents: Awaited<ReturnType<typeof processOfficialEventSync>> = {
     enabled: false,
     processed: false
@@ -349,7 +339,6 @@ async function heartbeat() {
     try {
       await action();
     } catch (error) {
-      if (safetyStop(error)) throw error;
       failedSteps.push(step);
       logMaintenanceFailure(step, 'batch', error);
     }
@@ -361,13 +350,10 @@ async function heartbeat() {
         await checkDatabase();
         database = 'ok';
       } catch (error) {
-        if (safetyStop(error)) throw error;
         database = 'unavailable';
         logMaintenanceFailure('database', 'probe', error);
       }
       if (database === 'ok' && !stopping) {
-        // The guard is outside per-step isolation: a QC violation stops all later work.
-        await assertLocalQcDatabaseAllowed(getDatabase());
         const state = createMaintenanceState(() => stopping);
         await run('activity', async () => {
           maintenance = await processActivityMaintenance(getDatabase(), undefined, state);
@@ -424,11 +410,6 @@ async function heartbeat() {
       }
     } else if (requireDatabase && !stopping) process.exitCode = 1;
   } catch (error) {
-    // A safety guard is not a database probe failure, and must retain its failing exit code.
-    if (safetyStop(error)) {
-      stopping = true;
-      process.exitCode = 1;
-    }
     failedSteps.push('safety');
     logMaintenanceFailure('safety', 'batch', error);
   }

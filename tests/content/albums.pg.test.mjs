@@ -297,7 +297,7 @@ test('相册：创建、上传、权限、点赞与管理（数据库）', async
         const d = await service.detail(community.id, tokens[0]);
         assert.equal(d.canDelete, false);
         await assert.rejects(
-          service.update(community.id, { action: 'remove', revision: d.revision }, tokens[0]),
+          service.update(community.id, { action: 'remove', revision: d.revision, intent: 'SELF' }, tokens[0]),
           (e) => e.status === 403
         );
       }

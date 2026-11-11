@@ -234,3 +234,22 @@ for (const scope of ['knowledge', 'album'])
     await rejection(() => erase(forged, { revision: 0, intent: 'SELF' }), 'FORBIDDEN');
     assert.equal(forged.writes.length, 0);
   });
+test('missing intent is rejected for every deletion entry before any write', async () => {
+  const f = fixture('ADMIN');
+  await rejection(() => f.knowledge.remove(f.article.id, { expectedRevision: 0 }), 'VALIDATION_ERROR');
+  await rejection(() => f.albums.update(f.album.id, { action: 'remove', revision: 0 }), 'VALIDATION_ERROR');
+  await rejection(
+    () => f.albums.updatePhoto(f.photos[0].id, { action: 'remove', revision: 0 }),
+    'VALIDATION_ERROR'
+  );
+  await rejection(
+    () => f.knowledge.removeComment(f.article.id, f.comment.id, { revision: 0, reason: '原因' }),
+    'VALIDATION_ERROR'
+  );
+  await rejection(
+    () => f.albums.removeComment(f.comment.id, { submissionKey: randomUUID(), revision: 0, reason: '原因' }),
+    'VALIDATION_ERROR'
+  );
+  assert.equal(f.writes.length, 0);
+  assert.equal(f.audits.length, 0);
+});

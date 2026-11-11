@@ -80,7 +80,7 @@ def parse_command(text: str) -> str | None:
     tokens = normalized.split(None, 1)
     first = tokens[0] if tokens else ""
     relevant = (normalized.startswith("报名") or first in
-                ("绑定群", "确认群", "绑定", "确认绑定", "退出", "取消报名", "换职业", "换位置"))
+                ("绑定群", "确认群", "绑定", "退出", "取消报名", "换职业", "换位置"))
     if not relevant:
         return None
     if len(text) > 512:
@@ -91,7 +91,7 @@ def parse_command(text: str) -> str | None:
         return "invalid"
     if normalized.startswith("报名"):
         return "register"
-    if re.fullmatch(r"(?:绑定|确认绑定)\s+[A-Za-z0-9_-]{8,128}", normalized):
+    if re.fullmatch(r"绑定\s+[A-Za-z0-9_-]{8,128}", normalized):
         return "bind"
     if first in ("退出", "取消报名", "换职业", "换位置"):
         return "website_only"

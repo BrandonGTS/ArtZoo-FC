@@ -11,7 +11,7 @@ import { verifyQqSignature } from './signature';
 
 export async function handleQqBinding(
   request: Request,
-  action: 'status' | 'initiate' | 'select' | 'progress' | 'confirm' | 'unlink' | 'cancel'
+  action: 'status' | 'initiate' | 'progress' | 'unlink' | 'cancel'
 ) {
   try {
     if (action === 'status' || action === 'progress' ? request.method !== 'GET' : request.method !== 'POST')

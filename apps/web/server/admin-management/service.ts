@@ -9,7 +9,6 @@ import {
 } from '@artzoo/domain';
 import { AccountService, accountSummary, lock } from '../auth/service';
 import { tokenDigest } from '../auth/crypto';
-import { readPublicSiteSettings } from './public-settings';
 type Tx = Prisma.TransactionClient;
 type Actor = Awaited<ReturnType<AccountService['requireAccount']>>;
 type Body = Record<string, unknown>;
@@ -118,18 +117,12 @@ export class AdminManagementService {
     await this.super(this.auth.db, token, actor);
     return result;
   }
-  async settings(token?: string | null) {
-    const actor = await this.super(this.auth.db, token);
-    const result = await readPublicSiteSettings(this.auth.db);
-    await this.super(this.auth.db, token, actor);
-    return result;
-  }
   async audits(url: URL, token?: string | null) {
     const actor = await this.super(this.auth.db, token),
       paging = page(url),
       scope = url.searchParams.get('scope');
-    if (scope !== 'roles' && scope !== 'public-qq') invalid('记录范围无效');
-    const kind: ManagementKind = scope === 'roles' ? 'ADMIN_ROLE_CHANGED' : 'PUBLIC_ADMIN_QQ_CHANGED';
+    if (scope !== 'roles') invalid('记录范围无效');
+    const kind: ManagementKind = 'ADMIN_ROLE_CHANGED';
     const result = await this.auth.db.$transaction(
       async (tx) => {
         const where = { kind },
@@ -151,8 +144,6 @@ export class AdminManagementService {
           target: a.target,
           beforeRole: a.beforeRole,
           afterRole: a.afterRole,
-          beforeQq: a.beforeQq,
-          afterQq: a.afterQq,
           reason: a.reason,
           createdAt: a.createdAt.toISOString()
         }));
@@ -222,9 +213,5 @@ export class AdminManagementService {
       await this.super(tx, token, actor);
       return { account, replayed: Boolean(old) };
     });
-  }
-  async saveSettings(_body: Body, token?: string | null) {
-    await this.super(this.auth.db, token);
-    throw new AccountError('FORBIDDEN', '公开QQ配置已停用，请使用游客联系留言', 403);
   }
 }

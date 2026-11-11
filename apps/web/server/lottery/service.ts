@@ -4,7 +4,6 @@ import {
   LotteryMaintenance,
   insertAutomaticLotteryEntries,
   databaseLotteryPorts,
-  assertLotteryPublicationCovered,
   markLotteryMediaMountedTx,
   type Prisma
 } from '@artzoo/db';
@@ -265,7 +264,6 @@ export class LotteryService {
       const now = this.auth.now();
       validateLottery(body, now);
       await assertLotteryImages(input.prizes, fresh.accountId, tx);
-      await assertLotteryPublicationCovered(tx, now);
       const id = randomUUID();
       await tx.$executeRaw`INSERT INTO "Lottery" ("id","creatorId","idempotencyKey","fingerprint","title","kind","mode","audience","month","minDays","prizes","drawAt","createdAt") VALUES (${id},${fresh.accountId},${input.idempotencyKey},${fingerprint},${input.title},${input.kind},${input.mode},${input.audience},${input.month},${input.minDays},${JSON.stringify(input.prizes)}::jsonb,${new Date(input.drawAt)},${now})`;
       await markLotteryMediaMountedTx(

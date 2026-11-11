@@ -91,9 +91,8 @@ export function useSharingCommand<T>({
       setUnknown(false);
       if (
         frozen.kind === 'json' &&
-        ((frozen.path.startsWith('/api/activity-shares/') &&
-          ['SAVE', 'FEATURE', 'UNFEATURE'].includes(String(frozen.body.action))) ||
-          (frozen.path.startsWith('/api/album-photos/') && frozen.body.action === 'unfeature'))
+        frozen.path.startsWith('/api/album-photos/') &&
+        frozen.body.action === 'unfeature'
       ) {
         window.dispatchEvent(new Event('artzoo:featured-updated'));
       }

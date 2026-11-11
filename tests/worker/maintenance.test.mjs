@@ -1,12 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMaintenanceState, runMaintenanceItem } from '../../packages/db/src/maintenance-run.ts';
-import { LocalQcDataBlocked } from '../../packages/db/src/local-qc-safety.ts';
 import { processSecurityCleanup } from '../../packages/db/src/security-cleanup.ts';
 import { processActivityMaintenance } from '../../packages/db/src/activity-maintenance.ts';
 const now = new Date('2030-06-10T00:00:00Z'),
   day = 86400000;
-test('failure logs allowlisted metadata only; safety failure propagates', async () => {
+test('failure logs allowlisted metadata only', async () => {
   const state = createMaintenanceState(),
     lines = [];
   const original = console.error;
@@ -21,14 +20,6 @@ test('failure logs allowlisted metadata only; safety failure propagates', async 
     );
     assert.equal(state.failed, 1);
     assert.deepEqual(lines, [{ step: 'activity', id: 'id', error: 'Error', code: 'P2028' }]);
-    await assert.rejects(
-      () =>
-        runMaintenanceItem(state, 'activity', 'id', async () => {
-          throw new LocalQcDataBlocked();
-        }),
-      LocalQcDataBlocked
-    );
-    assert.equal(state.failed, 1);
   } finally {
     console.error = original;
   }
@@ -189,7 +180,6 @@ test('a failed activity transaction does not block the next account or substep; 
     },
     account: { findMany: async () => [{ id: 'bad' }, { id: 'good' }] },
     activity: {
-      fields: { managementEnabledAt: {} },
       findMany: async () => {
         scans.push('activity');
         return [];

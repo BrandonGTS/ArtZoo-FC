@@ -26,12 +26,7 @@ const complete = {
   ARTZOO_SMS_REGISTER_TEMPLATE_CODE: '100001',
   ARTZOO_SMS_RESET_TEMPLATE_CODE: '100003'
 };
-const fields = [
-  ...Object.keys(complete),
-  'ARTZOO_SMS_TEMPLATE_CODE',
-  'ARTZOO_DEPLOYMENT_ENV',
-  'ARTZOO_PUBLIC_ORIGIN'
-];
+const fields = [...Object.keys(complete), 'ARTZOO_DEPLOYMENT_ENV', 'ARTZOO_PUBLIC_ORIGIN'];
 const origin = 'http://localhost:3100';
 const local = { ARTZOO_DEPLOYMENT_ENV: 'local', ARTZOO_PUBLIC_ORIGIN: origin };
 const headers = { origin, 'content-type': 'application/json', 'x-artzoo-request': '1' };
@@ -69,9 +64,7 @@ for (const [name, environment, expectedStatus, expectedSms] of [
   ['complete', complete, 200, { mode: 'aliyun', available: true }],
   ['absent', {}, 200, { mode: 'unconfigured', available: false }],
   ['incomplete', { ...complete, ARTZOO_SMS_ACCESS_KEY_SECRET: '' }, 503, null],
-  ['legacy provider', { ...complete, ARTZOO_SMS_PROVIDER: 'aliyun' }, 503, null],
-  ['legacy single template', { ...complete, ARTZOO_SMS_TEMPLATE_CODE: 'SMS_123456' }, 503, null],
-  ['legacy empty field', { ...complete, ARTZOO_SMS_TEMPLATE_CODE: '' }, 503, null],
+  ['unknown provider', { ...complete, ARTZOO_SMS_PROVIDER: 'aliyun' }, 503, null],
   ['wrong purpose template', { ...complete, ARTZOO_SMS_RESET_TEMPLATE_CODE: '100001' }, 503, null]
 ]) {
   test('real HTTP config: ' + name + ' without DB/network or secret serialization', async () => {

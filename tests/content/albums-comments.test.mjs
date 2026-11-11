@@ -298,6 +298,7 @@ const remove = (rows, extra = {}) => ({
   action: 'remove',
   photos: rows.map((p) => ({ id: p.id, revision: p.revision })),
   submissionKey: randomUUID(),
+  intent: 'SELF',
   ...extra
 });
 const commentBody = (extra = {}) => ({
@@ -448,7 +449,11 @@ test('ordinary deletion needs no reason but administrator governance requires re
   assert.equal((await owner.service.mutatePhotos(ids.album, ordinary, ids.owner)).replayed, true);
   assert.equal(owner.state.audits.length, 1);
   const h = harness(1);
-  for (const extra of [{}, { intent: 'MODERATE' }, { intent: 'SELF', reason: '不能伪造资格' }]) {
+  for (const extra of [
+    { intent: undefined },
+    { intent: 'MODERATE' },
+    { intent: 'SELF', reason: '不能伪造资格' }
+  ]) {
     await assert.rejects(
       h.service.mutatePhotos(ids.album, remove(h.state.photos, extra), ids.admin),
       rejected(extra.intent === 'SELF' ? 403 : 400)
@@ -564,7 +569,7 @@ test('removing one comment hides its whole branch and attachments while preservi
     removedAt: null,
     position: 0
   });
-  const body = { revision: 0, submissionKey: randomUUID() };
+  const body = { revision: 0, submissionKey: randomUUID(), intent: 'SELF' };
   await h.service.removeComment(root.id, body, ids.uploader);
   assert.equal((await h.service.removeComment(root.id, body, ids.uploader)).replayed, true);
   assert.deepEqual(
@@ -583,9 +588,16 @@ test('comment governance still requires a reason; ordinary creator cannot remove
   const h = harness(),
     c = await h.service.comment(ids.album, commentBody(), ids.uploader),
     body = { revision: 0, submissionKey: randomUUID() };
-  await assert.rejects(h.service.removeComment(c.id, body, ids.owner), rejected(403));
-  await assert.rejects(h.service.removeComment(c.id, body, ids.admin), rejected(400));
-  await h.service.removeComment(c.id, { ...body, reason: 'Synthetic moderation reason' }, ids.admin);
+  await assert.rejects(h.service.removeComment(c.id, { ...body, intent: 'SELF' }, ids.owner), rejected(403));
+  await assert.rejects(
+    h.service.removeComment(c.id, { ...body, intent: 'MODERATE' }, ids.admin),
+    rejected(400)
+  );
+  await h.service.removeComment(
+    c.id,
+    { ...body, intent: 'MODERATE', reason: 'Synthetic moderation reason' },
+    ids.admin
+  );
   assert.equal(h.state.audits[0].reason, 'Synthetic moderation reason');
 });
 test('unattached comment media is private to uploader and attached media stays internal', async () => {

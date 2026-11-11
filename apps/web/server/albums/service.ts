@@ -2235,8 +2235,7 @@ export class AlbumService {
         c.authorId === actor.accountId,
         admin(actor.account.adminRole),
         '作者删除本人评论',
-        500,
-        c.authorId !== actor.accountId
+        500
       );
       const rows = await tx.albumComment.findMany({
         where: { albumId: album.id, photoId: c.photoId },

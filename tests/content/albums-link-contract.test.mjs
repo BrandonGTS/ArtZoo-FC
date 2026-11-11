@@ -33,7 +33,6 @@ test('album return destinations allow only implemented internal routes and exact
     '/albums',
     '/featured',
     '/admin/featured',
-    '/admin/album-categories',
     `/albums/${id}`,
     `/albums/${id}?photoId=${photo}`,
     `/albums/${id}?periodActivityId=${photo}`,
@@ -46,7 +45,8 @@ test('album return destinations allow only implemented internal routes and exact
     `/albums/${id}?photoId=${photo}&photoId=${photo}`,
     `/albums/${id}?comments=1#other`,
     '//evil.invalid/albums',
-    '/albums/../admin'
+    '/albums/../admin',
+    '/admin/album-categories'
   ])
     assert.equal(safeAccountReturnTo(v), '/');
   assert.equal(messageId('album:' + id).source, 'album');

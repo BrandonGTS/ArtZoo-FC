@@ -459,7 +459,6 @@ export class ActivityService {
                   registrationClosesAt: new Date(period.startsAt.getTime() - 30 * 60000)
                 }
               : {}),
-            ...(offline || series ? { completionEnabledAt: null } : {}),
             ...(duty ? { dutyId: duty.id, dutySnapshot: duty as unknown as Prisma.InputJsonValue } : {}),
             ...period,
             createdAt: now,
@@ -878,7 +877,7 @@ export class ActivityService {
       async (tx) => {
         const actor = await this.auth.requireAccount(tx, token),
           now = this.auth.now();
-        const section = async (kind: 'registered' | 'published') => {
+        const section = async (kind: 'registered') => {
           const periodValue = url?.searchParams.get(`${kind}Period`) ?? 'current';
           if (periodValue !== 'current' && periodValue !== 'history')
             invalid(`${kind}Period`, '活动时间范围无效');
@@ -888,9 +887,7 @@ export class ActivityService {
             invalid(`${kind}Page`, '页码无效');
           const pageSize = 10;
           const where: Prisma.ActivityWhereInput = {
-            ...(kind === 'published'
-              ? { organizerId: actor.accountId }
-              : { registrations: { some: { accountId: actor.accountId } } }),
+            registrations: { some: { accountId: actor.accountId } },
             ...(period === 'current'
               ? { cancelledAt: null, endsAt: { gt: now } }
               : { OR: [{ cancelledAt: { not: null } }, { endsAt: { lte: now } }] })
@@ -908,11 +905,9 @@ export class ActivityService {
           const pagination: MyActivitiesPagination = { page, pageSize, total, totalPages, period };
           return { items: rows.map((row) => activitySummary(row, actor.accountId, now)), pagination };
         };
-        const [published, registered] = await Promise.all([section('published'), section('registered')]);
+        const registered = await section('registered');
         return {
-          published: published.items,
           registered: registered.items,
-          publishedPagination: published.pagination,
           registeredPagination: registered.pagination,
           serverNow: now.toISOString(),
           timeZone: 'Asia/Shanghai'

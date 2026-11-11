@@ -174,13 +174,13 @@ export async function managedBindingChecks(f, check) {
   const keyRow = (k) => f.db.qqOfficialBindingKey.findUniqueOrThrow({ where: { id: k.requestId } });
   const forbidden = (fn) => assert.rejects(fn, (e) => e?.code === 'FORBIDDEN');
   await adopt();
-  await check('managed adopted enabled group creates protocol2 binding', async () => {
+  await check('managed adopted enabled group creates binding', async () => {
     const key = await service.initiate(tokens[1]);
     await service.bindKey(scope, 'synthetic_managed_member_1', key.key);
     assert.equal(
       (await f.db.qqOfficialBinding.findFirstOrThrow({ where: { accountId: accounts[1].id, ...scope } }))
-        .protocolVersion,
-      2
+        .memberOpenId,
+      'synthetic_managed_member_1'
     );
   });
   let old;

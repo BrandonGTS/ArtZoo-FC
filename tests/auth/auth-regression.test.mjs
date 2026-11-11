@@ -60,8 +60,11 @@ test('normal change revokes both devices and takes account before session lock',
   assert.equal(f.db.rows.account[0].passwordVersion, 1);
   assert.equal(await verifySecret(newValue, f.db.rows.account[0].passwordHash), true);
   assert.ok(f.db.rows.accountSession.every((s) => s.revokedAt));
-  const locks = f.db.locks.filter((x) => [f.account.id, f.db.rows.accountSession[0].id].includes(x));
-  assert.deepEqual(locks, [f.account.id, f.db.rows.accountSession[0].id]);
+  // Account row before the session row; the final active-policy read re-selects the same account row.
+  const locks = f.db.locks
+    .filter((x) => [f.account.id, f.db.rows.accountSession[0].id].includes(x))
+    .filter((x, i, all) => x !== all[i - 1]);
+  assert.deepEqual(locks, [f.account.id, f.db.rows.accountSession[0].id, f.account.id]);
 });
 for (const stage of ['account-write', 'last-session-write', 'final-active-read'])
   test(`expiry during ${stage} rolls back password/version and every session`, async () => {

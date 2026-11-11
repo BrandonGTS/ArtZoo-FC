@@ -149,15 +149,10 @@ CI 每次都会在当前提交上运行全部单元测试和数据库测试。
 
 ### 测试中保留的旧兼容行为
 
-以下用例测试的是阶段 4 计划删除的兼容逻辑，删除那部分代码时一并删除：
+阶段 4 第一次清理已删除对应代码和用例（旧 6–7 位密码、旧邀请清理命令、功能上线时刻、公开 QQ 设置、QQ 旧绑定流程、插件事故恢复函数等）。仍然保留的：
 
-- `auth/concurrency.pg`："existing-six-and-seven-character-passwords-authenticate"（旧 6–7 位密码仍可登录）。
-- `auth/admin-and-invitations`：两条 "legacy cleanup" 用例（旧邀请清理命令）。
-- `activities/`、`scoring/`、`media/` 中名称带 legacy 的用例（旧数据缺字段时的兼容读取）。
-- `admin/admin-management.pg` 中写入"公开 QQ"历史审计的准备步骤（公开 QQ 设置已停用）。
 - `lottery/support/empty-cos-db.mjs`：图片存储查询 COS 位置记录的替身，删除 COS 代码时一并删除。
-- `qq/`、`teams/`、`wishes/`、`content/` 中名称带 legacy 的用例（旧配置别名、旧模板、旧内容格式的兼容读取）。
-- `qq-plugin/` 中名称带 legacy / historical 的用例（插件本地旧记录的兼容处理）。
+- 名称带 legacy / historical 的其他用例（如 `activities/home-upcoming`、`activities/duty-service`、`content/daily*`、`content/albums-*`、`content/knowledge-*`、`qq/bot-*`、`qq-plugin/test_management`、`qq-plugin/test_sender`）。它们对应的代码不在阶段 4 第一次清理的清单里，有的是在拒绝旧格式（应当保留），有的是在兼容旧数据（可以删）。逐条核实后列入 `docs/PLAN.md` 阶段 4 备忘，再决定是否删除。
 
 ### 从旧仓库迁移时修正或放弃的测试
 

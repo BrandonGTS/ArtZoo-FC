@@ -282,8 +282,7 @@ export async function notificationPostgresCases({ db, check, organizerId }) {
           mode: 'SINGLE',
           startsAt: f.activity.startsAt,
           endsAt: f.activity.endsAt,
-          createdAt: f.activity.createdAt,
-          completionEnabledAt: null
+          createdAt: f.activity.createdAt
         }
       });
       const values = {

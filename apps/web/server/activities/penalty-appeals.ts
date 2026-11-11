@@ -17,13 +17,7 @@ import { tokenDigest } from '../auth/crypto';
 import { ActivityService } from './service';
 type Tx = Prisma.TransactionClient;
 const singleReasons = ['LATE_WITHDRAWAL', 'LATE_CANCELLATION'];
-const seriesReasons = ['SERIES_UNAGREED_ABSENCE', 'SERIES_UNCOMMUNICATED_EXIT'];
-const reasonScope = {
-  OR: [
-    { reason: { in: singleReasons } },
-    { reason: { in: seriesReasons }, activity: { is: { scene: 'GAME', mode: 'SERIES' } } }
-  ]
-} satisfies Prisma.ActivityPenaltyWhereInput;
+const reasonScope = { reason: { in: singleReasons } } satisfies Prisma.ActivityPenaltyWhereInput;
 const appealSelect = {
   id: true,
   penaltyId: true,
@@ -43,7 +37,6 @@ const penaltySelect = {
   points: true,
   createdAt: true,
   reversedAt: true,
-  appealEnabledAt: true,
   activity: { select: { id: true, title: true, scene: true, mode: true } }
 } as const;
 type Appeal = Prisma.ActivityPenaltyAppealGetPayload<{ select: typeof appealSelect }>;
@@ -65,13 +58,7 @@ function conflict(message: string): never {
   throw new AccountError('CONFLICT', message, 409);
 }
 function supported(row: Penalty) {
-  if (
-    !(
-      singleReasons.includes(row.reason) ||
-      (seriesReasons.includes(row.reason) && row.activity.scene === 'GAME' && row.activity.mode === 'SERIES')
-    ) ||
-    !row.appealEnabledAt
-  )
+  if (!singleReasons.includes(row.reason))
     throw new AccountError('FORBIDDEN', '此处罚不可通过该入口申诉', 403);
 }
 function pagination(url: URL) {
@@ -171,7 +158,6 @@ export class ActivityPenaltyAppealService extends ActivityService {
             activityTitle: row.activity.title,
             expiresAt: penaltyAppealDeadline(row.createdAt).toISOString(),
             canAppeal:
-              !!row.appealEnabledAt &&
               !row.reversedAt &&
               penaltyAppealWindowOpen(row.createdAt, now) &&
               (!row.appeals[0] || row.appeals[0].status === 'REJECTED'),

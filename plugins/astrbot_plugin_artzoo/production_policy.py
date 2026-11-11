@@ -1,6 +1,5 @@
 """Production-only atomic reply capacity, no command content or credentials stored."""
 import hashlib
-import json
 import secrets
 from .core import Rejected, canonical_json
 
@@ -9,117 +8,16 @@ HEARTBEAT_SECONDS=5
 MAX_REPLY_SECONDS=120
 
 def schema(db):
-    db.execute("CREATE TABLE IF NOT EXISTS provider_refusal_resolutions(attempt_key TEXT PRIMARY KEY,scope TEXT NOT NULL,direction TEXT NOT NULL,resolved REAL NOT NULL,http_status INTEGER NOT NULL,provider_code INTEGER NOT NULL,log_evidence_sha256 TEXT NOT NULL,attempt_evidence_sha256 TEXT NOT NULL)")
-    db.execute("CREATE TABLE IF NOT EXISTS provider_resolution_invalidations(attempt_key TEXT PRIMARY KEY,observed REAL NOT NULL,outcome TEXT NOT NULL)")
     db.execute("CREATE TABLE IF NOT EXISTS reply_pre_send_failures(attempt_key TEXT PRIMARY KEY,category TEXT NOT NULL,created REAL NOT NULL)")
-    db.execute("CREATE TABLE IF NOT EXISTS reply_pause_resolutions(attempt_key TEXT PRIMARY KEY,scope TEXT NOT NULL,direction TEXT NOT NULL,prior_reason TEXT NOT NULL,resolved REAL NOT NULL,proof TEXT NOT NULL)")
     db.execute("CREATE TABLE IF NOT EXISTS reply_late_outcomes(attempt_key TEXT PRIMARY KEY,outcome TEXT NOT NULL,observed REAL NOT NULL)")
     db.execute("""CREATE TABLE IF NOT EXISTS reply_slots(
         attempt_key TEXT PRIMARY KEY, scope TEXT NOT NULL, member_hash TEXT NOT NULL,
         command_hash TEXT NOT NULL, owner_hash TEXT NOT NULL, state TEXT NOT NULL,
         created REAL NOT NULL, lease_until REAL NOT NULL)""")
 
-RESOLVED_PRE_SDK="resolved_pre_sdk"
-RESOLVED_PROVIDER_REFUSAL="resolved_provider_refusal"
-
 def pause(db, scope, direction, reason):
-    db.execute("INSERT INTO direction_pauses VALUES(?,?,?) ON CONFLICT(scope,direction) DO UPDATE SET reason=excluded.reason WHERE direction_pauses.reason IN (?,?)",(scope,direction,reason,RESOLVED_PRE_SDK,RESOLVED_PROVIDER_REFUSAL))
-
-def pre_sdk_evidence(db,key):
-    row=db.execute("""SELECT a.digest,a.outcome,a.receipt,a.ack,a.created,
-        r.command_hash,r.state,r.created,b.direction,r.scope,b.scope
-        FROM attempts a JOIN reply_slots r ON r.attempt_key=a.delivery_key
-        JOIN send_budgets b ON b.attempt_key=a.delivery_key WHERE a.delivery_key=?""",(key,)).fetchone()
-    valid=bool(row and row[0]==row[5] and row[1]=='unknown' and row[2]=='{}' and row[3]=='{}'
-                and row[4]==row[7] and row[6]=='UNKNOWN' and row[8]=='passive'
-                and row[9]==row[10] and key.startswith(row[9]+':reply:')
-                and not db.execute('SELECT 1 FROM reply_late_outcomes WHERE attempt_key=?',(key,)).fetchone())
-    return hashlib.sha256(canonical_json({'key':key,'row':list(row)})).hexdigest() if valid else None
-
-def verified_pre_sdk_placeholder(db,key):
-    return pre_sdk_evidence(db,key) is not None
-
-def resolved_placeholder(db,key):
-    row=db.execute('SELECT proof FROM reply_pause_resolutions WHERE attempt_key=?',(key,)).fetchone()
-    if not row:return False
-    try:
-        proof=json.loads(row[0]);evidence=pre_sdk_evidence(db,key)
-        return bool(evidence and proof=={'rule':'NO_SDK_START_PLACEHOLDER','evidenceDigest':evidence})
-    except (ValueError,TypeError):return False
-
-def resolve_incident_pre_sdk_pause(journal,scope,key,now):
-    """Operator-only exact incident recovery; retains every historical row and charge."""
-    wire=scope_key(scope)
-    with journal.db:
-        journal.db.execute('BEGIN IMMEDIATE')
-        if wire=='*' or journal.db.execute("SELECT 1 FROM direction_pauses WHERE scope='*'").fetchone():
-            raise Rejected('global_pause_requires_review')
-        blockers=journal.db.execute("SELECT a.delivery_key FROM attempts a JOIN send_budgets b ON b.attempt_key=a.delivery_key WHERE b.scope=? AND b.direction='passive' AND a.outcome IN ('started','unknown','permission_denied')",(wire,)).fetchall()
-        if blockers!=[(key,)] or not verified_pre_sdk_placeholder(journal.db,key):
-            raise Rejected('incident_has_unresolved_send_risk')
-        if journal.db.execute("SELECT 1 FROM reply_late_outcomes l JOIN send_budgets b ON b.attempt_key=l.attempt_key WHERE b.scope=? AND b.direction='passive'",(wire,)).fetchone():raise Rejected('incident_has_late_outcome')
-        if journal.db.execute("SELECT 1 FROM reply_slots WHERE scope=? AND state IN ('RESERVED','SENDING')",(wire,)).fetchone():
-            raise Rejected('incident_has_inflight_reply')
-        reason=journal.db.execute("SELECT reason FROM direction_pauses WHERE scope=? AND direction='passive'",(wire,)).fetchone()
-        if not reason or reason[0] not in ('reply_outcome_unknown','unknown',RESOLVED_PRE_SDK):
-            raise Rejected('incident_pause_reason_requires_review')
-        prior=journal.db.execute('SELECT 1 FROM reply_pause_resolutions WHERE attempt_key=?',(key,)).fetchone()
-        if reason[0]==RESOLVED_PRE_SDK and prior:return False
-        if prior:raise Rejected('incident_resolution_already_used')
-        journal.db.execute('INSERT INTO reply_pause_resolutions VALUES(?,?,?,?,?,?)',(key,wire,'passive',reason[0],current_time(now),json.dumps({'rule':'NO_SDK_START_PLACEHOLDER','evidenceDigest':pre_sdk_evidence(journal.db,key)},sort_keys=True)))
-        journal.db.execute("UPDATE direction_pauses SET reason=? WHERE scope=? AND direction='passive'",(RESOLVED_PRE_SDK,wire))
-        return True
-
-def provider_refusal_evidence(db,key):
-    row=db.execute("""SELECT a.digest,a.outcome,a.receipt,a.created,a.ack,a.acknowledged,
-        b.scope,b.direction,b.charged,b.created FROM attempts a JOIN send_budgets b
-        ON b.attempt_key=a.delivery_key WHERE a.delivery_key=?""",(key,)).fetchone()
-    if not(row and row[1] in ('unknown','permission_denied') and row[2]=='{}'
-            and row[5]==1 and row[7]=='proactive' and row[8]==1
-            and key.startswith(row[6]+':') and not key.startswith(row[6]+':reply:')
-            and not db.execute('SELECT 1 FROM reply_slots WHERE attempt_key=?',(key,)).fetchone()
-            and not db.execute('SELECT 1 FROM provider_resolution_invalidations WHERE attempt_key=?',(key,)).fetchone()):
-        return None
-    return hashlib.sha256(canonical_json({'key':key,'row':list(row)})).hexdigest()
-
-def resolved_provider_refusal(db,key):
-    row=db.execute('SELECT scope,direction,http_status,provider_code,log_evidence_sha256,attempt_evidence_sha256 FROM provider_refusal_resolutions WHERE attempt_key=?',(key,)).fetchone()
-    if not row:return False
-    scope=db.execute('SELECT scope FROM send_budgets WHERE attempt_key=?',(key,)).fetchone()
-    return bool(scope and row[0]==scope[0] and row[1]=='proactive' and row[2]==400
-                and row[3]==40034105 and isinstance(row[4],str) and len(row[4])==64
-                and all(x in '0123456789abcdef' for x in row[4])
-                and row[5]==provider_refusal_evidence(db,key))
-
-def resolve_confirmed_provider_refusal(journal,scope,key,log_evidence_sha256,now):
-    """Operator only: exact externally confirmed 400/40034105, never automatic."""
-    if not(isinstance(log_evidence_sha256,str) and len(log_evidence_sha256)==64
-           and all(x in '0123456789abcdef' for x in log_evidence_sha256)):
-        raise Rejected('invalid_provider_refusal_evidence')
-    wire=scope_key(scope)
-    with journal.db:
-        journal.db.execute('BEGIN IMMEDIATE')
-        prior=journal.db.execute('SELECT log_evidence_sha256 FROM provider_refusal_resolutions WHERE attempt_key=?',(key,)).fetchone()
-        if prior:
-            if prior[0]==log_evidence_sha256 and resolved_provider_refusal(journal.db,key):return False
-            raise Rejected('provider_resolution_already_used')
-        if journal.db.execute("SELECT 1 FROM direction_pauses WHERE scope='*'").fetchone():
-            raise Rejected('global_pause_requires_review')
-        own=journal.db.execute('SELECT scope FROM send_budgets WHERE attempt_key=?',(key,)).fetchone()
-        evidence=provider_refusal_evidence(journal.db,key)
-        if own!=(wire,) or not evidence:raise Rejected('provider_refusal_record_not_verified')
-        blockers=journal.db.execute("SELECT a.delivery_key FROM attempts a JOIN send_budgets b ON b.attempt_key=a.delivery_key WHERE b.scope=? AND b.direction='proactive' AND a.outcome IN ('started','unknown','permission_denied')",(wire,)).fetchall()
-        if any(k!=key and not resolved_provider_refusal(journal.db,k) for(k,)in blockers):
-            raise Rejected('other_send_risk_requires_review')
-        if journal.db.execute("SELECT 1 FROM reply_slots WHERE scope=? AND state IN ('RESERVED','SENDING')",(wire,)).fetchone():
-            raise Rejected('scope_has_inflight_reply')
-        pause_row=journal.db.execute("SELECT reason FROM direction_pauses WHERE scope=? AND direction='proactive'",(wire,)).fetchone()
-        if pause_row and pause_row[0]not in('unknown','permission_denied','provider_40034105'):
-            raise Rejected('pause_reason_requires_review')
-        journal.db.execute('INSERT INTO provider_refusal_resolutions VALUES(?,?,?,?,?,?,?,?)',
-            (key,wire,'proactive',current_time(now),400,40034105,log_evidence_sha256,evidence))
-        journal.db.execute("INSERT INTO direction_pauses VALUES(?,'proactive',?) ON CONFLICT(scope,direction) DO UPDATE SET reason=excluded.reason",(wire,RESOLVED_PROVIDER_REFUSAL))
-        return True
+    # The first recorded reason is kept; a pause is never lifted automatically.
+    db.execute("INSERT INTO direction_pauses VALUES(?,?,?) ON CONFLICT(scope,direction) DO NOTHING",(scope,direction,reason))
 
 def current_time(value):
     return value() if callable(value) else value
@@ -166,9 +64,6 @@ def recover(journal, now):
     with journal.db:
         journal.db.execute('BEGIN IMMEDIATE')
         now=current_time(now)
-        for key,scope,direction in journal.db.execute('SELECT attempt_key,scope,direction FROM provider_refusal_resolutions').fetchall():
-            if not resolved_provider_refusal(journal.db,key):
-                pause(journal.db,scope,direction,'invalid_provider_resolution')
         rows=journal.db.execute("""SELECT attempt_key,scope,command_hash,created
             FROM reply_slots WHERE state IN ('RESERVED','SENDING') AND lease_until<=?""",(now,)).fetchall()
         for row in rows:

@@ -218,9 +218,10 @@ export async function eightPostgresCases({ f, auth, service, check, token, fresh
                                   const total = await model.count(args);
                                   if (!inserted) {
                                     inserted = true;
+                                    const seatId = randomUUID();
                                     const created = await f.db.activity.create({
                                       data: {
-                                        organizerId: f.ids[12],
+                                        organizerId: f.ids[10],
                                         idempotencyKey: randomUUID(),
                                         requestFingerprint: 'snapshot-interleave',
                                         title: 'Concurrent committed',
@@ -228,7 +229,15 @@ export async function eightPostgresCases({ f, auth, service, check, token, fresh
                                         category: 'SOCIAL',
                                         startsAt: new Date(auth.now().getTime() + 3600000),
                                         endsAt: new Date(auth.now().getTime() + 7200000),
-                                        seats: { create: { position: 0, kind: 'ANY' } }
+                                        seats: { create: { id: seatId, position: 0, kind: 'ANY' } }
+                                      }
+                                    });
+                                    await f.db.activityRegistration.create({
+                                      data: {
+                                        activityId: created.id,
+                                        seatId,
+                                        accountId: f.ids[12],
+                                        job: null
                                       }
                                     });
                                     createdId = created.id;
@@ -251,12 +260,12 @@ export async function eightPostgresCases({ f, auth, service, check, token, fresh
         }
       });
       const first = await new ActivityService(raced).mine(token(12));
-      assert.equal(first.publishedPagination.total, 0);
-      assert.equal(first.published.length, 0);
+      assert.equal(first.registeredPagination.total, 0);
+      assert.equal(first.registered.length, 0);
       assert.equal(inserted, true);
       const next = await service.mine(token(12));
-      assert.equal(next.publishedPagination.total, 1);
-      assert.equal(next.published[0].id, createdId);
+      assert.equal(next.registeredPagination.total, 1);
+      assert.equal(next.registered[0].id, createdId);
     }
   );
   const seeded = await seedPagination(f, auth.now()),
@@ -271,18 +280,12 @@ export async function eightPostgresCases({ f, auth, service, check, token, fresh
         current.slice(0, 10)
       );
       assert.equal(first.registeredPagination.total, 23);
-      assert.equal(first.publishedPagination.total, 5);
-      const second = await service.mine(
-        token(11),
-        new URL('http://test?registeredPage=2&publishedPeriod=history')
-      );
+      assert.equal('published' in first, false);
+      const second = await service.mine(token(11), new URL('http://test?registeredPage=2'));
       assert.deepEqual(
         second.registered.map((x) => x.id),
         current.slice(10, 20)
       );
-      assert.equal(second.published.length, 0);
-      assert.equal(second.publishedPagination.totalPages, 0);
-      assert.equal(second.publishedPagination.page, 1);
       const past = await service.mine(
         token(11),
         new URL('http://test?registeredPeriod=history&registeredPage=2')
@@ -292,7 +295,6 @@ export async function eightPostgresCases({ f, auth, service, check, token, fresh
         history.slice(10)
       );
       assert.equal(past.registeredPagination.total, 12);
-      assert.equal(past.publishedPagination.total, 5);
       const firstPast = await service.mine(token(11), new URL('http://test?registeredPeriod=history'));
       assert.ok(
         firstPast.registered.some(
@@ -303,24 +305,15 @@ export async function eightPostgresCases({ f, auth, service, check, token, fresh
       noPrivate(past);
     }
   );
-  await check('MINE page clamping and published history filtering use own DB predicates', async () => {
-    const mine = await service.mine(token(11), new URL('http://test?registeredPage=999&publishedPage=999'));
+  await check('MINE page clamping uses own DB predicates and organizers see only registrations', async () => {
+    const mine = await service.mine(token(11), new URL('http://test?registeredPage=999'));
     assert.equal(mine.registeredPagination.page, 3);
     assert.deepEqual(
       mine.registered.map((x) => x.id),
       current.slice(20)
     );
-    assert.equal(mine.publishedPagination.page, 1);
-    const owner = await service.mine(
-      token(10),
-      new URL('http://test?publishedPeriod=history&publishedPage=999&registeredPeriod=history')
-    );
-    assert.equal(owner.publishedPagination.total, 12);
-    assert.equal(owner.publishedPagination.page, 2);
-    assert.deepEqual(
-      owner.published.map((x) => x.id),
-      history.slice(10)
-    );
+    const owner = await service.mine(token(10), new URL('http://test?registeredPeriod=history'));
+    assert.equal(owner.registeredPagination.total, 0);
     assert.equal(owner.registered.length, 0);
   });
   await check(
@@ -328,18 +321,17 @@ export async function eightPostgresCases({ f, auth, service, check, token, fresh
     async () => {
       for (const query of [
         'registeredPage=0',
-        'publishedPage=-1',
+        'registeredPage=-1',
         'registeredPage=1.5',
-        'publishedPage=9007199254740992',
+        'registeredPage=9007199254740992',
         'registeredPeriod=all',
-        'publishedPeriod=bad'
+        'registeredPeriod=bad'
       ])
         await reject(() => service.mine(token(11), new URL('http://test?' + query)), 'VALIDATION_ERROR');
       await reject(() => service.mine(), 'UNAUTHENTICATED');
       const other = await service.mine(token(12));
       assert.ok(other.registered.every((x) => x.myRegistration?.participant.id === f.ids[12]));
-      assert.ok(other.published.every((x) => x.organizer.id === f.ids[12]));
-      assert.ok([...other.registered, ...other.published].every((x) => !seeded.some((r) => r.id === x.id)));
+      assert.ok(other.registered.every((x) => !seeded.some((r) => r.id === x.id)));
     }
   );
 }
@@ -439,9 +431,7 @@ export async function eightHttpCases({ f, check, call, headers, post, data, body
     current = order(seeded, false),
     history = order(seeded, true);
   await check('MINE HTTP independent bounded DB pages periods and clamping', async () => {
-    const mine = await data(
-      await call('/api/me/activities?registeredPage=2&publishedPeriod=history', { headers: headers(11) })
-    );
+    const mine = await data(await call('/api/me/activities?registeredPage=2', { headers: headers(11) }));
     assert.deepEqual(
       mine.registered.map((x) => x.id),
       current.slice(10, 20)
@@ -453,7 +443,7 @@ export async function eightHttpCases({ f, check, call, headers, post, data, body
       totalPages: 3,
       period: 'current'
     });
-    assert.equal(mine.publishedPagination.total, 0);
+    assert.equal('published' in mine, false);
     const past = await data(
       await call('/api/me/activities?registeredPeriod=history&registeredPage=999', { headers: headers(11) })
     );
@@ -462,22 +452,17 @@ export async function eightHttpCases({ f, check, call, headers, post, data, body
       history.slice(10)
     );
     assert.equal(past.registeredPagination.page, 2);
-    assert.equal(past.publishedPagination.total, 5);
     const owner = await data(
-      await call('/api/me/activities?publishedPeriod=history', { headers: headers(10) })
+      await call('/api/me/activities?registeredPeriod=history', { headers: headers(10) })
     );
-    assert.deepEqual(
-      owner.published.map((x) => x.id),
-      history.slice(0, 10)
-    );
+    assert.equal(owner.registered.length, 0);
   });
   await check('MINE HTTP invalid queries and unrelated account exclude private pages', async () => {
-    for (const query of ['registeredPage=0', 'publishedPage=1.1', 'registeredPeriod=all'])
+    for (const query of ['registeredPage=0', 'registeredPage=1.1', 'registeredPeriod=all'])
       assert.equal((await call('/api/me/activities?' + query, { headers: headers(11) })).status, 400);
     assert.equal((await call('/api/me/activities?registeredPeriod=history')).status, 401);
     const unrelated = await data(await call('/api/me/activities', { headers: headers(12) }));
     assert.equal(unrelated.registered.length, 0);
-    assert.equal(unrelated.published.length, 0);
     assert.equal(unrelated.registeredPagination.total, 0);
   });
 }

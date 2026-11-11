@@ -232,25 +232,36 @@ test('comment removal preserves siblings, enforces ownership/reason and removes 
     child = comment(randomUUID(), root.id),
     sibling = comment(randomUUID());
   f.comments.push(root, child, sibling);
-  await f.service.removeComment(articleId, root.id, { revision: 0, submissionKey: randomUUID() });
+  await f.service.removeComment(articleId, root.id, {
+    revision: 0,
+    submissionKey: randomUUID(),
+    intent: 'SELF'
+  });
   assert.ok(root.removedAt);
   assert.ok(child.removedAt);
   assert.equal(sibling.removedAt, null);
   assert.equal(f.audits.length, 1);
-  await f.service.removeComment(articleId, root.id, { revision: 0, submissionKey: randomUUID() });
+  await f.service.removeComment(articleId, root.id, {
+    revision: 0,
+    submissionKey: randomUUID(),
+    intent: 'SELF'
+  });
   assert.equal(f.audits.length, 1);
   const forbidden = fixture(),
     other = comment(randomUUID(), null, ownerId);
   forbidden.comments.push(other);
-  await assert.rejects(() => forbidden.service.removeComment(articleId, other.id, { revision: 0 }), {
-    code: 'FORBIDDEN'
-  });
+  await assert.rejects(
+    () => forbidden.service.removeComment(articleId, other.id, { revision: 0, intent: 'SELF' }),
+    { code: 'FORBIDDEN' }
+  );
   forbidden.actor.account.adminRole = 'ADMIN';
-  await assert.rejects(() => forbidden.service.removeComment(articleId, other.id, { revision: 0 }), {
-    code: 'VALIDATION_ERROR'
-  });
+  await assert.rejects(
+    () => forbidden.service.removeComment(articleId, other.id, { revision: 0, intent: 'MODERATE' }),
+    { code: 'VALIDATION_ERROR' }
+  );
   await forbidden.service.removeComment(articleId, other.id, {
     revision: 0,
+    intent: 'MODERATE',
     reason: '合成违规原因',
     commentId: other.id
   });

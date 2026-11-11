@@ -77,8 +77,6 @@ export * from './lottery-checkin-enrollment.js';
 
 export * from './official-event-sync.js';
 
-export * from './local-qc-safety.js';
-
 export { validOfficialEventSourceUrl, validOfficialEventImageUrl } from './official-event-source.js';
 export * from './official-event-images.js';
 

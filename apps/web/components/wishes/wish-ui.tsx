@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button, Card, Tag } from 'antd';
-import { WISH_CATEGORIES, wishContent, type WishSummary, type WishWrite } from '../../server/wishes/contract';
+import { WISH_CATEGORIES, type WishSummary, type WishWrite } from '../../server/wishes/contract';
 import { errorDetail } from '../account/api';
 import { useFeedbackMessage } from '../use-feedback-message';
 import HomeCardSurface from '../home-card-surface';
@@ -71,15 +71,7 @@ export function WishFactIcon({ kind }: { kind: 'content' | 'interest' | 'time' }
 
 export type WishCardData = Pick<
   WishSummary,
-  | 'id'
-  | 'category'
-  | 'title'
-  | 'body'
-  | 'wantedContent'
-  | 'convenientTime'
-  | 'interestCount'
-  | 'interested'
-  | 'isAuthor'
+  'id' | 'category' | 'title' | 'body' | 'convenientTime' | 'interestCount' | 'interested' | 'isAuthor'
 >;
 export function WishCard({
   wish,
@@ -136,7 +128,7 @@ export function WishCard({
         <WishFactIcon kind="content" />
         <div>
           <span className="wish-card-fact-title">想玩的内容</span>
-          <p className="wish-card-excerpt">{wishContent(current) || '想玩的内容'}</p>
+          <p className="wish-card-excerpt">{current.body || '想玩的内容'}</p>
         </div>
       </div>
       <p className="wish-card-fact">

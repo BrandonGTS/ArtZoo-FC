@@ -4,7 +4,6 @@ import { state, reset, auth, QuickLinkService } from './support/stubs.mjs';
 import { handleAlbums } from '../../apps/web/server/albums/http.ts';
 import { handleDaily } from '../../apps/web/server/daily/http.ts';
 import { handleWishes } from '../../apps/web/server/wishes/http.ts';
-import { handleActivityShares } from '../../apps/web/server/activity-shares/http.ts';
 import { handleKnowledgeImage } from '../../apps/web/server/knowledge/image-http.ts';
 import { uploadLotteryImage } from '../../apps/web/server/lottery/media-http.ts';
 import { submitQuickIconUpload } from '../../apps/web/server/quick-links/upload-http.ts';
@@ -37,7 +36,6 @@ const uploads = [
   ['album-comment', (r) => handleAlbums(r, 'comment-upload', id)],
   ['daily', (r) => handleDaily(r, 'upload')],
   ['wish', (r) => handleWishes(r, 'upload')],
-  ['share', (r) => handleActivityShares(r, 'upload', id)],
   ['knowledge', (r) => handleKnowledgeImage(r)],
   ['lottery', (r) => uploadLotteryImage(r)],
   ['quick-icon', quick]
@@ -103,7 +101,6 @@ async function multipart(name, kind = 'valid', extra = {}, gate) {
   if (kind === 'duplicate') form.append('file', new File(['duplicate'], 'duplicate.png'));
   if (kind === 'unknown') form.append('unexpected', 'x');
   if (kind === 'missing') form.delete(icon ? 'command' : 'batchIndex');
-  if (kind === 'period') form.append('periodActivityId', id);
   const real = new Request(origin, { method: 'POST', body: form });
   return request(new Uint8Array(await real.arrayBuffer()), real.headers.get('content-type'), extra, gate);
 }
@@ -208,7 +205,6 @@ for (const [name, run] of uploads) {
     assert.ok(state.events.indexOf('parseBudget') < state.events.indexOf('reader'));
     const work = state.events.indexOf(name === 'lottery' ? 'decode' : 'business');
     assert.ok(state.events.indexOf('consume') < work);
-    if (name === 'share') assert.equal(state.events[0], 'admin');
     assert.equal(state.rate, name === 'knowledge' || name === 'lottery' ? 1 : 0);
   });
   test(name + ' atomic consume still rejects race after parse without service/decoder', async () => {
@@ -279,11 +275,6 @@ for (const [name, run] of uploads) {
     assert.equal((await run(await multipart(name))).status, 201);
   });
 }
-test('share rejects album-only period field without write quota', async () => {
-  reset();
-  assert.equal((await handleActivityShares(await multipart('share', 'period'), 'upload', id)).status, 400);
-  assert.equal(state.quota, 0);
-});
 for (const [name, run, max] of jsonRoutes) {
   for (const [label, headers] of [
     ['foreign-origin', { origin: 'https://attacker.invalid' }],
