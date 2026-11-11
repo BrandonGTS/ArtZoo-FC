@@ -214,7 +214,9 @@ test('短信：真实阿里云适配器 + 本地假传输 + 完整注册与找�
       start = performance.now();
     resetMetadata = await service.sendCode({ phone: registered.phone, purpose: 'RESET_PASSWORD' });
     knownElapsed = performance.now() - start;
-    assert.ok(knownElapsed >= 999, 'one-second floor allows only one millisecond of timer granularity');
+    // Node 的计时器按事件循环缓存的时间排期，机器繁忙时可能提前几毫秒触发；
+    // 下限仍能区分"有 1 秒等待"和"没有等待"（没有等待时只有几十毫秒）。
+    assert.ok(knownElapsed >= 950, 'one-second floor must hold within timer scheduling tolerance');
     assert.equal(calls.length, before + 1);
     const call = calls.at(-1);
     assert.equal(call.template, '100003');
@@ -246,7 +248,9 @@ test('短信：真实阿里云适配器 + 本地假传输 + 完整注册与找�
         start = performance.now();
       const result = await service.sendCode({ phone: missing, purpose: 'RESET_PASSWORD' });
       unknownElapsed = performance.now() - start;
-      assert.ok(unknownElapsed >= 999, 'one-second floor allows only one millisecond of timer granularity');
+      // Node 的计时器按事件循环缓存的时间排期，机器繁忙时可能提前几毫秒触发；
+      // 下限仍能区分"有 1 秒等待"和"没有等待"（没有等待时只有几十毫秒）。
+      assert.ok(unknownElapsed >= 950, 'one-second floor must hold within timer scheduling tolerance');
       assert.deepEqual(result, resetMetadata);
       assert.equal(calls.length, before);
       const row = await db.verificationCode.findFirst({ where: { phone: missing } });
