@@ -50,4 +50,4 @@
 - `packages/db/src/lottery-maintenance.ts`：开奖流程、补发通知。
 - `packages/db/src/lottery-eligibility.ts`：按指定时刻读取资格。
 - `packages/domain/src/lottery-contract.ts`：抽取算法（`randomInt` 加 Fisher–Yates 洗牌）和各项限制。
-- 迁移 `20261019160000_lottery`、`20261019163000_lottery_eligibility`、`20261108000000_single_content_moderation`：触发器和约束。
+- 初始迁移 `20261111000000_init`（由旧迁移 `20261019160000_lottery`、`20261019163000_lottery_eligibility`、`20261108000000_single_content_moderation` 等合并而来）：触发器和约束。
