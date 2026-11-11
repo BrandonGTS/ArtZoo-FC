@@ -70,7 +70,10 @@ export async function bridgePostgresCases({ f, auth, service, check, token, fres
       )
     ).activity;
     const row = await db.activity.findUniqueOrThrow({ where: { id: activity.id } });
-    await db.$transaction((tx) => enqueueQqActivityNotifications(tx, row, 'PUBLISHED', s.target, now));
+    // 传入固定时钟：计划时间不受等锁耗时影响，领取时刻（now）一定不早于计划时刻。
+    await db.$transaction((tx) =>
+      enqueueQqActivityNotifications(tx, row, 'PUBLISHED', s.target, now, () => now)
+    );
     const c = await s.bridge.claim(s.body);
     assert.ok(c.delivery);
     const identity = { ...s.body, delivery_id: c.delivery.delivery_id, claim_token: c.delivery.claim_token };

@@ -72,6 +72,16 @@ test('QQ 报名码与按钮报名（数据库）', async (t) => {
         )
       ).activity;
     }
+    // 入队时产品会把等锁耗时加到计划时间上；入队后把测试时钟推进到计划时间，紧接着的领取才不会早于它。
+    async function enqueueAndReach(a) {
+      await f.db.$transaction((tx) =>
+        enqueueQqActivityNotificationsById(tx, a.id, 'PUBLISHED', config.target, now)
+      );
+      const pending = await f.db.qqOfficialDelivery.findFirstOrThrow({
+        where: { activityId: a.id, kind: 'PUBLISHED', ...scope }
+      });
+      now = new Date(Math.max(now.getTime(), pending.dueAt.getTime()));
+    }
     async function claimActivity(a) {
       await f.db.$transaction((tx) =>
         enqueueQqActivityNotificationsById(tx, a.id, 'PUBLISHED', config.target, now)
@@ -427,9 +437,7 @@ test('QQ 报名码与按钮报名（数据库）', async (t) => {
     });
     await check('old frozen notices keep their content and have no retroactive code or button', async () => {
       const old = await create();
-      await f.db.$transaction((tx) =>
-        enqueueQqActivityNotificationsById(tx, old.id, 'PUBLISHED', config.target, now)
-      );
+      await enqueueAndReach(old);
       const row = await f.db.qqOfficialDelivery.findFirstOrThrow({
         where: { activityId: old.id, kind: 'PUBLISHED' }
       });
@@ -492,9 +500,7 @@ test('QQ 报名码与按钮报名（数据库）', async (t) => {
     );
     await check('button opt-in is frozen per delivery and absent by default', async () => {
       const activity = await create();
-      await f.db.$transaction((tx) =>
-        enqueueQqActivityNotificationsById(tx, activity.id, 'PUBLISHED', config.target, now)
-      );
+      await enqueueAndReach(activity);
       const normal = new QqBridgeService(auth, { ...config, signupButtons: undefined });
       const t = (await normal.claim(wire)).delivery;
       assert.equal(

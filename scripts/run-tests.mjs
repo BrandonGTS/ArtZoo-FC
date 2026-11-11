@@ -105,14 +105,22 @@ await Promise.all(
   })
 );
 const failed = results.filter((r) => !r.ok);
-for (const r of failed)
-  console.log(
-    `\n──── ${r.file} ────\n${r.out
-      .split('\n')
-      .filter((l) => !/^\s*(ok|# Subtest)/.test(l))
-      .slice(-60)
-      .join('\n')}`
-  );
+// 失败时只打印失败的用例：每个 "not ok" 行连同它下面的错误信息。
+// 外层汇总用例（错误为 "N subtests failed"）不重复打印。找不到时退回打印输出末尾。
+function failureReport(out) {
+  const lines = out.split('\n'),
+    blocks = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^\s*not ok \d+/.test(lines[i])) continue;
+    const block = [lines[i]];
+    for (let j = i + 1; j < lines.length && !/^\s*(not ok|ok) \d+|^\s*# Subtest/.test(lines[j]); j++)
+      block.push(lines[j]);
+    if (block.some((l) => /error: '\d+ subtests? failed'/.test(l))) continue;
+    blocks.push(block.slice(0, 40).join('\n'));
+  }
+  return blocks.length ? blocks.join('\n\n') : lines.slice(-60).join('\n');
+}
+for (const r of failed) console.log(`\n──── ${r.file} ────\n${failureReport(r.out)}`);
 const sum = (k) => results.reduce((n, r) => n + r[k], 0);
 console.log(
   `\n共 ${results.length} 个文件、${sum('tests')} 个用例：通过 ${sum('pass')}，失败 ${sum('fail')}；失败文件 ${failed.length} 个。`
