@@ -11,6 +11,7 @@ scope_label="artzoo.image-check=$token"
 partial=''
 declare -A refs=() ids=()
 roles=()
+config_files=(compose.yaml .env.example images.env deployment-compose-check.sh)
 
 fail() { printf '错误：%s\n' "$*" >&2; exit 1; }
 usage() {
@@ -69,7 +70,7 @@ trap 'exit 143' TERM
 load_bundle() {
   [[ -d "$1" ]] || fail '发布包目录不存在。'
   bundle=$(realpath -e -- "$1")
-  local file hash extra name role ref id platform version='' current
+  local file hash extra name role ref id platform version='' current config_count=0 expected actual
   local -A sums=() seen=()
   for file in SHA256SUMS images.tsv images.tar source.txt deployment-images.sh deployment-image-check.mjs; do
     [[ -f "$bundle/$file" && ! -L "$bundle/$file" ]] || fail "发布包缺少普通文件：$file"
@@ -77,11 +78,23 @@ load_bundle() {
   # Never source package metadata or accept checksum paths outside the bundle.
   while read -r hash name extra || [[ -n "${hash:-}${name:-}${extra:-}" ]]; do
     [[ "$hash" =~ ^[0-9a-f]{64}$ && -z "$extra" ]] || fail '校验清单格式错误。'
-    case "$name" in images.tsv|images.tar|source.txt|deployment-images.sh|deployment-image-check.mjs) ;; *) fail '校验清单包含非预期路径。';; esac
+    case "$name" in
+      images.tsv|images.tar|source.txt|deployment-images.sh|deployment-image-check.mjs) ;;
+      compose.yaml|.env.example|images.env|deployment-compose-check.sh) config_count=$((config_count + 1)) ;;
+      *) fail '校验清单包含非预期路径。';;
+    esac
     [[ -z "${sums[$name]:-}" ]] || fail '校验清单含重复文件。'
     sums[$name]=1
   done < "$bundle/SHA256SUMS"
-  ((${#sums[@]} == 5)) || fail '校验清单不完整。'
+  [[ "$config_count" == 0 || "$config_count" == 4 ]] || fail '运行模板清单不完整。'
+  ((${#sums[@]} == 5 + config_count)) || fail '校验清单不完整。'
+  for file in "${config_files[@]}"; do
+    if [[ "$config_count" == 4 ]]; then
+      [[ -f "$bundle/$file" && ! -L "$bundle/$file" ]] || fail "发布包缺少普通文件：$file"
+    else
+      [[ ! -e "$bundle/$file" && ! -L "$bundle/$file" ]] || fail '发现未经校验的运行模板。'
+    fi
+  done
   (cd -- "$bundle" && sha256sum --check --strict SHA256SUMS) || fail '发布包校验失败；请重新传输。'
   refs=(); ids=(); roles=()
   while read -r role ref id platform extra || [[ -n "${role:-}${ref:-}${id:-}${platform:-}${extra:-}" ]]; do
@@ -95,6 +108,17 @@ load_bundle() {
     seen[$role]=1; refs[$role]=$ref; ids[$role]=$id; roles+=("$role")
   done < "$bundle/images.tsv"
   ((${#roles[@]} > 0)) || fail '镜像清单为空。'
+  if [[ "$config_count" == 4 ]]; then
+    expected=$(image_environment)
+    actual=$(cat -- "$bundle/images.env")
+    [[ "$actual" == "$expected" ]] || fail 'images.env 与镜像清单不一致。'
+  fi
+}
+image_environment() {
+  local role
+  for role in web worker tools; do
+    [[ -z "${refs[$role]:-}" ]] || printf 'ARTZOO_%s_IMAGE=%s\n' "${role^^}" "${refs[$role]}"
+  done
 }
 image_matches() {
   local actual
@@ -234,6 +258,8 @@ build_bundle() {
   mkdir -p -- "$output"
   partial=$(mktemp -d "$output/.artzoo-build.XXXXXX")
   cp -- "$script_path" "$helper" "$partial/"
+  cp -- "$root/deployment/compose.yaml" "$root/deployment/.env.example" "$partial/"
+  cp -- "$root/scripts/deployment-compose-check.sh" "$partial/"
   roles=(web worker tools)
   [[ "$target" == all ]] || roles=("$target")
   for role in "${roles[@]}"; do
@@ -247,12 +273,13 @@ build_bundle() {
   [[ "$(git -C "$root" rev-parse HEAD)" == "$commit" && "$(git -C "$root" status --porcelain=v1 --untracked-files=all)" == "$status" ]] || fail '构建期间 Git 状态发生变化，请重新构建。'
   helper="$partial/deployment-image-check.mjs"
   basic_checks
-  printf 'format=1\nrelease=%s\ncommit=%s\nworktree=%s\nplatform=linux/amd64\ntarget=%s\n' \
+  image_environment > "$partial/images.env"
+  printf 'format=2\nrelease=%s\ncommit=%s\nworktree=%s\nplatform=linux/amd64\ntarget=%s\n' \
     "$release" "$commit" "$state" "$target" > "$partial/source.txt"
   local images=()
   for role in "${roles[@]}"; do images+=("${refs[$role]}"); done
   d image save "${images[@]}" > "$partial/images.tar"
-  (cd -- "$partial" && sha256sum images.tar images.tsv source.txt deployment-images.sh deployment-image-check.mjs > SHA256SUMS)
+  (cd -- "$partial" && sha256sum images.tar images.tsv source.txt deployment-images.sh deployment-image-check.mjs "${config_files[@]}" > SHA256SUMS)
   [[ ! -e "$output/$release" ]] || fail '发布目录已存在。'
   mv -T -- "$partial" "$output/$release"
   partial=''
