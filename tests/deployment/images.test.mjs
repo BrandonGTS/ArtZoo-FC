@@ -190,3 +190,28 @@ test('checksummed image environment must match the manifest without executing it
     assert.equal(f.calls(), '');
   }
 });
+
+test('verify checks the package without contacting Docker', (t) => {
+  const f = fixture(t);
+  addConfiguration(f);
+  assert.equal(f.run('verify', f.bundle).status, 0);
+  assert.equal(f.calls(), '');
+});
+
+test('maintenance entry is accepted only when checksummed with complete templates', (t) => {
+  const f = fixture(t);
+  addConfiguration(f);
+  const entry = join(f.bundle, 'deployment-maintenance.sh');
+  writeFileSync(entry, '#!/usr/bin/env bash\n');
+  assert.equal(f.run('verify', f.bundle).status, 1);
+  const sums = join(f.bundle, 'SHA256SUMS');
+  writeFileSync(
+    sums,
+    readFileSync(sums, 'utf8') +
+      `${createHash('sha256').update(readFileSync(entry)).digest('hex')}  deployment-maintenance.sh\n`
+  );
+  assert.equal(f.run('verify', f.bundle).status, 0);
+  writeFileSync(entry, 'changed');
+  assert.equal(f.run('verify', f.bundle).status, 1);
+  assert.equal(f.calls(), '');
+});
