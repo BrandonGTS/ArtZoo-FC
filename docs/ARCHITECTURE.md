@@ -1,6 +1,6 @@
 # ArtZoo 架构
 
-本文介绍代码怎么分层、一个请求怎么流转、关键数据规则落在哪里、后台任务做什么，以及有哪些配置开关。所有内容都对照代码版本 `fa643541` 核对过。
+本文介绍代码怎么分层、一个请求怎么流转、关键数据规则落在哪里、后台任务做什么，以及有哪些配置开关。业务结构基于代码版本 `fa643541` 整理；第九节的部署交付流程以当前 Dockerfile 和脚本为准。
 
 业务规则（例如退出扣几分）不在本文范围内，请看 `rules/`。
 
@@ -258,6 +258,66 @@ flowchart LR
 
 ---
 
-## 九、即将变化的部分
+## 九、部署镜像与交付
 
-阶段 5（新部署）完成后，本文相应章节会同步更新。各阶段的具体备忘见 [PLAN.md](PLAN.md) 第三节。
+开发和运行分离：开发端保留仓库并构建镜像，运行端只安装 Docker，接收发布包和运行配置，不拉取源码，也不需要安装 Node、pnpm 或 Python。家庭部署可使用同一台 Windows 上的两个独立 WSL；以后 Linux 服务器沿用相同发布包格式。
+
+`Dockerfile` 提供三个目标：
+
+| 镜像 | 内容与用途 |
+|---|---|
+| web | Next standalone、静态资源、独立 BMP 线程及其生产依赖 |
+| worker | 编译后的后台程序及独立生产依赖，默认要求数据库配置 |
+| tools | Prisma CLI、迁移、编译后的共享包和受保护的超管初始化入口；默认启动只显示说明 |
+
+镜像使用同一 Node 基础镜像和锁文件，以 UID/GID 1000 运行。`.dockerignore` 只允许构建输入进入上下文，排除宿主依赖、私有配置、密钥和运行数据。媒体持久化由运行配置负责，镜像中不包含上传数据。
+
+### 开发端：构建发布包
+
+在开发仓库根目录执行，脚本会在需要时请求本机 Docker 的 sudo 权限；不要给整个脚本加 sudo。依赖 Bash、Git、Docker Buildx 和常用 GNU 工具，不依赖宿主 Node。
+
+```bash
+# 正式候选包：必须是干净工作区，默认输出三个镜像。
+bash scripts/deployment-images.sh build --output "$HOME/artzoo-releases"
+
+# 开发验证：允许未提交改动，只输出 web 镜像。
+bash scripts/deployment-images.sh build --output "$HOME/artzoo-releases" --target web --allow-dirty
+```
+
+脚本构建后先运行基础检查，再导出镜像。输出目录必须在仓库外；每次生成独立版本目录和镜像标签，不覆盖已有发布包。`--target` 支持 `all`、`web`、`worker`、`tools`。允许未提交改动或只输出部分镜像的包使用 `dev-` 标签，不能当作可按提交重建的正式候选包。
+
+完整发布目录包含 `images.tar`、`images.tsv`、`source.txt`、`SHA256SUMS` 和两个部署脚本。`source.txt` 记录提交、工作区状态、目标及平台，`images.tsv` 记录镜像 ID。包内不包含站点密码或运行配置。构建会占用 CPU、内存和磁盘；失败时不会发布最终目录，会报告保留的 `.artzoo-build.*` 临时目录，核对后可手动清理再重试。已构建的镜像和缓存不自动删除。
+
+### 运行端：导入与验证
+
+将整个发布目录复制到运行端。家庭 WSL 可以直接读取 Windows 共享盘上的目录；远程服务器通过 SSH/SCP 传输到操作者选择的发布目录。不要只复制 `images.tar`。下列 `bundle` 应替换为实际目录；命令可以在运行端任意目录执行。
+
+```bash
+bundle=/srv/artzoo/releases/实际发布包目录
+bash "$bundle/deployment-images.sh" import "$bundle"
+bash "$bundle/deployment-images.sh" check "$bundle"
+```
+
+导入先校验固定文件清单及 SHA-256，再加载镜像并核对 ID 和平台；已存在相同 ID 的版本可重复导入，不同 ID 的同名标签会被拒绝。校验失败时重新传输，不绕过检查。校验只能检查传输完整性，不是发布者签名，发布包必须来自可信开发端。
+
+基础检查使用临时容器，验证 UID、应用目录中的私有配置与运行数据、BMP 转换和损坏图片拒绝、web HTTP/静态资源/图片优化、worker 数据库依赖及缺库拒绝、tools CLI 与初始化入口保护。web 不连接数据库，健康接口应返回 503；检查不发布端口、不挂载业务数据，也不验证 Windows 转发、局域网 HTTPS 或登录上传。
+
+### 隔离数据库检查
+
+**【危险：仅临时测试库】** 下面的命令会在新建的隔离 PostgreSQL 中执行迁移、写入测试记录并运行 worker 清理。只适用于同时包含 worker 和 tools 的包；不会读取站点环境文件或连接已有数据库。
+
+```bash
+bash "$bundle/deployment-images.sh" check "$bundle" --database
+```
+
+该检查使用与 CI 对齐的 PostgreSQL 镜像，缺少时会下载；数据库存储使用临时内存文件系统，网络不连外网、不发布端口。检查空库迁移、重复迁移、Prisma 结构差异，以及清理关闭、开启和重复运行时的记录变化。媒体配额、媒体删除和官方活动采集保持关闭。
+
+正常退出、失败或收到 INT/TERM 时，脚本只清理本次带唯一标识的测试容器和网络，不使用全局 prune。主机断电或进程被强制终止时可能留下测试资源，可按 `artzoo.image-check` 标签核对后单独清理；不要删除其他任务资源。检查结果以终端的 `PASS` 和退出码 0 为准，日志如需保存应放在仓库外。
+
+### 与正式启用的边界
+
+构建、导入和检查都不会修改正在运行的网站。正式启用时由运行配置引用核对过的版本标签；保留上一版本镜像与发布包，供单独评估回退。数据库迁移、媒体基线和首位超管初始化仍需单独核对目标后执行，不能隐含在网站启动或导入过程中；数据库结构变化不能仅靠换回旧镜像撤销。
+
+tools 中直接调用 `/app/packages/db/node_modules/.bin/prisma`，工作目录为 `/app/packages/db`，避免 `pnpm exec` 在运行时检查并尝试调整依赖。`ARTZOO_DEPLOYMENT_ENV` 用于站点部署策略；构建时不要把 `NODE_ENV` 固定为 `development`。
+
+Compose、Caddy、持久化、启动恢复及业务验收的任务和状态仍以 [PLAN.md](PLAN.md) 第三节为唯一入口，本节不另建待办清单。
