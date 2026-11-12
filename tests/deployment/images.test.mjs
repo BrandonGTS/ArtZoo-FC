@@ -141,3 +141,52 @@ test('database verification requires worker and tools before Docker is contacted
   assert.equal(f.run('check', f.bundle, '--database').status, 1);
   assert.equal(f.calls(), '');
 });
+
+function addConfiguration(f, imageEnv = `ARTZOO_WEB_IMAGE=${ref}\n`) {
+  for (const [file, content] of Object.entries({
+    'compose.yaml': 'services: {}\n',
+    'deployment-compose-check.sh': '#!/usr/bin/env bash\n',
+    '.env.example': 'POSTGRES_PASSWORD=\n',
+    'images.env': imageEnv
+  }))
+    writeFileSync(join(f.bundle, file), content);
+  const all = [...files, 'compose.yaml', '.env.example', 'images.env', 'deployment-compose-check.sh'];
+  writeFileSync(
+    join(f.bundle, 'SHA256SUMS'),
+    all
+      .map(
+        (file) =>
+          `${createHash('sha256')
+            .update(readFileSync(join(f.bundle, file)))
+            .digest('hex')}  ${file}\n`
+      )
+      .join('')
+  );
+}
+test('configuration travels with the verified bundle and repeat import remains safe', (t) => {
+  const f = fixture(t);
+  addConfiguration(f);
+  for (let attempt = 0; attempt < 2; attempt++) assert.equal(f.run('import', f.bundle).status, 0);
+  assert.doesNotMatch(f.calls(), /image load| run | start /);
+});
+test('modified, incomplete and unchecked runtime templates are refused before Docker', (t) => {
+  for (const variant of ['modified', 'incomplete', 'unchecked']) {
+    const f = fixture(t);
+    if (variant !== 'unchecked') addConfiguration(f);
+    if (variant === 'incomplete') rmSync(join(f.bundle, '.env.example'));
+    else writeFileSync(join(f.bundle, 'compose.yaml'), 'modified\n');
+    assert.equal(f.run('import', f.bundle).status, 1);
+    assert.equal(f.calls(), '');
+  }
+});
+test('checksummed image environment must match the manifest without executing its contents', (t) => {
+  for (const content of [
+    `ARTZOO_WEB_IMAGE=artzoo-web:local\n`,
+    `ARTZOO_WEB_IMAGE=${ref}\nEXTRA=$(exit 0)\n`
+  ]) {
+    const f = fixture(t);
+    addConfiguration(f, content);
+    assert.equal(f.run('import', f.bundle).status, 1);
+    assert.equal(f.calls(), '');
+  }
+});

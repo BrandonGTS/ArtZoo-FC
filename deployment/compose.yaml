@@ -1,0 +1,119 @@
+name: artzoo
+
+x-app-environment: &app-environment
+  ARTZOO_DEPLOYMENT_ENV: production
+  ARTZOO_PUBLIC_ORIGIN: ${ARTZOO_PUBLIC_ORIGIN:?Set the exact HTTPS origin}
+  ARTZOO_TRUSTED_PROXY: ${ARTZOO_TRUSTED_PROXY:-}
+  ARTZOO_AVATAR_DIR: /app/storage/avatars
+  ARTZOO_MEDIA_BUDGET_ENABLED: '0'
+  ARTZOO_MEDIA_CLEANUP_EXECUTE: '0'
+  ARTZOO_OFFICIAL_SYNC_ENABLED: '0'
+  ARTZOO_QQ_MODE: ''
+  ARTZOO_SMS_PROVIDER: unconfigured
+  PGHOST: postgres
+  PGPORT: '5432'
+  PGUSER: artzoo
+  PGDATABASE: artzoo
+  PGPASSWORD: ${POSTGRES_PASSWORD:?Set a random hexadecimal database password}
+
+x-media: &media
+  - type: bind
+    source: ${ARTZOO_MEDIA_ROOT:?Set an absolute media directory}/original
+    target: /app/storage/original
+    bind:
+      create_host_path: false
+  - type: bind
+    source: ${ARTZOO_MEDIA_ROOT:?Set an absolute media directory}/derived
+    target: /app/storage/derived
+    bind:
+      create_host_path: false
+  - type: bind
+    source: ${ARTZOO_MEDIA_ROOT:?Set an absolute media directory}/avatars
+    target: /app/storage/avatars
+    bind:
+      create_host_path: false
+
+x-app: &app
+  platform: linux/amd64
+  pull_policy: never
+  user: '1000:1000'
+  init: true
+  restart: unless-stopped
+  stop_grace_period: 30s
+  depends_on:
+    postgres:
+      condition: service_healthy
+  volumes: *media
+  networks: [backend, outbound]
+
+services:
+  postgres:
+    image: postgres:17.11-bookworm
+    platform: linux/amd64
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_USER: artzoo
+      POSTGRES_DB: artzoo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a random hexadecimal database password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U artzoo -d artzoo']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  web:
+    <<: *app
+    image: ${ARTZOO_WEB_IMAGE:?Load images.env from the verified release}
+    environment:
+      <<: *app-environment
+      ARTZOO_INVITATION_KEY: ${ARTZOO_INVITATION_KEY:?Set a random invitation signing key}
+      ARTZOO_SECURITY_CLEANUP_ENABLED: '0'
+      PG_POOL_MAX: '10'
+    ports:
+      - target: 3100
+        published: ${ARTZOO_HTTP_PORT:-13100}
+        host_ip: 127.0.0.1
+        protocol: tcp
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3100/api/health',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  worker:
+    <<: *app
+    image: ${ARTZOO_WORKER_IMAGE:?Load images.env from the verified release}
+    environment:
+      <<: *app-environment
+      ARTZOO_SECURITY_CLEANUP_ENABLED: '1'
+      PG_POOL_MAX: '3'
+
+  tools:
+    <<: *app
+    image: ${ARTZOO_TOOLS_IMAGE:?Load images.env from the verified release}
+    profiles: [maintenance]
+    restart: 'no'
+    environment:
+      <<: *app-environment
+      ARTZOO_SECURITY_CLEANUP_ENABLED: '0'
+      DATABASE_URL: postgresql://artzoo:${POSTGRES_PASSWORD:?Set a random hexadecimal database password}@postgres:5432/artzoo?schema=public
+
+volumes:
+  postgres-data:
+
+networks:
+  backend:
+    internal: true
+  outbound:
