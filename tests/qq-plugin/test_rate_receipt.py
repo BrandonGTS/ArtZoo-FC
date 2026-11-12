@@ -163,9 +163,10 @@ class RateReceiptTests(unittest.IsolatedAsyncioTestCase):
         async def slow_post(path,body):
             await asyncio.sleep(.3);return await original_post(path,body)
         rt.bridge.post=slow_post
-        # Same timing ratios, with room for CI scheduler stalls beyond the old 50ms lease.
-        # Ten serialized .3s sends still make tail replies wait through several .5s leases.
-        with patch.object(policy,'LEASE_SECONDS',.5),patch.object(policy,'HEARTBEAT_SECONDS',.1),patch.object(policy,'MAX_REPLY_SECONDS',20):
+        # A 1s lease tolerates CI scheduler stalls of up to .9s between .1s heartbeats
+        # (a .5s lease failed on CI). Ten serialized .3s sends still make tail replies
+        # wait through about three leases, so a missing heartbeat is still caught.
+        with patch.object(policy,'LEASE_SECONDS',1.0),patch.object(policy,'HEARTBEAT_SECONDS',.1),patch.object(policy,'MAX_REPLY_SECONDS',20):
             jobs=[rt.sender.deliver(self.task(1),self.scope,self.api,begin=self.begun)]
             jobs.extend(rt.handle(self.event('e'+str(i),'m'+str(i))) for i in range(9))
             await asyncio.gather(*jobs)
