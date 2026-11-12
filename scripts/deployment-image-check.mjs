@@ -95,6 +95,69 @@ if (mode === 'runtime') {
   const ports = await import('./apps/web/server/auth/ports.ts');
   assert.equal(typeof owner.runOwnerInitialization, 'function');
   assert.equal(ports.mainlandChinaPhone.ready, true);
+} else if (mode === 'media-baseline') {
+  // Only invoked by --database against its freshly migrated disposable database.
+  assert.equal(process.env.PGDATABASE, 'artzoo_image_test');
+  assert.equal(process.getuid(), 1000);
+  const { spawnSync } = await import('node:child_process');
+  const { writeFileSync, unlinkSync } = await import('node:fs');
+  const { getDatabase, disconnectDatabase } = await import('./packages/db/dist/index.js');
+  const db = getDatabase();
+  const state = () => db.mediaBudgetState.findUnique({ where: { id: 'global' } });
+  const invoke = (expected, extra = []) => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        '/app/scripts/media-baseline-cli.mjs',
+        '--offline',
+        '--expect-database',
+        'artzoo_image_test',
+        ...extra
+      ],
+      { encoding: 'utf8', timeout: 10000 }
+    );
+    // Never echo subprocess diagnostics or connection environment on failure.
+    assert.equal(result.status, expected, 'Unexpected maintenance CLI exit status');
+    assert.ok(!(result.stdout + result.stderr).includes(process.env.PGPASSWORD));
+    return result.stdout;
+  };
+  try {
+    assert.equal(await state(), null);
+    invoke(1, ['--force']);
+    for (const directory of ['original', 'derived', 'avatars']) {
+      const path = `/app/storage/${directory}/synthetic-probe`;
+      writeFileSync(path, '', { mode: 0o600 });
+      invoke(1);
+      assert.equal(await state(), null);
+      unlinkSync(path);
+    }
+    await db.mediaDailyBudget.create({ data: { accountId: 'synthetic-baseline', day: '2026-01-01' } });
+    invoke(1);
+    assert.equal(await state(), null);
+    await db.mediaDailyBudget.deleteMany({ where: { accountId: 'synthetic-baseline' } });
+    assert.match(invoke(0), /: initialized\./);
+    const initial = await state();
+    assert.equal(initial.baselineBytes, 0n);
+    assert.match(invoke(0), /: already-initialized\./);
+    assert.deepEqual(await state(), initial);
+    await db.mediaBudgetState.update({
+      where: { id: 'global' },
+      data: { committedBytes: 11n, reservedBytes: 7n }
+    });
+    const used = await state();
+    writeFileSync('/app/storage/avatars/synthetic-later-upload', 'synthetic', { mode: 0o600 });
+    assert.match(invoke(0), /: already-initialized\./);
+    assert.deepEqual(await state(), used);
+    await db.mediaBudgetState.update({
+      where: { id: 'global' },
+      data: { baselineFingerprint: 'a'.repeat(64) }
+    });
+    const conflicting = await state();
+    invoke(1);
+    assert.deepEqual(await state(), conflicting);
+  } finally {
+    await disconnectDatabase();
+  }
 } else if (mode === 'database-module') {
   const db = await import('@artzoo/db');
   assert.equal(typeof db.PrismaClient, 'function');

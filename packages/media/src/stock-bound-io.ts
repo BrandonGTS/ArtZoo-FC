@@ -66,6 +66,35 @@ function description(map: WeakMap<object, BoundDescription>, ticket: object) {
 }
 export const verifiedBoundWrite = (ticket: object) => description(written, ticket);
 export const verifiedBoundRemoval = (ticket: object) => description(removed, ticket);
+/** Shared trust check for persistent media directories; never creates directories. */
+export async function trustedMediaDirectoryIdentity(root: string) {
+  if (!isAbsolute(root) || resolve(root) !== root || root === '/') throw Error('MEDIA_BOUND_ROOT');
+  let current = '/';
+  let namespaceIdentity: string[] | undefined;
+  if (typeof process.getuid !== 'function') throw Error('MEDIA_BOUND_PLATFORM');
+  const uid = BigInt(process.getuid());
+  const top = await lstat('/', { bigint: true });
+  if (!top.isDirectory() || top.isSymbolicLink() || top.uid !== 0n || (top.mode & 0o022n) !== 0n)
+    throw Error('MEDIA_BOUND_UNTRUSTED_ROOT');
+  for (const part of root.split('/').filter(Boolean)) {
+    current = join(/* turbopackIgnore: true */ current, part);
+    const stat = await lstat(current, { bigint: true });
+    if (
+      !stat.isDirectory() ||
+      stat.isSymbolicLink() ||
+      (stat.uid !== uid && stat.uid !== 0n) ||
+      (stat.mode & 0o022n) !== 0n
+    )
+      throw Error('MEDIA_BOUND_UNTRUSTED_ROOT');
+    // Validate ALL ancestors every time; bind only the persistent namespace identity.
+    // Image/container ancestor inodes may legitimately change across a deployment.
+    namespaceIdentity = [stat.dev.toString(), stat.ino.toString(), stat.uid.toString()];
+  }
+  if ((await realpath(root)) !== root) throw Error('MEDIA_BOUND_UNTRUSTED_ROOT');
+  if (!namespaceIdentity) throw Error('MEDIA_BOUND_ROOT');
+  return namespaceIdentity;
+}
+
 /** Purely real FS proofs. No generic callback, flag, caller-provided identity or proof constructor. */
 export class BoundNamespace {
   private readonly root: string;
@@ -78,30 +107,7 @@ export class BoundNamespace {
     if (this.root === '/') throw Error('MEDIA_BOUND_ROOT');
   }
   private async rootIdentity() {
-    let current = '/';
-    let namespaceIdentity: string[] | undefined;
-    if (typeof process.getuid !== 'function') throw Error('MEDIA_BOUND_PLATFORM');
-    const uid = BigInt(process.getuid());
-    const top = await lstat('/', { bigint: true });
-    if (!top.isDirectory() || top.isSymbolicLink() || top.uid !== 0n || (top.mode & 0o022n) !== 0n)
-      throw Error('MEDIA_BOUND_UNTRUSTED_ROOT');
-    for (const part of this.root.split('/').filter(Boolean)) {
-      current = join(/* turbopackIgnore: true */ current, part);
-      const stat = await lstat(current, { bigint: true });
-      if (
-        !stat.isDirectory() ||
-        stat.isSymbolicLink() ||
-        (stat.uid !== uid && stat.uid !== 0n) ||
-        (stat.mode & 0o022n) !== 0n
-      )
-        throw Error('MEDIA_BOUND_UNTRUSTED_ROOT');
-      // Validate ALL ancestors every time; bind only the persistent namespace identity.
-      // Image/container ancestor inodes may legitimately change across a deployment.
-      namespaceIdentity = [stat.dev.toString(), stat.ino.toString(), stat.uid.toString()];
-    }
-    if ((await realpath(this.root)) !== this.root) throw Error('MEDIA_BOUND_UNTRUSTED_ROOT');
-    if (!namespaceIdentity) throw Error('MEDIA_BOUND_ROOT');
-    return boundHash([this.kind, this.root, namespaceIdentity]);
+    return boundHash([this.kind, this.root, await trustedMediaDirectoryIdentity(this.root)]);
   }
   private path(id: string, part: Part) {
     if (!isMemberId(id)) throw Error('MEDIA_BOUND_KEY');

@@ -211,6 +211,14 @@ database_checks() {
   migrate migrate deploy
   migrate migrate status
   migrate migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+  # Three ephemeral media mounts survive all CLI subprocesses within this one tools container.
+  d run --rm --interactive --network "$network" --label "$scope_label" --entrypoint node \
+    --tmpfs /app/storage/original:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700 \
+    --tmpfs /app/storage/derived:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700 \
+    --tmpfs /app/storage/avatars:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700 \
+    --env PGHOST="$db" --env PGPORT=5432 --env PGUSER=image_test --env PGDATABASE=artzoo_image_test \
+    --env PGPASSWORD="$password" --env ARTZOO_AVATAR_DIR=/app/storage/avatars \
+    "${refs[tools]}" --input-type=module - media-baseline < "$helper"
   worker_once 0
   sql <<'SQL'
 INSERT INTO "AccountRateEvent" ("id", "key", "createdAt") VALUES
@@ -226,7 +234,7 @@ SQL
   worker_once 1
   count=$(sql <<< 'SELECT id FROM "AccountRateEvent";')
   [[ "$count" == image-test-current ]] || fail '重复清理结果异常。'
-  printf 'PASS: 隔离空库迁移、重复迁移、结构对比及 worker 清理。\n'
+  printf 'PASS: 隔离空库迁移、重复迁移、结构对比、媒体基线及 worker 清理。\n'
 }
 
 build_bundle() {
