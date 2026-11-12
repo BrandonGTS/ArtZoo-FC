@@ -155,3 +155,5 @@ export * from './media-album-comment-orphan.js';
 
 export { processMediaOrphanCompletion } from './media-orphan-completion.js';
 export type { MediaOrphanCompletionOptions, MediaOrphanCompletionResult } from './media-orphan-completion.js';
+
+export { lockEmptyMediaBaselineTarget, assertEmptyMediaBaselineTarget } from './media-baseline.js';
