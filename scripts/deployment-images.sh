@@ -12,16 +12,19 @@ partial=''
 declare -A refs=() ids=()
 roles=()
 config_files=(compose.yaml .env.example images.env deployment-compose-check.sh)
+maintenance_file=deployment-maintenance.sh
 
 fail() { printf '错误：%s\n' "$*" >&2; exit 1; }
 usage() {
   cat <<'HELP'
 用法：
   bash scripts/deployment-images.sh build [--output 目录] [--target all|web|worker|tools] [--allow-dirty]
+  bash deployment-images.sh verify 发布包目录
   bash deployment-images.sh import 发布包目录
   bash deployment-images.sh check 发布包目录 [--database]
 
 build：开发端构建、基础验证并导出；默认三个镜像、干净工作区，输出到仓库外。
+verify：仅验证文件清单和校验和，不连接 Docker。
 import：运行端校验并导入；不启动或替换网站。重复导入同一版本可安全跳过。
 check：运行端临时容器验收。--database 额外创建隔离空库，执行迁移和 worker 写操作。
 服务器只需要 Bash、Docker 和常用 GNU 工具；不需要源码、Node、pnpm 或 Python。
@@ -70,7 +73,7 @@ trap 'exit 143' TERM
 load_bundle() {
   [[ -d "$1" ]] || fail '发布包目录不存在。'
   bundle=$(realpath -e -- "$1")
-  local file hash extra name role ref id platform version='' current config_count=0 expected actual
+  local file hash extra name role ref id platform version='' current config_count=0 maintenance_count=0 expected actual
   local -A sums=() seen=()
   for file in SHA256SUMS images.tsv images.tar source.txt deployment-images.sh deployment-image-check.mjs; do
     [[ -f "$bundle/$file" && ! -L "$bundle/$file" ]] || fail "发布包缺少普通文件：$file"
@@ -80,6 +83,7 @@ load_bundle() {
     [[ "$hash" =~ ^[0-9a-f]{64}$ && -z "$extra" ]] || fail '校验清单格式错误。'
     case "$name" in
       images.tsv|images.tar|source.txt|deployment-images.sh|deployment-image-check.mjs) ;;
+      deployment-maintenance.sh) maintenance_count=$((maintenance_count + 1)) ;;
       compose.yaml|.env.example|images.env|deployment-compose-check.sh) config_count=$((config_count + 1)) ;;
       *) fail '校验清单包含非预期路径。';;
     esac
@@ -87,7 +91,12 @@ load_bundle() {
     sums[$name]=1
   done < "$bundle/SHA256SUMS"
   [[ "$config_count" == 0 || "$config_count" == 4 ]] || fail '运行模板清单不完整。'
-  ((${#sums[@]} == 5 + config_count)) || fail '校验清单不完整。'
+  ((${#sums[@]} == 5 + config_count + maintenance_count)) || fail '校验清单不完整。'
+  if [[ "$maintenance_count" == 1 ]]; then
+    [[ "$config_count" == 4 && -f "$bundle/$maintenance_file" && ! -L "$bundle/$maintenance_file" ]] || fail '维护入口需要完整且经过校验的运行模板。'
+  else
+    [[ ! -e "$bundle/$maintenance_file" && ! -L "$bundle/$maintenance_file" ]] || fail '发现未经校验的维护入口。'
+  fi
   for file in "${config_files[@]}"; do
     if [[ "$config_count" == 4 ]]; then
       [[ -f "$bundle/$file" && ! -L "$bundle/$file" ]] || fail "发布包缺少普通文件：$file"
@@ -267,7 +276,7 @@ build_bundle() {
   partial=$(mktemp -d "$output/.artzoo-build.XXXXXX")
   cp -- "$script_path" "$helper" "$partial/"
   cp -- "$root/deployment/compose.yaml" "$root/deployment/.env.example" "$partial/"
-  cp -- "$root/scripts/deployment-compose-check.sh" "$partial/"
+  cp -- "$root/scripts/deployment-compose-check.sh" "$root/scripts/$maintenance_file" "$partial/"
   roles=(web worker tools)
   [[ "$target" == all ]] || roles=("$target")
   for role in "${roles[@]}"; do
@@ -282,12 +291,12 @@ build_bundle() {
   helper="$partial/deployment-image-check.mjs"
   basic_checks
   image_environment > "$partial/images.env"
-  printf 'format=2\nrelease=%s\ncommit=%s\nworktree=%s\nplatform=linux/amd64\ntarget=%s\n' \
+  printf 'format=3\nrelease=%s\ncommit=%s\nworktree=%s\nplatform=linux/amd64\ntarget=%s\n' \
     "$release" "$commit" "$state" "$target" > "$partial/source.txt"
   local images=()
   for role in "${roles[@]}"; do images+=("${refs[$role]}"); done
   d image save "${images[@]}" > "$partial/images.tar"
-  (cd -- "$partial" && sha256sum images.tar images.tsv source.txt deployment-images.sh deployment-image-check.mjs "${config_files[@]}" > SHA256SUMS)
+  (cd -- "$partial" && sha256sum images.tar images.tsv source.txt deployment-images.sh deployment-image-check.mjs "${config_files[@]}" "$maintenance_file" > SHA256SUMS)
   [[ ! -e "$output/$release" ]] || fail '发布目录已存在。'
   mv -T -- "$partial" "$output/$release"
   partial=''
@@ -300,7 +309,7 @@ command=${1:---help}
 case "$command" in
   --help|-h|help) usage ;;
   build) build_bundle "$@" ;;
-  import|check)
+  verify|import|check)
     (($# >= 1 && $# <= 2)) || fail '请指定发布包目录。'
     database=0
     if (($# == 2)); then
@@ -308,6 +317,7 @@ case "$command" in
       database=1
     fi
     load_bundle "$1"
+    if [[ "$command" == verify ]]; then printf "PASS: 发布包文件校验完成。\n"; exit 0; fi
     helper="$bundle/deployment-image-check.mjs"
     if [[ "$database" == 1 ]]; then
       [[ -n "${refs[worker]:-}" && -n "${refs[tools]:-}" ]] || fail '--database 需要同时包含 worker 和 tools 的发布包。'

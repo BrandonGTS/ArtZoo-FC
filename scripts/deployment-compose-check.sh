@@ -64,12 +64,12 @@ if (unset POSTGRES_PASSWORD ARTZOO_PUBLIC_ORIGIN ARTZOO_INVITATION_KEY; "${docke
 fi
 c up -d --wait --wait-timeout 90 postgres
 migrate() {
-  c run --rm --no-deps -T --workdir /app/packages/db --entrypoint /app/packages/db/node_modules/.bin/prisma tools migrate deploy 2>&1 |
+  c run --rm --no-deps -T --interactive=false --workdir /app/packages/db --entrypoint /app/packages/db/node_modules/.bin/prisma tools migrate deploy 2>&1 |
     sed "s/$password/[redacted]/g"
 }
 migrate
 c up -d --wait --wait-timeout 90 web worker
-output=$(c run --rm --no-deps -T worker --once --require-db)
+output=$(c run --rm --no-deps -T --interactive=false worker --once --require-db)
 c run --rm --no-deps -T --entrypoint node tools --input-type=module - worker-result "$output" ok < "$bundle/deployment-image-check.mjs"
 test -z "$(c ps --all --quiet tools)"
 db=$(c ps --quiet postgres)
@@ -83,7 +83,7 @@ test "$(d inspect --format '{{len .NetworkSettings.Networks}}' "$db")" == 1
 endpoint=$(c port web 3100)
 test "${endpoint%:*}" == 127.0.0.1
 curl --fail --silent --show-error --max-time 10 --noproxy '*' "http://$endpoint/api/health" | grep -q '"ok":true'
-test "$(c run --rm --no-deps -T tools)" == 'ArtZoo maintenance image: specify an explicit command. Nothing was changed.'
+test "$(c run --rm --no-deps -T --interactive=false tools)" == 'ArtZoo maintenance image: specify an explicit command. Nothing was changed.'
 sql() { c exec -T postgres psql -X -v ON_ERROR_STOP=1 -U artzoo -d artzoo -At; }
 sql <<'SQL'
 CREATE TABLE compose_probe (value text NOT NULL);
@@ -126,14 +126,14 @@ done
 c stop worker
 c rm -f worker
 "${root_cmd[@]}" mv -- "$temporary/media/avatars" "$temporary/media/saved-avatars"
-if c run --rm --no-deps -T --entrypoint node worker -e 'process.exit(0)' >/dev/null 2>&1; then
+if c run --rm --no-deps -T --interactive=false --entrypoint node worker -e 'process.exit(0)' >/dev/null 2>&1; then
   echo 'Missing media directory was silently accepted' >&2; exit 1
 fi
 test ! -e "$temporary/media/avatars"
 "${root_cmd[@]}" mv -- "$temporary/media/saved-avatars" "$temporary/media/avatars"
 # Wrong ownership/mode must not be repaired by the unprivileged application.
 "${root_cmd[@]}" chmod 0500 "$temporary/media/avatars"
-if c run --rm --no-deps -T --entrypoint node worker -e 'require("node:fs").writeFileSync("/app/storage/avatars/forbidden", "no")' >/dev/null 2>&1; then
+if c run --rm --no-deps -T --interactive=false --entrypoint node worker -e 'require("node:fs").writeFileSync("/app/storage/avatars/forbidden", "no")' >/dev/null 2>&1; then
   echo 'Read-only media permissions were bypassed' >&2; exit 1
 fi
 "${root_cmd[@]}" chmod 0700 "$temporary/media/avatars"
