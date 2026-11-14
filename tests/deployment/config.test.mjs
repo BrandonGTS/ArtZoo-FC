@@ -75,6 +75,21 @@ function fixture(t) {
   writeFileSync(join(root, 'bin/docker'), '#!/bin/sh\necho DOCKER_MUST_NOT_RUN >&2\nexit 99\n', {
     mode: 0o700
   });
+  // Unit fixtures model the deployed UID/GID, independently of the CI runner's
+  // account. Keep real filesystem modes and all unknown owners unchanged.
+  const identity = `
+id() { case "$1" in -u|-g) printf '1000\\n';; *) /usr/bin/id "$@";; esac; }
+stat() {
+  local result
+  result=$(/usr/bin/stat "$@") || return $?
+  if [[ "$1" == -c && "$2" == %u && "$result" == ${process.getuid()} ]]; then result=1000
+  elif [[ "$1" == -c && "$2" == %u:%g:%a ]]; then
+    result=\${result/#${process.getuid()}:${process.getgid()}:/1000:1000:}
+  fi
+  printf '%s\\n' "$result"
+}
+source "$1" "\${@:2}"
+`;
   const base = {
     COMPOSE_PROJECT_NAME: 'artzoo',
     ARTZOO_MEDIA_ROOT: `${root}/media`,
@@ -91,7 +106,17 @@ function fixture(t) {
     const before = readdirSync(join(root, 'secrets'));
     const result = spawnSync(
       'bash',
-      [join(bundle, 'deployment-maintenance.sh'), 'config-check', '--bundle', bundle, '--root', root],
+      [
+        '-c',
+        identity,
+        'fixture',
+        join(bundle, 'deployment-maintenance.sh'),
+        'config-check',
+        '--bundle',
+        bundle,
+        '--root',
+        root
+      ],
       {
         encoding: 'utf8',
         timeout: 10000,
