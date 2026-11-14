@@ -1,0 +1,36 @@
+# name|requirement (required/optional/when:NAME:VALUE/fixed)|secret (0/1)|rules (; separated)|default|services (- = host only)
+# No shell evaluation. Fixed rows describe container policy, not accepted compose.env keys.
+COMPOSE_PROJECT_NAME|required|0|project||-
+ARTZOO_MEDIA_ROOT|required|0|media-root||-
+ARTZOO_HTTP_PORT|optional|0|uint:65535|13100|-
+ARTZOO_PUBLIC_ORIGIN|required|0|origin||web,worker,tools
+ARTZOO_TRUSTED_PROXY|optional|0|enum:,caddy||web,worker,tools
+POSTGRES_PASSWORD|required|1|regex:^[0-9a-f]{64}$||-
+ARTZOO_INVITATION_KEY|required|1|regex:^[0-9a-f]{64}$||web
+ARTZOO_MEDIA_BUDGET_ENABLED|required|0|enum:0,1|0|web,worker,tools
+ARTZOO_MEDIA_GLOBAL_LIMIT_BYTES|optional|0|uint:9223372036854775807|10000000000|web,worker,tools
+ARTZOO_MEDIA_DAILY_LIMIT_BYTES|optional|0|uint:9223372036854775807;lte:ARTZOO_MEDIA_GLOBAL_LIMIT_BYTES|2000000000|web,worker,tools
+ARTZOO_SMS_PROVIDER|optional|0|enum:unconfigured,aliyun-pnvs|unconfigured|web
+ARTZOO_SMS_ACCESS_KEY_ID|when:ARTZOO_SMS_PROVIDER:aliyun-pnvs|1|regex:^[A-Za-z0-9]{1,256}$||web
+ARTZOO_SMS_ACCESS_KEY_SECRET|when:ARTZOO_SMS_PROVIDER:aliyun-pnvs|1|regex:^[!-~]{1,256}$||web
+ARTZOO_SMS_SIGN_NAME|when:ARTZOO_SMS_PROVIDER:aliyun-pnvs|0|length:128||web
+ARTZOO_SMS_REGISTER_TEMPLATE_CODE|when:ARTZOO_SMS_PROVIDER:aliyun-pnvs|0|enum:100001||web
+ARTZOO_SMS_RESET_TEMPLATE_CODE|when:ARTZOO_SMS_PROVIDER:aliyun-pnvs|0|enum:100003||web
+AUTH_SMS_DAILY_LIMIT|optional|0|uint:10000|200|web
+NODE_ENV|fixed|0||production|web,worker,tools
+ARTZOO_DEPLOYMENT_ENV|fixed|0||production|web,worker,tools
+ARTZOO_AVATAR_DIR|fixed|0||/app/storage/avatars|web,worker,tools
+ARTZOO_MEDIA_CLEANUP_EXECUTE|fixed|0||0|web,worker,tools
+ARTZOO_OFFICIAL_SYNC_ENABLED|fixed|0||0|web,worker,tools
+ARTZOO_QQ_MODE|fixed|0|||web,worker,tools
+ARTZOO_SMS_PROVIDER|fixed|0||unconfigured|worker,tools
+ARTZOO_SECURITY_CLEANUP_ENABLED|fixed|0||0|web,tools
+ARTZOO_SECURITY_CLEANUP_ENABLED|fixed|0||1|worker
+PG_POOL_MAX|fixed|0||10|web
+PG_POOL_MAX|fixed|0||3|worker
+PGHOST|fixed|0||postgres|web,worker,tools
+PGPORT|fixed|0||5432|web,worker,tools
+PGUSER|fixed|0||artzoo|web,worker,tools
+PGDATABASE|fixed|0||artzoo|web,worker,tools
+PGPASSWORD|fixed|1|||web,worker,tools
+DATABASE_URL|fixed|1|||tools

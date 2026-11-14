@@ -13,6 +13,7 @@ declare -A refs=() ids=()
 roles=()
 config_files=(compose.yaml .env.example images.env deployment-compose-check.sh)
 maintenance_file=deployment-maintenance.sh
+manifest_file=runtime-config.manifest
 https_files=(Caddyfile.lan.example Caddyfile.public.example proxy.compose.yaml.example wslconfig.example dev-docker.tmpfiles.conf.example dev-user-retry.conf.example dev-docker-proxy.conf.example deployment-https-check.mjs DEPLOYMENT.md)
 
 fail() { printf '错误：%s\n' "$*" >&2; exit 1; }
@@ -75,7 +76,7 @@ trap 'exit 143' TERM
 load_bundle() {
   [[ -d "$1" ]] || fail '发布包目录不存在。'
   bundle=$(realpath -e -- "$1")
-  local file hash extra name role ref id platform version='' current config_count=0 maintenance_count=0 https_count=0 expected actual
+  local file hash extra name role ref id platform version='' current config_count=0 maintenance_count=0 https_count=0 manifest_count=0 expected actual
   local -A sums=() seen=()
   for file in SHA256SUMS images.tsv images.tar source.txt deployment-images.sh deployment-image-check.mjs; do
     [[ -f "$bundle/$file" && ! -L "$bundle/$file" ]] || fail "发布包缺少普通文件：$file"
@@ -85,6 +86,7 @@ load_bundle() {
     [[ "$hash" =~ ^[0-9a-f]{64}$ && -z "$extra" ]] || fail '校验清单格式错误。'
     case "$name" in
       images.tsv|images.tar|source.txt|deployment-images.sh|deployment-image-check.mjs) ;;
+      runtime-config.manifest) manifest_count=$((manifest_count + 1)) ;;
       deployment-maintenance.sh) maintenance_count=$((maintenance_count + 1)) ;;
       compose.yaml|.env.example|images.env|deployment-compose-check.sh) config_count=$((config_count + 1)) ;;
       Caddyfile.lan.example|Caddyfile.public.example|proxy.compose.yaml.example|wslconfig.example|dev-docker.tmpfiles.conf.example|dev-user-retry.conf.example|dev-docker-proxy.conf.example|deployment-https-check.mjs|DEPLOYMENT.md) https_count=$((https_count + 1)) ;;
@@ -95,9 +97,14 @@ load_bundle() {
   done < "$bundle/SHA256SUMS"
   [[ "$config_count" == 0 || "$config_count" == 4 ]] || fail '运行模板清单不完整。'
   [[ "$https_count" == 0 || "$https_count" == "${#https_files[@]}" ]] || fail 'HTTPS 交付文件不完整。'
-  ((${#sums[@]} == 5 + config_count + maintenance_count + https_count)) || fail '校验清单不完整。'
+  ((${#sums[@]} == 5 + config_count + maintenance_count + https_count + manifest_count)) || fail '校验清单不完整。'
   if ((https_count)); then
     [[ "$config_count" == 4 && "$maintenance_count" == 1 ]] || fail 'HTTPS 交付需要完整运行模板和维护入口。'
+  fi
+  if ((manifest_count)); then
+    [[ "$config_count" == 4 && "$maintenance_count" == 1 && -f "$bundle/$manifest_file" && ! -L "$bundle/$manifest_file" ]] || fail '配置清单需要完整维护发布包。'
+  else
+    [[ ! -e "$bundle/$manifest_file" && ! -L "$bundle/$manifest_file" ]] || fail '发现未经校验的配置清单。'
   fi
   for file in "${https_files[@]}"; do
     if ((https_count)); then
@@ -296,7 +303,7 @@ build_bundle() {
   mkdir -p -- "$output"
   partial=$(mktemp -d "$output/.artzoo-build.XXXXXX")
   cp -- "$script_path" "$helper" "$partial/"
-  cp -- "$root/deployment/compose.yaml" "$root/deployment/.env.example" "$partial/"
+  cp -- "$root/deployment/compose.yaml" "$root/deployment/.env.example" "$root/deployment/$manifest_file" "$partial/"
   cp -- "$root/scripts/deployment-compose-check.sh" "$root/scripts/$maintenance_file" "$partial/"
   for file in "${https_files[@]}"; do
     case "$file" in
@@ -319,12 +326,12 @@ build_bundle() {
   helper="$partial/deployment-image-check.mjs"
   basic_checks
   image_environment > "$partial/images.env"
-  printf 'format=4\nrelease=%s\ncommit=%s\nworktree=%s\nplatform=linux/amd64\ntarget=%s\n' \
+  printf 'format=5\nrelease=%s\ncommit=%s\nworktree=%s\nplatform=linux/amd64\ntarget=%s\n' \
     "$release" "$commit" "$state" "$target" > "$partial/source.txt"
   local images=()
   for role in "${roles[@]}"; do images+=("${refs[$role]}"); done
   d image save "${images[@]}" > "$partial/images.tar"
-  (cd -- "$partial" && sha256sum images.tar images.tsv source.txt deployment-images.sh deployment-image-check.mjs "${config_files[@]}" "$maintenance_file" "${https_files[@]}" > SHA256SUMS)
+  (cd -- "$partial" && sha256sum images.tar images.tsv source.txt deployment-images.sh deployment-image-check.mjs "${config_files[@]}" "$maintenance_file" "$manifest_file" "${https_files[@]}" > SHA256SUMS)
   [[ ! -e "$output/$release" ]] || fail '发布目录已存在。'
   mv -T -- "$partial" "$output/$release"
   partial=''

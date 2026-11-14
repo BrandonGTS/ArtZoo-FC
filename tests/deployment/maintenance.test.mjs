@@ -76,7 +76,9 @@ test(
         }
       );
     };
+    let cleanupConfig;
     t.after(() => {
+      if (cleanupConfig) writeFileSync(join(root, 'secrets/compose.env'), cleanupConfig);
       const result = compose('down', '--volumes', '--remove-orphans', '--timeout', '20');
       assert.equal(result.status, 0, 'isolated fixture cleanup must succeed');
       assert.ok(root.startsWith(`${scratch}/maintenance-test-`));
@@ -100,6 +102,7 @@ test(
     const config = join(root, 'secrets/compose.env');
     assert.equal(statSync(config).mode & 0o777, 0o600);
     const original = readFileSync(config, 'utf8');
+    cleanupConfig = original;
     refuse('prepare-env', ['--origin', 'https://localhost']);
     assert.equal(readFileSync(config, 'utf8'), original);
     const portProbe = createServer();
@@ -107,6 +110,7 @@ test(
     const port = portProbe.address().port;
     await new Promise((closed) => portProbe.close(closed));
     writeFileSync(config, original.replace('ARTZOO_HTTP_PORT=13100', `ARTZOO_HTTP_PORT=${port}`));
+    pass('config-check');
     pass('database');
     refuse('database');
     pass('migrate');
@@ -221,6 +225,106 @@ test(
     refuse('status');
     refuse('start');
     recreateWeb(['-f', proxy]);
+    pass('status');
+    // Real inspect verifies default and configured environments, without sending SMS.
+    const inspect = (service) => {
+      const result = docker('inspect', app(service));
+      assert.equal(result.status, 0, 'inspect fixture container');
+      return JSON.parse(result.stdout)[0];
+    };
+    for (const service of ['web', 'worker']) {
+      const data = inspect(service);
+      assert.equal(data.HostConfig.LogConfig.Type, 'json-file');
+      assert.deepEqual(data.HostConfig.LogConfig.Config, { 'max-file': '3', 'max-size': '10m' });
+      assert.ok(data.Config.Env.includes('ARTZOO_SMS_PROVIDER=unconfigured'));
+    }
+    const unconfigured = readFileSync(config, 'utf8');
+    const secret = String.raw`SyntheticPrivateSms$#\x'"`;
+    const settings = {
+      ARTZOO_SMS_PROVIDER: 'aliyun-pnvs',
+      ARTZOO_SMS_ACCESS_KEY_ID: 'SyntheticPrivateSmsId',
+      ARTZOO_SMS_ACCESS_KEY_SECRET: `'${secret.replaceAll("'", "\\'")}'`,
+      ARTZOO_SMS_SIGN_NAME: "'公会 测试'",
+      ARTZOO_SMS_REGISTER_TEMPLATE_CODE: '100001',
+      ARTZOO_SMS_RESET_TEMPLATE_CODE: '100003',
+      AUTH_SMS_DAILY_LIMIT: '17',
+      ARTZOO_MEDIA_GLOBAL_LIMIT_BYTES: '3000000000',
+      ARTZOO_MEDIA_DAILY_LIMIT_BYTES: '1000000000'
+    };
+    const configured = unconfigured
+      .split('\n')
+      .map((line) => {
+        const key = line.split('=')[0];
+        return Object.hasOwn(settings, key) ? `${key}=${settings[key]}` : line;
+      })
+      .join('\n');
+    writeFileSync(config, configured);
+    pass('config-check');
+    // New non-secret settings must reject stale containers before any restart.
+    const oldWeb = app('web');
+    refuse('status');
+    refuse('start');
+    assert.equal(app('web'), oldWeb);
+    const rebuild = () => {
+      const result = compose(
+        '-f',
+        proxy,
+        'up',
+        '-d',
+        '--no-deps',
+        '--force-recreate',
+        '--wait',
+        'web',
+        'worker'
+      );
+      assert.equal(
+        result.status,
+        0,
+        result.stderr
+          .split('\n')
+          .filter((line) => !line.includes('SyntheticPrivateSms'))
+          .join('\n')
+          .replace(/[0-9a-f]{64}/g, '[redacted]')
+      );
+    };
+    rebuild();
+    const current = pass('status');
+    assert.doesNotMatch(current.stdout + current.stderr, /SyntheticPrivateSms/);
+    assert.match(current.stdout, /total=3000000000 daily=1000000000/);
+    const webEnv = inspect('web').Config.Env;
+    assert.ok(webEnv.includes(`ARTZOO_SMS_ACCESS_KEY_SECRET=${secret}`), 'literal secret survives Compose');
+    assert.ok(webEnv.includes('ARTZOO_SMS_SIGN_NAME=公会 测试'));
+    assert.ok(webEnv.includes('AUTH_SMS_DAILY_LIMIT=17'));
+    assert.ok(webEnv.includes('ARTZOO_SMS_REGISTER_TEMPLATE_CODE=100001'));
+    assert.ok(webEnv.includes('ARTZOO_SMS_RESET_TEMPLATE_CODE=100003'));
+    assert.ok(webEnv.includes('ARTZOO_SMS_PROVIDER=aliyun-pnvs'));
+    assert.ok(
+      !inspect('worker').Config.Env.some((value) => /^(ARTZOO_SMS_(?!PROVIDER)|AUTH_SMS_)/.test(value))
+    );
+    const toolsCheck = compose(
+      'run',
+      '--rm',
+      '--no-deps',
+      '-T',
+      '--entrypoint',
+      'node',
+      'tools',
+      '-e',
+      'if(process.env.ARTZOO_SMS_PROVIDER!=="unconfigured" || Object.keys(process.env).some(k=>/^(ARTZOO_SMS_(?!PROVIDER)|AUTH_SMS_)/.test(k)))process.exit(1)'
+    );
+    assert.equal(toolsCheck.status, 0, 'tools must not receive SMS fields');
+    for (const [key, value] of [
+      ['ARTZOO_SMS_SIGN_NAME', "'另一个签名'"],
+      ['AUTH_SMS_DAILY_LIMIT', '18'],
+      ['ARTZOO_MEDIA_DAILY_LIMIT_BYTES', '900000000']
+    ]) {
+      writeFileSync(config, configured.replace(new RegExp(`^${key}=.*$`, 'm'), `${key}=${value}`));
+      const result = invoke('status');
+      assert.equal(result.status, 1);
+      assert.ok(result.stderr.includes(key));
+      assert.doesNotMatch(result.stdout + result.stderr, /SyntheticPrivateSms/);
+    }
+    writeFileSync(config, configured);
     pass('status');
     refuse('enable-budget');
     refuse('database');

@@ -12,7 +12,8 @@ usage() {
   migrate         仅迁移首次空库；失败保留现场，不自动重置或重试
   baseline        停写状态下初始化媒体基线；不清零既有用量
   owner           本机真实 TTY 初始化首位超管；不接受账号或密码参数
-  enable-budget   首次启用全站 10 GB / 每账号每天 2 GB 并创建应用容器
+  enable-budget   首次启用配置中的媒体配额并创建应用容器
+  config-check    只读核对配置清单；仅报告变量名，不连接 Docker
   status          只读核对现有服务、配额、挂载、健康；不要求用量为零
   start           启动已初始化的现有容器；不建库、迁移、初始化或升级
   stop            先停止应用，再停止数据库；保留容器、卷和媒体
@@ -31,7 +32,7 @@ HELP
 }
 command=${1:---help}
 [[ $# == 0 ]] || shift
-case "$command" in --help|-h|help) usage; exit 0;; prepare-env|database|migrate|baseline|owner|enable-budget|status|start|stop) ;; *) fail '未知维护命令。';; esac
+case "$command" in --help|-h|help) usage; exit 0;; prepare-env|database|migrate|baseline|owner|enable-budget|config-check|status|start|stop) ;; *) fail '未知维护命令。';; esac
 bundle='' root='' project=artzoo origin=''
 while (($#)); do
   (($# >= 2)) || fail '选项缺少值。'
@@ -76,6 +77,121 @@ bash "$bundle/deployment-images.sh" verify "$bundle" >/dev/null 2>&1 || fail '�
 declare -A values=() refs=() ids=()
 while read -r role ref image_id platform extra; do refs[$role]=$ref; ids[$role]=$image_id; done < "$bundle/images.tsv"
 for role in web worker tools; do [[ -n "${ids[$role]:-}" ]] || fail '维护需要完整三镜像包。'; done
+# The bundle manifest is data, never sourced or evaluated.
+[[ -f "$bundle/runtime-config.manifest" && ! -L "$bundle/runtime-config.manifest" ]] || fail '发布包缺少配置清单。'
+declare -A requirements=() rules=() defaults=() destinations=() confidential=() fixed=() expected_env=() input_secrets=()
+while IFS='|' read -r key requirement secret rule default services extra; do
+  [[ -z "$key" || "$key" == \#* ]] && continue
+  [[ "$key" =~ ^[A-Z][A-Z0-9_]*$ && "$secret" =~ ^[01]$ && -z "$extra" ]] || fail '配置清单格式不符。'
+  if [[ "$requirement" != fixed ]]; then
+    [[ ! -v "requirements[$key]" ]] || fail '配置清单重复。'
+    input_secrets[$key]=$secret; requirements[$key]=$requirement; rules[$key]=$rule; defaults[$key]=$default; destinations[$key]=$services
+  fi
+  IFS=',' read -ra targets <<< "$services"
+  for service in "${targets[@]}"; do
+    [[ "$service" == - ]] && continue
+    [[ "$service" == web || "$service" == worker || "$service" == tools ]] || fail '配置清单服务不符。'
+    confidential[$service:$key]=$secret
+    if [[ "$requirement" == fixed ]]; then fixed[$service:$key]=$default; fi
+  done
+done < "$bundle/runtime-config.manifest"
+# Decimal string comparison avoids shell integer overflow before validation.
+decimal_le() { [[ ${#1} -lt ${#2} || ( ${#1} -eq ${#2} && ( "$1" == "$2" || "$1" < "$2" ) ) ]]; }
+read_config() {
+  [[ -f "$config" && ! -L "$config" && "$(stat -c '%u:%g:%a' "$config")" == 1000:1000:600 ]] || fail '秘密文件缺失或权限不符。'
+  LC_ALL=C tr -d '\000-\010\013\014\016-\037\177' < "$config" | cmp -s "$config" - || fail '配置格式不符：含控制字符。'
+  values=(); expected_env=()
+  local LC_ALL=C.UTF-8
+  local line key value rule argument requirement dependency wanted service pair errors=0 units position point
+  local -A supplied=() invalid=()
+  local -a checks=() targets=()
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line=${line%$'\r'}
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    key=${line%%=*}
+    if [[ "$line" != *=* || ! "$key" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
+      printf '格式不符：无法识别变量名。\n' >&2; errors=1; continue
+    fi
+    if [[ ! -v "requirements[$key]" ]]; then printf '多余：%s\n' "$key" >&2; errors=1; continue; fi
+    if [[ -v "supplied[$key]" ]]; then invalid[$key]=1; fi
+    supplied[$key]=1; value=${line#*=}
+    if [[ "$value" =~ ^\'(.*)\'$ ]]; then
+      value=${BASH_REMATCH[1]}
+      # Reject ambiguous backslash/apostrophe boundaries that Compose cannot round-trip.
+      [[ "$value" != *\\ && "$value" != *\\\\\'* ]] || invalid[$key]=1
+      # Compose single quotes are literal, with only escaped apostrophes decoded.
+      value=${value//\\\'/$'\001'}
+      [[ "$value" != *\'* ]] || invalid[$key]=1
+      value=${value//$'\001'/\'}
+    elif [[ "$value" == *[\$\'\"\\\#]* ]]; then invalid[$key]=1
+    fi
+    [[ ! "$value" =~ ^[[:space:]] && ! "$value" =~ [[:space:]]$ && ! "$value" =~ [[:cntrl:]] ]] || invalid[$key]=1
+    [[ "$value" != [$'\u00a0\ufeff']* && "$value" != *[$'\u00a0\ufeff'] ]] || invalid[$key]=1
+    values[$key]=$value
+  done < "$config"
+  for key in "${!requirements[@]}"; do
+    requirement=${requirements[$key]}
+    if [[ "$requirement" == required && -z "${values[$key]:-}" ]]; then
+      printf '缺失：%s\n' "$key" >&2; errors=1
+    fi
+    # Matches Compose ${NAME:-default}; empty optional values use their default.
+    values[$key]=${values[$key]:-${defaults[$key]}}
+  done
+  for key in "${!requirements[@]}"; do
+    value=${values[$key]}; requirement=${requirements[$key]}
+    if [[ "$requirement" == when:* ]]; then
+      dependency=${requirement#when:}; wanted=${dependency#*:}; dependency=${dependency%%:*}
+      if [[ "${values[$dependency]:-}" != "$wanted" ]]; then
+        [[ -z "$value" ]] || invalid[$key]=1
+        continue
+      elif [[ -z "$value" ]]; then
+        printf '缺失：%s\n' "$key" >&2; errors=1; continue
+      fi
+    fi
+    IFS=';' read -ra checks <<< "${rules[$key]}"
+    for rule in "${checks[@]}"; do
+      argument=${rule#*:}
+      case "$rule" in
+        project) [[ "$value" == "$project" ]] || invalid[$key]=1;;
+        media-root) [[ "$value" == "$root/media" ]] || invalid[$key]=1;;
+        origin) [[ "$value" =~ ^https://[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?(:[1-9][0-9]{0,4})?$ ]] || invalid[$key]=1;;
+        enum:*) [[ "$value" != *,* && ",$argument," == *",$value,"* ]] || invalid[$key]=1;;
+        regex:*) [[ "$value" =~ $argument ]] || invalid[$key]=1;;
+        uint:*) [[ "$value" =~ ^[1-9][0-9]*$ ]] && decimal_le "$value" "$argument" || invalid[$key]=1;;
+        lte:*) decimal_le "$value" "${values[$argument]}" || invalid[$key]=1;;
+        length:*)
+          units=0
+          for ((position=0; position<${#value}; position++)); do
+            printf -v point '%d' "'${value:position:1}"
+            ((units += point > 65535 ? 2 : 1))
+          done
+          [[ -n "$value" && "$units" -le "$argument" ]] || invalid[$key]=1;;
+        *) fail '配置清单校验规则未知。';;
+      esac
+    done
+  done
+  for key in "${!invalid[@]}"; do printf '格式不符：%s\n' "$key" >&2; errors=1; done
+  ((errors == 0)) || fail '配置检查未通过；仅列出变量名。'
+  for key in "${!destinations[@]}"; do
+    IFS=',' read -ra targets <<< "${destinations[$key]}"
+    for service in "${targets[@]}"; do
+      [[ "$service" == - ]] && continue
+      if [[ "${confidential[$service:$key]}" == 0 ]]; then expected_env[$service:$key]=${values[$key]}; fi
+    done
+  done
+  for pair in "${!fixed[@]}"; do
+    if [[ "${confidential[$pair]}" == 0 ]]; then expected_env[$pair]=${fixed[$pair]}; fi
+  done
+  # Secrets are needed only during validation, never for inspection or diagnostics.
+  for key in "${!input_secrets[@]}"; do
+    if [[ "${input_secrets[$key]}" == 1 ]]; then unset 'values[$key]'; fi
+  done
+}
+if [[ "$command" == config-check ]]; then
+  read_config
+  printf 'PASS: config-check；配置符合发布包清单。\n'
+  exit 0
+fi
 umask 077
 lock="$root/secrets/.maintenance.lock"
 [[ ! -L "$lock" && ( ! -e "$lock" || ( -f "$lock" && "$(stat -c '%u:%g:%a' "$lock")" == 1000:1000:600 ) ) ]] || fail '维护锁文件不可信。'
@@ -117,27 +233,6 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-read_config() {
-  [[ -f "$config" && ! -L "$config" && "$(stat -c '%u:%g:%a' "$config")" == 1000:1000:600 ]] || fail '秘密文件缺失或权限不符。'
-  values=()
-  local line key value
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ -z "$line" || "$line" == \#* ]] && continue
-    [[ "$line" == *=* ]] || fail '配置格式不符；不要输出文件内容。'
-    key=${line%%=*}; value=${line#*=}
-    case "$key" in COMPOSE_PROJECT_NAME|ARTZOO_MEDIA_ROOT|ARTZOO_HTTP_PORT|ARTZOO_PUBLIC_ORIGIN|ARTZOO_TRUSTED_PROXY|POSTGRES_PASSWORD|ARTZOO_INVITATION_KEY|ARTZOO_MEDIA_BUDGET_ENABLED|ARTZOO_MEDIA_GLOBAL_LIMIT_BYTES|ARTZOO_MEDIA_DAILY_LIMIT_BYTES) ;; *) fail '配置包含非模板变量。';; esac
-    [[ ! -v "values[$key]" ]] || fail '配置含重复变量。'
-    values[$key]=$value
-  done < "$config"
-  [[ ${#values[@]} == 10 ]] || fail '配置变量不完整。'
-  [[ "${values[COMPOSE_PROJECT_NAME]}" == "$project" && "${values[ARTZOO_MEDIA_ROOT]}" == "$root/media" ]] || fail '项目名或媒体路径与目标不一致。'
-  [[ "${values[POSTGRES_PASSWORD]}" =~ ^[0-9a-f]{64}$ && "${values[ARTZOO_INVITATION_KEY]}" =~ ^[0-9a-f]{64}$ ]] || fail '秘密配置格式不符。'
-  [[ "${values[ARTZOO_PUBLIC_ORIGIN]}" =~ ^https://[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?(:[1-9][0-9]{0,4})?$ ]] || fail 'HTTPS origin 格式不符。'
-  [[ "${values[ARTZOO_HTTP_PORT]}" =~ ^[1-9][0-9]{0,4}$ ]] && (( values[ARTZOO_HTTP_PORT] <= 65535 )) || fail '端口不符。'
-  [[ "${values[ARTZOO_TRUSTED_PROXY]}" == '' || "${values[ARTZOO_TRUSTED_PROXY]}" == caddy ]] || fail '代理配置不符。'
-  [[ "${values[ARTZOO_MEDIA_BUDGET_ENABLED]}" =~ ^[01]$ && "${values[ARTZOO_MEDIA_GLOBAL_LIMIT_BYTES]}" == 10000000000 && "${values[ARTZOO_MEDIA_DAILY_LIMIT_BYTES]}" == 2000000000 ]] || fail '本入口仅接受已约定的 10 GB / 2 GB 配额。'
-  unset 'values[POSTGRES_PASSWORD]' 'values[ARTZOO_INVITATION_KEY]'
-}
 configure_proxy() {
   local proxy="$root/deploy/proxy.compose.yaml" line
   local -a lines=()
@@ -211,7 +306,7 @@ check_mounts() {
   [[ "$actual" == "$expected" ]] || fail '实际媒体挂载不符。'
 }
 check_app() {
-  local service=$1 container ports security=0
+  local service=$1 container ports
   container=$(dc ps --all --quiet "$service")
   [[ "$container" =~ ^[0-9a-f]{64}$ ]] || fail '应用容器缺失；start 不创建或升级容器。'
   [[ "$(d inspect --format '{{.Image}}' "$container")" == "${ids[$service]}" ]] || fail '现有容器与所选发布包不一致。'
@@ -221,19 +316,16 @@ check_app() {
     [[ "$ports" == "1|127.0.0.1|${values[ARTZOO_HTTP_PORT]}" ]] || fail 'web 回环端口绑定不符。'
   else
     [[ "$(d inspect --format '{{len .HostConfig.PortBindings}}' "$container")" == 0 ]] || fail 'worker 不应发布端口。'
-    security=1
   fi
-  local key actual expected
-  for key in ARTZOO_PUBLIC_ORIGIN ARTZOO_TRUSTED_PROXY ARTZOO_MEDIA_BUDGET_ENABLED ARTZOO_MEDIA_GLOBAL_LIMIT_BYTES ARTZOO_MEDIA_DAILY_LIMIT_BYTES; do
-    actual=$(d inspect --format "{{range .Config.Env}}{{if eq (index (split . \"=\") 0) \"$key\"}}{{println .}}{{end}}{{end}}" "$container")
-    expected=${values[$key]}
+  local pair key actual expected
+  for pair in "${!expected_env[@]}"; do
+    [[ "$pair" == "$service:"* ]] || continue
+    key=${pair#*:}; expected=${expected_env[$pair]}
     if [[ "$service" == web && "$key" == ARTZOO_TRUSTED_PROXY ]]; then expected=$web_proxy; fi
-    [[ "$actual" == "$key=$expected" ]] || fail '容器配置与目标配置中的非秘密字段不一致。'
+    actual=$(d inspect --format "{{range .Config.Env}}{{if eq (index (split . \"=\") 0) \"$key\"}}{{println .}}{{end}}{{end}}" "$container")
+    [[ "$actual" == "$key=$expected" ]] || fail "容器非秘密配置不一致：$key"
   done
-  for key in NODE_ENV=production ARTZOO_DEPLOYMENT_ENV=production ARTZOO_AVATAR_DIR=/app/storage/avatars PGHOST=postgres PGPORT=5432 PGUSER=artzoo PGDATABASE=artzoo ARTZOO_MEDIA_CLEANUP_EXECUTE=0 ARTZOO_OFFICIAL_SYNC_ENABLED=0 ARTZOO_QQ_MODE= ARTZOO_SMS_PROVIDER=unconfigured "ARTZOO_SECURITY_CLEANUP_ENABLED=$security"; do
-    actual=$(d inspect --format "{{range .Config.Env}}{{if eq (index (split . \"=\") 0) \"${key%%=*}\"}}{{println .}}{{end}}{{end}}" "$container")
-    [[ "$actual" == "$key" ]] || fail '容器运行策略不符。'
-  done
+  [[ "$(d inspect --format '{{.HostConfig.LogConfig.Type}}|{{index .HostConfig.LogConfig.Config "max-size"}}|{{index .HostConfig.LogConfig.Config "max-file"}}' "$container")" == 'json-file|10m|3' ]] || fail '容器日志上限不符。'
 }
 status_check() {
   identity
@@ -243,7 +335,7 @@ status_check() {
     check_app "$service"
     container=$(dc ps --quiet "$service")
     [[ -n "$container" && "$(d inspect --format '{{.State.Running}}' "$container")" == true ]] || fail '应用没有运行。'
-    printf '%s quota=1 total=10000000000 daily=2000000000\n' "$service"
+    printf '%s quota=1 total=%s daily=%s\n' "$service" "${values[ARTZOO_MEDIA_GLOBAL_LIMIT_BYTES]}" "${values[ARTZOO_MEDIA_DAILY_LIMIT_BYTES]}"
   done
   container=$(dc ps --quiet web)
   [[ "$(d inspect --format '{{.State.Health.Status}}' "$container")" == healthy ]] || fail 'web 尚未健康。'
@@ -312,7 +404,7 @@ case "$command" in
     before=$(sql 'SELECT row_to_json(s)::text FROM "MediaBudgetState" s ORDER BY id;')
     printf '【危险】启用配额并创建、启动 web/worker。\n'
     temporary=$(mktemp "$root/secrets/.compose.env.XXXXXXXX")
-    sed 's/^ARTZOO_MEDIA_BUDGET_ENABLED=0$/ARTZOO_MEDIA_BUDGET_ENABLED=1/' "$config" > "$temporary"
+    sed 's/^ARTZOO_MEDIA_BUDGET_ENABLED=.*$/ARTZOO_MEDIA_BUDGET_ENABLED=1/' "$config" > "$temporary"
     backup=$(mktemp "$root/secrets/compose.env.before-budget.XXXXXXXX")
     cp --preserve=mode -- "$config" "$backup"
     mv -T -- "$temporary" "$config"; temporary=''
