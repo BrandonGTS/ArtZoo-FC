@@ -43,7 +43,7 @@ install -d -m 0700 "$temporary/media"
 "${root_cmd[@]}" install -d -o 1000 -g 1000 -m 0700 "$temporary/media/"{original,derived,avatars}
 umask 077
 password=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
-key=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+key=$(head -c 32 /dev/urandom | base64 -w 0)
 printf 'COMPOSE_PROJECT_NAME=%s\nARTZOO_MEDIA_ROOT=%s/media\nARTZOO_HTTP_PORT=0\nARTZOO_PUBLIC_ORIGIN=https://localhost\nPOSTGRES_PASSWORD=%s\nARTZOO_INVITATION_KEY=%s\n' \
   "$project" "$temporary" "$password" "$key" > "$temporary/test.env"
 # Preserve the real network topology; external integrations remain disabled.

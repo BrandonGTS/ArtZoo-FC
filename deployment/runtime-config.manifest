@@ -6,7 +6,7 @@ ARTZOO_HTTP_PORT|optional|0|uint:65535|13100|-
 ARTZOO_PUBLIC_ORIGIN|required|0|origin||web,worker,tools
 ARTZOO_TRUSTED_PROXY|optional|0|enum:,caddy||web,worker,tools
 POSTGRES_PASSWORD|required|1|regex:^[0-9a-f]{64}$||-
-ARTZOO_INVITATION_KEY|required|1|regex:^[0-9a-f]{64}$||web
+ARTZOO_INVITATION_KEY|required|1|regex:^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$||web
 ARTZOO_MEDIA_BUDGET_ENABLED|required|0|enum:0,1|0|web,worker,tools
 ARTZOO_MEDIA_GLOBAL_LIMIT_BYTES|optional|0|uint:9223372036854775807|10000000000|web,worker,tools
 ARTZOO_MEDIA_DAILY_LIMIT_BYTES|optional|0|uint:9223372036854775807;lte:ARTZOO_MEDIA_GLOBAL_LIMIT_BYTES|2000000000|web,worker,tools
