@@ -230,6 +230,7 @@ test(
           ...(body ? { body: JSON.stringify(body) } : {}),
           signal: AbortSignal.timeout(10000)
         });
+        assert.ok(response.headers.get('content-type')?.includes('application/json'), path + ': HTTP ' + response.status);
         const result = await response.json();
         assert.equal(response.status, expected, result.error?.code ?? 'unexpected HTTP status');
         assert.equal(result.ok, true);
@@ -243,7 +244,7 @@ test(
         expiresAt: new Date(Date.now() + 3600000).toISOString()
       }, 201);
       assert.ok(/^\\/invite\\/[A-Za-z0-9_-]{43}$/.test(created.invitePath));
-      const reopened = await request('/api/admin/invitations/' + created.invitation.id + '/link');
+      const reopened = await request('/api/admin/invitations/' + created.invitation.id + '/link', {});
       assert.ok(reopened.invitePath === created.invitePath, 'encrypted invitation must round-trip');
       console.log('PASS: generated invitation key creates and reopens a real invitation');
     `
