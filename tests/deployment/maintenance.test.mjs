@@ -208,6 +208,49 @@ test(
     assert.equal(proxyValue('web'), 'ARTZOO_TRUSTED_PROXY=caddy');
     assert.equal(proxyValue('worker'), 'ARTZOO_TRUSTED_PROXY=');
     assert.match(readFileSync(config, 'utf8'), /^ARTZOO_TRUSTED_PROXY=$/m);
+    // Exercise the built website with the key from prepare-env, not a hand-written fixture.
+    // All account inputs are synthetic; no SMS provider is contacted or secrets printed.
+    const invitations = docker(
+      'exec',
+      app('web'),
+      'node',
+      '--input-type=module',
+      '-e',
+      `
+      import assert from 'node:assert/strict';
+      const headers = {
+        origin: 'https://localhost',
+        'content-type': 'application/json',
+        'x-artzoo-request': '1',
+        'x-forwarded-for': '127.0.0.1'
+      };
+      const request = async (path, body, expected = 200) => {
+        const response = await fetch('http://127.0.0.1:3100' + path, {
+          method: body ? 'POST' : 'GET', headers,
+          ...(body ? { body: JSON.stringify(body) } : {}),
+          signal: AbortSignal.timeout(10000)
+        });
+        assert.ok(response.headers.get('content-type')?.includes('application/json'), path + ': HTTP ' + response.status);
+        const result = await response.json();
+        assert.equal(response.status, expected, result.error?.code ?? 'unexpected HTTP status');
+        assert.equal(result.ok, true);
+        const cookie = response.headers.get('set-cookie');
+        if (cookie) headers.cookie = cookie.split(';')[0];
+        return result.data;
+      };
+      await request('/api/auth/login', { phone: '+8613800000001', password: 'Synthetic-test-only-123' });
+      const created = await request('/api/admin/invitations', {
+        membership: 'FRIEND', usageMode: 'SINGLE',
+        expiresAt: new Date(Date.now() + 3600000).toISOString()
+      }, 201);
+      assert.ok(/^\\/invite\\/[A-Za-z0-9_-]{43}$/.test(created.invitePath));
+      const reopened = await request('/api/admin/invitations/' + created.invitation.id + '/link', {});
+      assert.ok(reopened.invitePath === created.invitePath, 'encrypted invitation must round-trip');
+      console.log('PASS: generated invitation key creates and reopens a real invitation');
+    `
+    );
+    assert.equal(invitations.status, 0, invitations.stderr);
+    assert.match(invitations.stdout, /PASS: generated invitation key/);
     const trustedWeb = app('web');
     rmSync(proxy);
     refuse('status');

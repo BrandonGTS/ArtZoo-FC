@@ -347,7 +347,7 @@ if [[ "$command" == prepare-env ]]; then
   for dir in "$root/media/"{original,derived,avatars}; do [[ -z "$(find "$dir" -mindepth 1 -printf x -quit)" ]] || fail '媒体非空，不初始化。'; done
   temporary=$(mktemp "$root/secrets/.compose.env.XXXXXXXX")
   password=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
-  invitation=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+  invitation=$(head -c 32 /dev/urandom | base64 -w 0)
   while IFS= read -r line || [[ -n "$line" ]]; do
     case "$line" in
       COMPOSE_PROJECT_NAME=*) printf 'COMPOSE_PROJECT_NAME=%s\n' "$project";;

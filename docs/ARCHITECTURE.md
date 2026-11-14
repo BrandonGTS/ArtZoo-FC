@@ -242,7 +242,7 @@ Caddy 部署通过 web 专用 Compose 覆盖文件设置 `ARTZOO_TRUSTED_PROXY=c
 | `ARTZOO_DEPLOYMENT_ENV` | 无 | 只能是 `production` 或 `local` |
 | `ARTZOO_PUBLIC_ORIGIN` | 无 | 站点地址，生产环境必须是 https |
 | `ARTZOO_TRUSTED_PROXY` | 空 | Caddy 部署通过 web 专用 Compose 覆盖文件设为 `caddy` |
-| `ARTZOO_INVITATION_KEY` | 无 | 不设置就无法生成邀请链接 |
+| `ARTZOO_INVITATION_KEY` | 无 | 独立随机 32 字节的规范 Base64 编码（44 字符）；缺失或格式错误时无法生成邀请链接 |
 | `ARTZOO_SMS_PROVIDER` | `unconfigured` | web 设为 `aliyun-pnvs` 并完整配置下列字段才启用；worker、tools 固定关闭 |
 | `ARTZOO_SMS_ACCESS_KEY_ID` / `ARTZOO_SMS_ACCESS_KEY_SECRET` | 空 | 阿里云短信凭证，仅传给 web，作为秘密处理 |
 | `ARTZOO_SMS_SIGN_NAME` | 空 | 短信签名；开启短信时必填 |

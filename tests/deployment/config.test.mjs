@@ -14,6 +14,7 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadInvitationCipher } from '../../apps/web/server/auth/invitation-cipher.ts';
 
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 const marker = 'SecretMustNeverAppear';
@@ -95,7 +96,7 @@ source "$1" "\${@:2}"
     ARTZOO_MEDIA_ROOT: `${root}/media`,
     ARTZOO_PUBLIC_ORIGIN: 'https://localhost',
     POSTGRES_PASSWORD: 'a'.repeat(64),
-    ARTZOO_INVITATION_KEY: 'b'.repeat(64),
+    ARTZOO_INVITATION_KEY: Buffer.alloc(32, 7).toString('base64'),
     ARTZOO_MEDIA_BUDGET_ENABLED: '0'
   };
   const config = join(root, 'secrets/compose.env');
@@ -124,10 +125,8 @@ source "$1" "\${@:2}"
       }
     );
     const output = result.stdout + result.stderr;
-    assert.doesNotMatch(
-      output,
-      new RegExp(`${marker}|DOCKER_MUST_NOT_RUN|${base.POSTGRES_PASSWORD}|${base.ARTZOO_INVITATION_KEY}`)
-    );
+    assert.doesNotMatch(output, new RegExp(`${marker}|DOCKER_MUST_NOT_RUN|${base.POSTGRES_PASSWORD}`));
+    assert.ok(!output.includes(base.ARTZOO_INVITATION_KEY), 'invitation key must stay private');
     assert.deepEqual(readdirSync(join(root, 'secrets')), before);
     assert.equal(readFileSync(config, 'utf8'), content);
     return { status: result.status, output };
@@ -240,5 +239,35 @@ test('config manifest must be present, checksummed, unmodified and a regular fil
       writeFileSync(sums, readFileSync(sums, 'utf8').replace(/^.*  runtime-config\.manifest\n/m, ''));
     }
     assert.equal(f.run().status, 1, variant);
+  }
+});
+
+test('configuration and invitation cipher agree on canonical 32-byte Base64 keys', (t) => {
+  const f = fixture(t);
+  const valid = Array.from({ length: 16 }, (_, last) => {
+    const bytes = Buffer.alloc(32, 255);
+    bytes[0] = 251;
+    bytes[31] = last;
+    return bytes.toString('base64');
+  });
+  const invalid = [
+    'b'.repeat(64),
+    Buffer.alloc(31).toString('base64'),
+    Buffer.alloc(33).toString('base64'),
+    Buffer.alloc(32, 255).toString('base64url'),
+    valid[0].slice(0, 42) + 'B=',
+    valid[0].slice(0, -1)
+  ];
+  for (const [keys, accepted] of [
+    [valid, true],
+    [invalid, false]
+  ]) {
+    for (const value of keys) {
+      assert.equal(!!loadInvitationCipher({ ARTZOO_INVITATION_KEY: value }), accepted);
+      const result = f.run({ ARTZOO_INVITATION_KEY: value });
+      assert.equal(result.status, accepted ? 0 : 1, result.output);
+      assert.ok(!result.output.includes(value), 'key must not appear in diagnostics');
+      if (!accepted) assert.match(result.output, /ARTZOO_INVITATION_KEY/);
+    }
   }
 });
