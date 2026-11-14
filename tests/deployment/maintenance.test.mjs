@@ -1,7 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, statSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
@@ -146,7 +155,73 @@ test(
     clearTimeout(timer);
     assert.equal(code, 0, 'synthetic owner initialization must complete');
     assert.equal(answered, 5);
+    const deploy = join(root, 'deploy');
+    const proxy = join(deploy, 'proxy.compose.yaml');
+    const proxyContent = 'services:\n  web:\n    environment:\n      ARTZOO_TRUSTED_PROXY: caddy\n';
+    mkdirSync(deploy, { mode: 0o750 });
+    const beforeProxy = readFileSync(config, 'utf8');
+    const refuseProxy = () => {
+      const result = invoke('enable-budget');
+      assert.equal(result.status, 1, 'unsafe proxy configuration must be rejected');
+      assert.equal(readFileSync(config, 'utf8'), beforeProxy, 'refusal must precede quota changes');
+      assert.equal(compose('ps', '--all', '--quiet', 'web').stdout.trim(), '');
+      assert.doesNotMatch(result.stdout + result.stderr, /proxy-content-must-stay-private/);
+    };
+    for (const content of [
+      'proxy-content-must-stay-private: [invalid',
+      proxyContent.replace('caddy', 'unknown-proxy'),
+      proxyContent.replace('  web:', '  worker:'),
+      proxyContent + '    ports:\n      - "0.0.0.0:13100:3100"\n'
+    ]) {
+      writeFileSync(proxy, content, { mode: 0o640 });
+      refuseProxy();
+    }
+    writeFileSync(proxy, proxyContent);
+    chmodSync(proxy, 0o666);
+    refuseProxy();
+    chmodSync(proxy, 0o640);
+    chmodSync(deploy, 0o770);
+    refuseProxy();
+    chmodSync(deploy, 0o750);
+    rmSync(proxy);
+    for (const target of [config, join(deploy, 'missing.yaml')]) {
+      symlinkSync(target, proxy);
+      refuseProxy();
+      rmSync(proxy);
+    }
+    writeFileSync(proxy, `# dedicated web proxy\r\n\r\n${proxyContent.replaceAll('\n', '\r\n')}`, {
+      mode: 0o640
+    });
     pass('enable-budget');
+    const app = (service) => compose('ps', '--all', '--quiet', service).stdout.trim();
+    const proxyValue = (service) =>
+      docker(
+        'inspect',
+        '--format',
+        '{{range .Config.Env}}{{if eq (index (split . "=") 0) "ARTZOO_TRUSTED_PROXY"}}{{println .}}{{end}}{{end}}',
+        app(service)
+      ).stdout.trim();
+    assert.equal(proxyValue('web'), 'ARTZOO_TRUSTED_PROXY=caddy');
+    assert.equal(proxyValue('worker'), 'ARTZOO_TRUSTED_PROXY=');
+    assert.match(readFileSync(config, 'utf8'), /^ARTZOO_TRUSTED_PROXY=$/m);
+    const trustedWeb = app('web');
+    rmSync(proxy);
+    refuse('status');
+    refuse('start');
+    assert.equal(app('web'), trustedWeb, 'a missing override must not recreate the existing web');
+    assert.equal(proxyValue('web'), 'ARTZOO_TRUSTED_PROXY=caddy');
+    // The original no-override deployment remains supported; drift must be detected either way.
+    const recreateWeb = (files = []) => {
+      const result = compose(...files, 'up', '-d', '--no-deps', '--force-recreate', '--wait', 'web');
+      assert.equal(result.status, 0, 'isolated web recreation must succeed');
+    };
+    recreateWeb();
+    pass('status');
+    writeFileSync(proxy, proxyContent, { mode: 0o640 });
+    refuse('status');
+    refuse('start');
+    recreateWeb(['-f', proxy]);
+    pass('status');
     refuse('enable-budget');
     refuse('database');
     refuse('baseline');
@@ -176,6 +251,8 @@ test(
     pass('stop');
     refuse('status');
     pass('start');
+    assert.equal(proxyValue('web'), 'ARTZOO_TRUSTED_PROXY=caddy');
+    assert.equal(proxyValue('worker'), 'ARTZOO_TRUSTED_PROXY=');
     assert.equal(sql('SELECT row_to_json(s)::text FROM "MediaBudgetState" s;'), before);
     assert.equal(compose('ps', '--quiet', 'postgres').stdout.trim(), database);
     assert.equal(sql('SELECT count(*) FROM "Account";'), '1');

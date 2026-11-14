@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +18,7 @@ const files = [
   'deployment-images.sh',
   'deployment-image-check.mjs'
 ];
-function fixture(t, manifest = `web\t${ref}\t${id}\tlinux/amd64\n`, actual = id) {
+function fixture(t, manifest = `web\t${ref}\t${id}\tlinux/amd64\n`, actual = id, environment = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'artzoo-deployment-test-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const bundle = join(directory, 'bundle');
@@ -53,6 +53,7 @@ esac
   );
   writeFileSync(join(bin, 'sudo'), '#!/usr/bin/env bash\nexit 99\n', { mode: 0o755 });
   return {
+    directory,
     bundle,
     bin,
     calls: () => {
@@ -66,7 +67,13 @@ esac
       spawnSync('bash', [script, ...args], {
         encoding: 'utf8',
         timeout: 10000,
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, ARTZOO_TEST_DOCKER_LOG: log }
+        env: {
+          ...process.env,
+          ARTZOO_BUILD_PROXY: '',
+          ...environment,
+          PATH: `${bin}:${process.env.PATH}`,
+          ARTZOO_TEST_DOCKER_LOG: log
+        }
       })
   };
 }
@@ -214,4 +221,111 @@ test('maintenance entry is accepted only when checksummed with complete template
   writeFileSync(entry, 'changed');
   assert.equal(f.run('verify', f.bundle).status, 1);
   assert.equal(f.calls(), '');
+});
+
+const httpsFiles = [
+  'Caddyfile.lan.example',
+  'Caddyfile.public.example',
+  'proxy.compose.yaml.example',
+  'wslconfig.example',
+  'dev-docker.tmpfiles.conf.example',
+  'dev-user-retry.conf.example',
+  'dev-docker-proxy.conf.example',
+  'deployment-https-check.mjs',
+  'DEPLOYMENT.md'
+];
+function addHttps(f, withMaintenance = true) {
+  addConfiguration(f);
+  const extra = [...httpsFiles, ...(withMaintenance ? ['deployment-maintenance.sh'] : [])];
+  let checksums = readFileSync(join(f.bundle, 'SHA256SUMS'), 'utf8');
+  for (const file of extra) {
+    const content = `fixture: ${file}\n`;
+    writeFileSync(join(f.bundle, file), content);
+    checksums += `${createHash('sha256').update(content).digest('hex')}  ${file}\n`;
+  }
+  writeFileSync(join(f.bundle, 'SHA256SUMS'), checksums);
+}
+test('complete HTTPS delivery verifies and imports without changing running services', (t) => {
+  const f = fixture(t);
+  addHttps(f);
+  assert.equal(f.run('verify', f.bundle).status, 0);
+  assert.equal(f.calls(), '');
+  assert.equal(f.run('import', f.bundle).status, 0);
+  assert.doesNotMatch(f.calls(), /image load| run | start /);
+});
+test('HTTPS delivery rejects tampering, missing files, symlinks and incomplete manifests', (t) => {
+  for (const variant of ['modified', 'missing', 'symlink', 'partial', 'unchecked', 'no-maintenance']) {
+    const f = fixture(t);
+    addHttps(f, variant !== 'no-maintenance');
+    const entry = join(f.bundle, 'DEPLOYMENT.md');
+    const sums = join(f.bundle, 'SHA256SUMS');
+    if (variant === 'modified') writeFileSync(entry, 'changed');
+    if (variant === 'missing' || variant === 'symlink') rmSync(entry);
+    if (variant === 'symlink') symlinkSync('source.txt', entry);
+    if (variant === 'partial')
+      writeFileSync(sums, readFileSync(sums, 'utf8').replace(/^.*  DEPLOYMENT\.md\n/m, ''));
+    if (variant === 'unchecked') addConfiguration(f);
+    const result = f.run('import', f.bundle);
+    assert.equal(result.status, 1, variant);
+    assert.equal(f.calls(), '', variant);
+  }
+});
+
+test('build packages reusable HTTPS templates and the handbook under checksum protection', (t) => {
+  const f = fixture(t, undefined, undefined, { ARTZOO_BUILD_PROXY: 'http://10.0.2.2:7890' });
+  // Substitute only Docker: exercise the real copy, manifest and archive packaging path.
+  writeFileSync(
+    join(f.bin, 'docker'),
+    `#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$ARTZOO_TEST_DOCKER_LOG"
+case "$*" in
+  *'buildx build'*) touch "$ARTZOO_TEST_DOCKER_LOG.built" ;;
+  *'image inspect'*)
+    test -f "$ARTZOO_TEST_DOCKER_LOG.built" || exit 1
+    if [[ "$*" == *'{{.Os}}'* ]]; then printf '%s linux/amd64\\n' '${id}'
+    else printf '%s\\n' '${id}'; fi ;;
+  *'image save'*) printf 'test archive\\n' ;;
+  *'run --detach'*) printf 'test-web-container\\n' ;;
+  *' info'|*'buildx version'|*'run --rm'*|*' exec '*|*' rm '*|*'ps --all --quiet'*|*'network ls --quiet'*) ;;
+  *) exit 89 ;;
+esac
+`
+  );
+  const result = f.run('build', '--target', 'web', '--allow-dirty', '--output', join(f.directory, 'output'));
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const buildCalls = f
+    .calls()
+    .split('\n')
+    .filter((line) => line.includes('buildx build'));
+  assert.equal(buildCalls.length, 1);
+  assert.match(buildCalls[0], /--build-arg HTTP_PROXY=http:\/\/10\.0\.2\.2:7890/);
+  assert.match(buildCalls[0], /--build-arg HTTPS_PROXY=http:\/\/10\.0\.2\.2:7890/);
+  assert.ok(
+    f
+      .calls()
+      .split('\n')
+      .filter((line) => !line.includes('buildx build'))
+      .every((line) => !line.includes('10.0.2.2:7890'))
+  );
+  const output = result.stdout.match(/发布包已完成：(.+)\n/)[1];
+  const verified = f.run('verify', output);
+  assert.equal(verified.status, 0, verified.stderr);
+  for (const name of httpsFiles) assert.ok(readFileSync(join(output, name)).length > 0, name);
+  writeFileSync(join(output, 'Caddyfile.lan.example'), 'tampered');
+  assert.equal(f.run('verify', output).status, 1);
+});
+
+test('invalid or credential-bearing build proxies are refused before Docker without echoing values', (t) => {
+  for (const proxy of [
+    'http://user:private-marker@localhost:7890',
+    'http://localhost:99999',
+    'http://localhost:7890/private-marker',
+    'socks5://localhost:7890'
+  ]) {
+    const f = fixture(t, undefined, undefined, { ARTZOO_BUILD_PROXY: proxy });
+    const result = f.run('build', '--allow-dirty');
+    assert.equal(result.status, 1);
+    assert.equal(f.calls(), '');
+    assert.doesNotMatch(result.stdout + result.stderr, /private-marker/);
+  }
 });
