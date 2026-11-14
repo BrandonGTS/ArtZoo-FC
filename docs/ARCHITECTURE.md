@@ -237,6 +237,8 @@ Caddy 部署通过 web 专用 Compose 覆盖文件设置 `ARTZOO_TRUSTED_PROXY=c
 
 ## 八、配置开关一览
 
+家庭站的 web 已配置 `ARTZOO_SMS_PROVIDER=aliyun-pnvs`，注册和重置密码模板编号分别为 `100001`、`100003`。下表“默认”列表示未配置时的值。
+
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `ARTZOO_DEPLOYMENT_ENV` | 无 | 只能是 `production` 或 `local` |
