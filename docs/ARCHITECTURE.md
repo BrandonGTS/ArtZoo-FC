@@ -243,7 +243,12 @@ Caddy 部署通过 web 专用 Compose 覆盖文件设置 `ARTZOO_TRUSTED_PROXY=c
 | `ARTZOO_PUBLIC_ORIGIN` | 无 | 站点地址，生产环境必须是 https |
 | `ARTZOO_TRUSTED_PROXY` | 空 | Caddy 部署通过 web 专用 Compose 覆盖文件设为 `caddy` |
 | `ARTZOO_INVITATION_KEY` | 无 | 不设置就无法生成邀请链接 |
-| `ARTZOO_SMS_PROVIDER` | `unconfigured` | 设为 `aliyun-pnvs` 才能发送短信 |
+| `ARTZOO_SMS_PROVIDER` | `unconfigured` | web 设为 `aliyun-pnvs` 并完整配置下列字段才启用；worker、tools 固定关闭 |
+| `ARTZOO_SMS_ACCESS_KEY_ID` / `ARTZOO_SMS_ACCESS_KEY_SECRET` | 空 | 阿里云短信凭证，仅传给 web，作为秘密处理 |
+| `ARTZOO_SMS_SIGN_NAME` | 空 | 短信签名；开启短信时必填 |
+| `ARTZOO_SMS_REGISTER_TEMPLATE_CODE` / `ARTZOO_SMS_RESET_TEMPLATE_CODE` | 空 | 开启短信时分别必须是 `100001` / `100003` |
+| `AUTH_SMS_DAILY_LIMIT` | 200 | 全站每日短信预约上限，北京时间自然日，整数 1–10000；失败发送和虚拟预约也占额 |
+| `ARTZOO_MEDIA_GLOBAL_LIMIT_BYTES` / `ARTZOO_MEDIA_DAILY_LIMIT_BYTES` | 10000000000 / 2000000000 | 正整数字节数，不超过有符号 64 位整数上限；每日不得超过全站 |
 | `ARTZOO_AVATAR_DIR` | 仓库下的 `.local/avatars` | 生产环境必须设置为绝对路径 |
 | `ARTZOO_UPLOAD_CONCURRENCY` | 2 | 同时上传的请求数，范围 1–8 |
 | `ARTZOO_MEDIA_BUDGET_ENABLED` | 关 | 上传配额 |
@@ -290,7 +295,7 @@ Caddy 覆盖转发头；应用仅在 `ARTZOO_TRUSTED_PROXY=caddy` 时信任来�
 | 发布包内容 | 文件或用途 |
 |---|---|
 | 镜像与清单 | `images.tar`、`images.tsv`、`source.txt`、`SHA256SUMS` |
-| 运行配置 | `compose.yaml`、`.env.example`、由镜像清单生成的 `images.env` |
+| 运行配置 | `compose.yaml`、`.env.example`、`runtime-config.manifest`、由镜像清单生成的 `images.env` |
 | 构建与验收工具 | `deployment-images.sh`、`deployment-image-check.mjs`、`deployment-compose-check.sh`、`deployment-https-check.mjs` |
 | 维护入口 | `deployment-maintenance.sh` |
 | 配置模板 | 七份 Caddy、代理覆盖、WSL 网络及 Dev Docker 配置模板，源文件位于 `deployment/` |
@@ -299,6 +304,16 @@ Caddy 覆盖转发头；应用仅在 `ARTZOO_TRUSTED_PROXY=caddy` 时信任来�
 发布包输出到仓库外的独立版本目录，交付文件逐项纳入 SHA-256 校验；导入还核对镜像 ID 和平台，不替换同名不同内容的镜像。校验和用于完整性检查，发布包仍须来自可信开发端。PostgreSQL 官方镜像单独准备，不包含在三个应用镜像中。
 
 正式候选包来自干净工作区；允许未提交改动或仅构建部分镜像时使用 `dev-` 标签。完整 Compose 和维护流程需要三个镜像；发布包导入不切换正在运行的网站。
+
+### 运行配置清单
+
+`deployment/runtime-config.manifest` 随发布包交付并参与 SHA-256 校验。每行用 `|` 分隔变量名、必填条件、秘密标记、校验规则、默认值、目标服务；`fixed` 行描述不可由环境文件覆盖的容器策略，`-` 表示仅供宿主使用。新增常规运行变量只需修改清单与 `compose.yaml`，不再修改维护脚本的变量白名单。
+
+环境文件只接受清单声明的输入变量。可选项未提供或为空时使用清单与 Compose 中一致的默认值；短信的五个字段在 `aliyun-pnvs` 下全部必填，关闭时必须为空。普通值使用 `NAME=value`；含 `$`、`#`、引号或反斜杠时使用单引号包裹，内部单引号写作 `\'`。不接受末尾反斜杠、反斜杠紧邻单引号的值、双引号插值、多行值、行尾注释或首尾空白；不会执行文件内容。
+
+只读命令 `bash "$bundle/deployment-maintenance.sh" config-check --bundle "$bundle" --root "$root"` 校验发布包及配置，汇总缺失、多余和格式不符的变量名，不显示值，不连接 Docker、不创建锁或临时文件。它不代表镜像已导入、代理已验收或短信已发送成功。实际维护仍核对镜像 ID、挂载和代理覆盖；`check_app` 按清单比较所有声明的非秘密容器变量，秘密仅在读取配置时校验格式。
+
+web、worker 使用 `json-file` 容器日志，每个文件最多 `10m`，最多保留 `3` 个；维护检查会核对实际日志设置。tools 使用 `none`，不持久记录初始化交互。语法依据 [Docker 日志配置](https://docs.docker.com/reference/compose-file/services/#logging)及[环境文件插值规则](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)。
 
 ### 持久化与维护
 
@@ -313,7 +328,7 @@ Caddy 覆盖转发头；应用仅在 `ARTZOO_TRUSTED_PROXY=caddy` 时信任来�
 
 媒体使用 Linux 文件系统；目录及祖先须属于 root 或运行用户，不能被组或其他用户写入。Compose 拒绝缺失的挂载目录，不自动创建或放宽权限。
 
-迁移、媒体基线和首位超管初始化均为显式维护，不随网站启动执行。配额须在基线完成后启用；worker 开启认证记录清理，孤儿媒体删除、官方采集、QQ 和短信默认关闭。维护入口核对发布包、镜像及运行配置；日常启停保留数据，不执行初始化或升级。
+迁移、媒体基线和首位超管初始化均为显式维护，不随网站启动执行。配额须在基线完成后启用；worker 开启认证记录清理，孤儿媒体删除、官方采集和 QQ 固定关闭；短信默认关闭，仅 web 可按清单启用。维护入口核对发布包、镜像及运行配置；日常启停保留数据，不执行初始化或升级。
 
 ### 验证与边界
 

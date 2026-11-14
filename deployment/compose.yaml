@@ -36,6 +36,11 @@ x-media: &media
       create_host_path: false
 
 x-app: &app
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '3'
   platform: linux/amd64
   pull_policy: never
   user: '1000:1000'
@@ -73,6 +78,13 @@ services:
     image: ${ARTZOO_WEB_IMAGE:?Load images.env from the verified release}
     environment:
       <<: *app-environment
+      ARTZOO_SMS_PROVIDER: ${ARTZOO_SMS_PROVIDER:-unconfigured}
+      ARTZOO_SMS_ACCESS_KEY_ID: ${ARTZOO_SMS_ACCESS_KEY_ID:-}
+      ARTZOO_SMS_ACCESS_KEY_SECRET: ${ARTZOO_SMS_ACCESS_KEY_SECRET:-}
+      ARTZOO_SMS_SIGN_NAME: ${ARTZOO_SMS_SIGN_NAME:-}
+      ARTZOO_SMS_REGISTER_TEMPLATE_CODE: ${ARTZOO_SMS_REGISTER_TEMPLATE_CODE:-}
+      ARTZOO_SMS_RESET_TEMPLATE_CODE: ${ARTZOO_SMS_RESET_TEMPLATE_CODE:-}
+      AUTH_SMS_DAILY_LIMIT: ${AUTH_SMS_DAILY_LIMIT:-200}
       ARTZOO_INVITATION_KEY: ${ARTZOO_INVITATION_KEY:?Set a random invitation signing key}
       ARTZOO_SECURITY_CLEANUP_ENABLED: '0'
       PG_POOL_MAX: '10'
@@ -107,6 +119,8 @@ services:
     image: ${ARTZOO_TOOLS_IMAGE:?Load images.env from the verified release}
     profiles: [maintenance]
     restart: 'no'
+    logging:
+      driver: none
     environment:
       <<: *app-environment
       ARTZOO_SECURITY_CLEANUP_ENABLED: '0'
