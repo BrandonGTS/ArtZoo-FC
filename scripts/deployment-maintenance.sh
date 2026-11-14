@@ -19,6 +19,12 @@ usage() {
 默认只显示帮助。项目名默认 artzoo，跨版本必须保持不变。
 root 下预先准备 secrets 和 media/{original,derived,avatars}，UID/GID 1000、0700。
 秘密文件固定为 root/secrets/compose.env（0600）；不 source、不打印配置。
+可选代理覆盖固定为 root/deploy/proxy.compose.yaml，仅允许以下四行（可加空行或独立注释）：
+services:
+  web:
+    environment:
+      ARTZOO_TRUSTED_PROXY: caddy
+存在时所有 Compose 操作均加载该文件；须为可信普通文件，不能修改其他服务或设置。
 运行端只需 Bash、Docker Compose、GNU 工具和 flock；无需源码、Node 或 pnpm。
 所有写操作均须在核对目标后由站长单独执行；失败保留数据，勿删除卷或盲目重复初始化。
 HELP
@@ -92,7 +98,7 @@ if ! d compose version >/dev/null 2>&1; then
   standalone=$(command -v docker-compose) || fail '缺少 Docker Compose。'
   compose_bin=("$standalone")
 fi
-override='' temporary='' tool='' apps_touched=0
+override='' temporary='' tool='' apps_touched=0 web_proxy=''
 compose=()
 dc() { "${privilege[@]}" timeout --kill-after=10s 330s env -i "PATH=$PATH" "HOME=$HOME" DOCKER_HOST=unix:///var/run/docker.sock "${compose[@]}" "$@" </dev/null; }
 cleanup() {
@@ -132,11 +138,31 @@ read_config() {
   [[ "${values[ARTZOO_MEDIA_BUDGET_ENABLED]}" =~ ^[01]$ && "${values[ARTZOO_MEDIA_GLOBAL_LIMIT_BYTES]}" == 10000000000 && "${values[ARTZOO_MEDIA_DAILY_LIMIT_BYTES]}" == 2000000000 ]] || fail '本入口仅接受已约定的 10 GB / 2 GB 配额。'
   unset 'values[POSTGRES_PASSWORD]' 'values[ARTZOO_INVITATION_KEY]'
 }
+configure_proxy() {
+  local proxy="$root/deploy/proxy.compose.yaml" line
+  local -a lines=()
+  web_proxy=${values[ARTZOO_TRUSTED_PROXY]}
+  [[ -e "$proxy" || -L "$proxy" ]] || return 0
+  [[ -f "$proxy" && ! -L "$proxy" && -r "$proxy" ]] || fail '代理覆盖须为可读普通文件，不能是符号链接。'
+  trusted_path "$proxy"
+  [[ "$(stat -c %s "$proxy")" -le 4096 ]] || fail '代理覆盖文件过大。'
+  # Deliberately accept only the dedicated web trust switch, not arbitrary Compose overrides.
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line=${line%$'\r'}
+    [[ "$line" =~ ^[[:space:]]*(#.*)?$ ]] && continue
+    lines+=("$line")
+  done < "$proxy"
+  [[ ${#lines[@]} == 4 && "${lines[0]}" == 'services:' && "${lines[1]}" == '  web:' && "${lines[2]}" == '    environment:' && "${lines[3]}" == '      ARTZOO_TRUSTED_PROXY: caddy' ]] || fail '代理覆盖仅支持帮助中列出的 web/caddy 四行配置；文件内容未输出。'
+  compose+=(-f "$proxy")
+  web_proxy=caddy
+}
 configure() {
   read_config
   override=$(mktemp "$root/secrets/.maintenance.XXXXXXXX.yaml")
   printf 'services:\n  tools:\n    logging:\n      driver: "none"\n' > "$override"
-  compose=("${compose_bin[@]}" --project-name "$project" --env-file "$bundle/images.env" --env-file "$config" -f "$bundle/compose.yaml" -f "$override")
+  compose=("${compose_bin[@]}" --project-name "$project" --env-file "$bundle/images.env" --env-file "$config" -f "$bundle/compose.yaml")
+  configure_proxy
+  compose+=(-f "$override")
   dc config --quiet >/dev/null 2>&1 || fail 'Compose 配置解析失败，诊断内容未输出以保护秘密。'
 }
 no_project() {
@@ -197,10 +223,12 @@ check_app() {
     [[ "$(d inspect --format '{{len .HostConfig.PortBindings}}' "$container")" == 0 ]] || fail 'worker 不应发布端口。'
     security=1
   fi
-  local key actual
+  local key actual expected
   for key in ARTZOO_PUBLIC_ORIGIN ARTZOO_TRUSTED_PROXY ARTZOO_MEDIA_BUDGET_ENABLED ARTZOO_MEDIA_GLOBAL_LIMIT_BYTES ARTZOO_MEDIA_DAILY_LIMIT_BYTES; do
     actual=$(d inspect --format "{{range .Config.Env}}{{if eq (index (split . \"=\") 0) \"$key\"}}{{println .}}{{end}}{{end}}" "$container")
-    [[ "$actual" == "$key=${values[$key]}" ]] || fail '容器配置与秘密文件中的非秘密字段不一致。'
+    expected=${values[$key]}
+    if [[ "$service" == web && "$key" == ARTZOO_TRUSTED_PROXY ]]; then expected=$web_proxy; fi
+    [[ "$actual" == "$key=$expected" ]] || fail '容器配置与目标配置中的非秘密字段不一致。'
   done
   for key in NODE_ENV=production ARTZOO_DEPLOYMENT_ENV=production ARTZOO_AVATAR_DIR=/app/storage/avatars PGHOST=postgres PGPORT=5432 PGUSER=artzoo PGDATABASE=artzoo ARTZOO_MEDIA_CLEANUP_EXECUTE=0 ARTZOO_OFFICIAL_SYNC_ENABLED=0 ARTZOO_QQ_MODE= ARTZOO_SMS_PROVIDER=unconfigured "ARTZOO_SECURITY_CLEANUP_ENABLED=$security"; do
     actual=$(d inspect --format "{{range .Config.Env}}{{if eq (index (split . \"=\") 0) \"${key%%=*}\"}}{{println .}}{{end}}{{end}}" "$container")

@@ -1,6 +1,6 @@
 # ArtZoo 架构
 
-本文介绍代码怎么分层、一个请求怎么流转、关键数据规则落在哪里、后台任务做什么，以及有哪些配置开关。业务结构基于代码版本 `fa643541` 整理；第九节的部署交付流程以当前 Dockerfile 和脚本为准。
+本文介绍代码怎么分层、一个请求怎么流转、关键数据规则落在哪里、后台任务做什么，以及有哪些配置开关。业务结构基于代码版本 `fa643541` 整理；第九节的部署架构以当前配置模板和脚本为准，操作步骤见部署手册。
 
 业务规则（例如退出扣几分）不在本文范围内，请看 `rules/`。
 
@@ -109,7 +109,7 @@ flowchart LR
 - 只有在 `ARTZOO_TRUSTED_PROXY=caddy` 时，才读取 `X-Forwarded-For` 的**最后一段**作为来源。IPv4 按单个地址计算，IPv6 按 /64 网段计算。
 - 其他情况下，所有人都算作同一个来源 `untrusted-source`，**全站共用一个桶**。
 
-所以，生产环境如果放在 Caddy 后面，必须设置 `ARTZOO_TRUSTED_PROXY=caddy`；新部署方式也要确保代理会覆盖 `X-Forwarded-For`。如果新部署不使用 Caddy，需要修改这个文件。
+Caddy 部署通过 web 专用 Compose 覆盖文件设置 `ARTZOO_TRUSTED_PROXY=caddy`，并验证代理覆盖 `X-Forwarded-For`；配置关系见第九节。
 
 ### 安全响应头
 
@@ -241,7 +241,7 @@ flowchart LR
 |---|---|---|
 | `ARTZOO_DEPLOYMENT_ENV` | 无 | 只能是 `production` 或 `local` |
 | `ARTZOO_PUBLIC_ORIGIN` | 无 | 站点地址，生产环境必须是 https |
-| `ARTZOO_TRUSTED_PROXY` | 空 | 生产环境放在 Caddy 后面时，设为 `caddy` |
+| `ARTZOO_TRUSTED_PROXY` | 空 | Caddy 部署通过 web 专用 Compose 覆盖文件设为 `caddy` |
 | `ARTZOO_INVITATION_KEY` | 无 | 不设置就无法生成邀请链接 |
 | `ARTZOO_SMS_PROVIDER` | `unconfigured` | 设为 `aliyun-pnvs` 才能发送短信 |
 | `ARTZOO_AVATAR_DIR` | 仓库下的 `.local/avatars` | 生产环境必须设置为绝对路径 |
@@ -254,120 +254,69 @@ flowchart LR
 | `ARTZOO_QQ_BRIDGE_SECRET` | 无 | 网站和插件之间通信用的签名密钥 |
 | `PG_POOL_MAX` | web 10 / worker 3 | 数据库连接数上限 |
 
-第 5 阶段写部署配置时，会按本表逐项确定新站的取值。
+本表列通用默认值；部署配置关系见第九节，实际配置步骤见[部署配置操作手册](DEPLOYMENT.md)。
 
 ---
 
 ## 九、部署镜像与交付
 
-开发和运行分离：开发端保留仓库并构建镜像，运行端只安装 Docker，接收发布包和运行配置，不拉取源码，也不需要安装 Node、pnpm 或 Python。家庭部署可使用同一台 Windows 上的两个独立 WSL；以后 Linux 服务器沿用相同发布包格式。
+部署决定见 [DECISIONS.md](DECISIONS.md) 第 8–12 条；安装、配置、构建、验收、启停和回退步骤统一见[部署配置操作手册](DEPLOYMENT.md)。
 
-`Dockerfile` 提供三个目标：
+### 运行布局
+
+- **Dev**：保留源码并构建镜像，Docker 使用 rootless 与独立网络，避免覆盖 Server 的防火墙规则。Docker 下载代理通过用户服务配置；构建步骤使用 `ARTZOO_BUILD_PROXY`，代理不写入运行镜像环境。家庭代理配置允许 Dev 容器访问宿主回环服务。
+- **Server**：安装 Caddy、Docker 和 Docker Compose，接收版本化发布包，不拉取源码，也不需要宿主 Node、pnpm 或 Python。web、worker、PostgreSQL 由 Compose 管理；tools 只用于显式维护。
+- **Windows**：WSL 使用 mirrored、DNS 隧道、自动代理及本机 IP 回环；宿主防火墙将家庭入口限定为指定局域网到 TCP 443。Windows 不安装 Caddy，不配置家庭公网端口映射。
+- **正式服务器**：沿用镜像发布方式；独立 Linux 服务器不需要 WSL 配置，域名入口使用单独的 Caddy 模板。
+
+### HTTPS 与代理
+
+访问链路为固定局域网地址的 HTTPS → Server Caddy → `127.0.0.1:13100` → web 容器 `3100`。worker 不发布端口；PostgreSQL 只接内部网络、不发布宿主端口；Caddy 管理接口仅监听回环地址。
+
+家庭入口使用 Caddy 内部 CA，当前允许设备证书警告，设备信任状态单独记录。正式域名模板使用自动 HTTPS；证书和私钥保存在 Server，不进入仓库或发布包。
+
+Caddy 覆盖转发头；应用仅在 `ARTZOO_TRUSTED_PROXY=caddy` 时信任来源。基础环境配置保持该值为空，由 `/srv/artzoo/deploy/proxy.compose.yaml` 仅为 web 启用。维护脚本自动加载并校验覆盖文件，拒绝额外服务、字段或不可信文件。
+
+### 镜像与发布包
 
 | 镜像 | 内容与用途 |
 |---|---|
-| web | Next standalone、静态资源、独立 BMP 线程及其生产依赖 |
-| worker | 编译后的后台程序及独立生产依赖，默认要求数据库配置 |
-| tools | Prisma CLI、迁移、编译后的共享包和受保护的超管初始化入口；默认启动只显示说明 |
+| web | Next standalone、静态资源、独立 BMP 线程及生产依赖 |
+| worker | 编译后的后台程序及生产依赖，默认要求数据库配置 |
+| tools | Prisma CLI、迁移、媒体基线和受保护的超管初始化入口；默认只显示说明 |
 
-镜像使用同一 Node 基础镜像和锁文件，以 UID/GID 1000 运行。`.dockerignore` 只允许构建输入进入上下文，排除宿主依赖、私有配置、密钥和运行数据。媒体持久化由运行配置负责，镜像中不包含上传数据。
+应用镜像统一使用锁文件和固定 Node 基础镜像，默认以 UID/GID 1000 运行。`.dockerignore` 排除宿主依赖、私有配置、密钥和运行数据；Compose 仅引用镜像，不挂源码、不执行构建。
 
-### 开发端：构建发布包
+| 发布包内容 | 文件或用途 |
+|---|---|
+| 镜像与清单 | `images.tar`、`images.tsv`、`source.txt`、`SHA256SUMS` |
+| 运行配置 | `compose.yaml`、`.env.example`、由镜像清单生成的 `images.env` |
+| 构建与验收工具 | `deployment-images.sh`、`deployment-image-check.mjs`、`deployment-compose-check.sh`、`deployment-https-check.mjs` |
+| 维护入口 | `deployment-maintenance.sh` |
+| 配置模板 | 七份 Caddy、代理覆盖、WSL 网络及 Dev Docker 配置模板，源文件位于 `deployment/` |
+| 操作手册 | `DEPLOYMENT.md` |
 
-在开发仓库根目录执行，脚本会在需要时请求本机 Docker 的 sudo 权限；不要给整个脚本加 sudo。依赖 Bash、Git、Docker Buildx 和常用 GNU 工具，不依赖宿主 Node。
+发布包输出到仓库外的独立版本目录，交付文件逐项纳入 SHA-256 校验；导入还核对镜像 ID 和平台，不替换同名不同内容的镜像。校验和用于完整性检查，发布包仍须来自可信开发端。PostgreSQL 官方镜像单独准备，不包含在三个应用镜像中。
 
-```bash
-# 正式候选包：必须是干净工作区，默认输出三个镜像。
-bash scripts/deployment-images.sh build --output "$HOME/artzoo-releases"
+正式候选包来自干净工作区；允许未提交改动或仅构建部分镜像时使用 `dev-` 标签。完整 Compose 和维护流程需要三个镜像；发布包导入不切换正在运行的网站。
 
-# 开发验证：允许未提交改动，只输出 web 镜像。
-bash scripts/deployment-images.sh build --output "$HOME/artzoo-releases" --target web --allow-dirty
-```
+### 持久化与维护
 
-脚本构建后先运行基础检查，再导出镜像。输出目录必须在仓库外；每次生成独立版本目录和镜像标签，不覆盖已有发布包。`--target` 支持 `all`、`web`、`worker`、`tools`。允许未提交改动或只输出部分镜像的包使用 `dev-` 标签，不能当作可按提交重建的正式候选包。
-
-完整发布目录包含 `images.tar`、`images.tsv`、`source.txt`、`SHA256SUMS`、镜像检查脚本，以及 `compose.yaml`、`.env.example`、`images.env`、`deployment-compose-check.sh`。运行模板源文件在 `deployment/`；`images.env` 从镜像清单生成，导入时逐项核对，不能自行改成 `local` 或其他版本。所有交付文件都参与 SHA-256 校验。`source.txt` 记录提交、工作区状态、目标及平台；包内没有真实密码或已填写的环境配置。部分镜像包仍可单独检查，但不能启动完整 Compose。
-
-构建会占用 CPU、内存和磁盘；失败时不会发布最终目录，会报告保留的 `.artzoo-build.*` 临时目录，核对后可手动清理再重试。已构建的镜像和缓存不自动删除。旧格式包仍可导入和执行原有镜像检查；Compose 验证需要新格式完整包。
-
-### 运行端：导入与验证
-
-将整个发布目录复制到运行端。家庭 WSL 可以直接读取 Windows 共享盘上的目录；远程服务器通过 SSH/SCP 传输到操作者选择的发布目录。不要只复制 `images.tar`。下列 `bundle` 应替换为实际目录；命令可以在运行端任意目录执行。Compose 操作另外需要 Docker Compose 插件；隔离检查还需要 curl。
-
-```bash
-bundle=/srv/artzoo/releases/实际发布包目录
-bash "$bundle/deployment-images.sh" import "$bundle"
-bash "$bundle/deployment-images.sh" check "$bundle"
-```
-
-导入先校验固定文件清单及 SHA-256，再加载镜像并核对 ID 和平台；已存在相同 ID 的版本可重复导入，不同 ID 的同名标签会被拒绝。校验失败时重新传输，不绕过检查。校验只能检查传输完整性，不是发布者签名，发布包必须来自可信开发端。
-
-基础检查使用临时容器，验证 UID、应用目录中的私有配置与运行数据、BMP 转换和损坏图片拒绝、web HTTP/静态资源/图片优化、worker 数据库依赖及缺库拒绝、tools CLI 与初始化入口保护。web 不连接数据库，健康接口应返回 503；检查不发布端口、不挂载业务数据，也不验证 Windows 转发、局域网 HTTPS 或登录上传。
-
-### 隔离数据库检查
-
-**【危险：仅临时测试库】** 下面的命令会在新建的隔离 PostgreSQL 中执行迁移、写入测试记录并运行 worker 清理。只适用于同时包含 worker 和 tools 的包；不会读取站点环境文件或连接已有数据库。
-
-```bash
-bash "$bundle/deployment-images.sh" check "$bundle" --database
-```
-
-该检查使用与 CI 对齐的 PostgreSQL 镜像，缺少时会下载；数据库存储使用临时内存文件系统，网络不连外网、不发布端口。检查空库迁移、重复迁移、Prisma 结构差异，以及清理关闭、开启和重复运行时的记录变化。媒体配额、媒体删除和官方活动采集保持关闭。
-
-正常退出、失败或收到 INT/TERM 时，脚本只清理本次带唯一标识的测试容器和网络，不使用全局 prune。主机断电或进程被强制终止时可能留下测试资源，可按 `artzoo.image-check` 标签核对后单独清理；不要删除其他任务资源。检查结果以终端的 `PASS` 和退出码 0 为准，日志如需保存应放在仓库外。
-
-### Compose：持久化与环境配置
-
-Compose 只有 `image:`，不挂源码、不执行构建。web 默认发布 `127.0.0.1:13100 → 3100`；worker 不发布端口；PostgreSQL 只连接内部网络，不发布宿主端口。web、worker 和 tools 另有出站网络，供以后按配置访问外部服务。隔离检查保留这一网络结构，外部服务开关全部关闭，不发送真实短信或 QQ。
-
-| 数据或配置 | 运行端位置 | 权限与生命周期 |
+| 数据或配置 | Server 位置 | 约束 |
 |---|---|---|
-| PostgreSQL 17.11-bookworm | `artzoo_postgres-data` named volume，容器内 `/var/lib/postgresql/data` | 由官方镜像管理所有权，不改为 UID 1000；重建容器保留卷 |
-| 原图、衍生图、头像 | `/srv/artzoo/media/{original,derived,avatars}` → `/app/storage/` 对应子目录 | UID/GID 1000、目录 0700；web、worker、tools 共用 |
-| 秘密配置 | `/srv/artzoo/secrets/compose.env` | 操作者所有、0600；上级 secrets 目录 0700；不随发布包传输 |
-| 发布包 | `/srv/artzoo/releases/<版本>` | 操作者所有、发布目录 0750；保留旧版本，不原地改包 |
+| PostgreSQL 数据 | `artzoo_postgres-data` named volume | 固定 Compose 项目名，重建容器保留数据卷 |
+| 原图、衍生图、头像 | `/srv/artzoo/media/{original,derived,avatars}` | UID/GID 1000、目录 0700；web、worker、tools 共用 |
+| 秘密配置 | `/srv/artzoo/secrets/compose.env` | 文件 0600、secrets 目录 0700，不随包传输 |
+| 代理覆盖 | `/srv/artzoo/deploy/proxy.compose.yaml` | 仅覆盖 web 的代理信任配置，文件及上级目录不可被组或其他用户写入 |
+| Caddy 配置与状态 | `/etc/caddy/Caddyfile`、`/var/lib/caddy/` | 配置、证书和私钥留在 Server；模板单独入库 |
+| 发布包 | `/srv/artzoo/releases/<版本>` | 保留旧版本，不原地修改已校验的包 |
 
-媒体及每一级上级目录必须属于 root 或运行用户，且不能被组或其他用户写入；宿主目录使用 WSL/Linux 文件系统，不放到 Windows 共享盘。Compose 的 `create_host_path: false` 会拒绝不存在的挂载源，不自动建目录或修权限。应用以 UID/GID 1000 写入，不使用 `chmod 777`。镜像中的 `/app` 与 `/app/storage` 由 root 持有；tools 的父目录由 Docker 创建，挂载权限要求相同。
+媒体使用 Linux 文件系统；目录及祖先须属于 root 或运行用户，不能被组或其他用户写入。Compose 拒绝缺失的挂载目录，不自动创建或放宽权限。
 
-先由站长核对上述目录。只在秘密配置尚不存在时，将包内 `.env.example` 复制为 `compose.env`，立即设为 0600，并在运行端编辑。填写精确 HTTPS origin，分别生成数据库密码与邀请签名密钥；数据库密码使用随机十六进制字符串，避免拼接 Prisma URL 时出现转义歧义。不要覆盖已有配置，不把秘密粘贴到命令、聊天或日志。修改环境文件中的数据库密码不会修改已初始化卷内的密码。
+迁移、媒体基线和首位超管初始化均为显式维护，不随网站启动执行。配额须在基线完成后启用；worker 开启认证记录清理，孤儿媒体删除、官方采集、QQ 和短信默认关闭。维护入口核对发布包、镜像及运行配置；日常启停保留数据，不执行初始化或升级。
 
-下面在运行端任意目录定义命令入口，只解析配置，不启动服务。`bundle` 必须指向已校验的完整发布包；固定项目名防止每换一个版本目录就创建新数据库卷。清空子进程环境，避免宿主导出的变量覆盖文件中的镜像或存储路径。
+### 验证与边界
 
-```bash
-bundle=/srv/artzoo/releases/实际发布包目录
-dc() {
-  sudo env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root \
-    docker --host unix:///var/run/docker.sock compose --project-name artzoo \
-    --env-file "$bundle/images.env" --env-file /srv/artzoo/secrets/compose.env \
-    -f "$bundle/compose.yaml" "$@"
-}
-dc config --quiet
-```
-
-成功退出表示配置能解析，不表示数据库已初始化或网站可用。不要运行会输出秘密的裸 `config` 或 `config --environment`。失败时修正运行端配置或目录，重新校验；配置检查不需要回退数据。环境文件只填写模板所列变量，不覆盖 `ARTZOO_*_IMAGE`。PostgreSQL 镜像不包含在三应用镜像包中，运行端应预先准备精确的 `postgres:17.11-bookworm`；完全离线时另行传输官方镜像。
-
-模板固定 production 策略；`ARTZOO_TRUSTED_PROXY` 初始为空，真实 Caddy 覆盖转发头后才填 `caddy`。worker 开启认证记录清理；孤儿媒体删除、上传配额、官方采集、QQ 和短信首轮关闭。后续开启配额必须先完成基线初始化；有关开关应通过经过审核的 Compose 配置调整，不是只往环境文件新增变量。
-
-tools 属于 `maintenance` profile，普通启动不会带起它；显式 `dc run --rm --no-deps tools` 只显示说明。维护时必须明确指定命令，不把迁移、基线或超管初始化塞入启动入口。实际迁移使用 tools 的 `/app/packages/db/node_modules/.bin/prisma`，工作目录 `/app/packages/db`；生产库的初始化步骤在核对目标后单独执行。
-
-### Compose 隔离验收
-
-**【危险：仅新建临时项目】** 在运行端任意目录执行以下命令。脚本校验并导入发布包，创建唯一 `artzoo-compose-check-*` 项目、独立 named volume 和 `/srv/artzoo-compose-check.*` 媒体目录；不读取正式环境文件。测试会迁移临时空库、运行 worker、写入数据库和媒体、删除并重建容器，最后删除本次测试数据。
-
-```bash
-bash "$bundle/deployment-compose-check.sh" "$bundle"
-```
-
-以退出码 0 和最后的 `PASS` 为成功标志：回环端口可访问；数据库无发布端口且仅接内部网络；tools 默认不运行；web、worker 共享三类目录并能跨容器读写；不删除卷的完整重建保留数据库记录和媒体；空白配置、缺失挂载目录及不可写目录均被拒绝。临时 web 使用随机回环端口，不占用正式 13100；HTTP 健康探测不等同于 HTTPS、来源 IP 或业务验收。
-
-正常退出或失败会清理本次容器、网络、卷和目录；SIGKILL、断电可能留下资源。失败时先按终端报告的唯一项目名排查残留，再重新运行，不使用全局 prune。正式运行时保持同一项目名和媒体路径，普通 `down` 后 `up` 保留数据；**不要使用 `down --volumes` 删除正式数据库卷**。只有隔离脚本在自己的临时项目中使用该选项。
-
-实现依据：[Docker Compose 服务配置](https://docs.docker.com/reference/compose-file/services/)、[profiles](https://docs.docker.com/compose/how-tos/profiles/) 与 [PostgreSQL 官方镜像](https://hub.docker.com/_/postgres)。
-
-### 与正式启用的边界
-
-构建、导入和检查都不会修改正在运行的网站。正式启用时由运行配置引用核对过的版本标签；保留上一版本镜像与发布包，供单独评估回退。数据库迁移、媒体基线和首位超管初始化仍需单独核对目标后执行，不能隐含在网站启动或导入过程中；数据库结构变化不能仅靠换回旧镜像撤销。
-
-tools 中直接调用 `/app/packages/db/node_modules/.bin/prisma`，工作目录为 `/app/packages/db`，避免 `pnpm exec` 在运行时检查并尝试调整依赖。`ARTZOO_DEPLOYMENT_ENV` 用于站点部署策略；构建时不要把 `NODE_ENV` 固定为 `development`。
-
-正式启用、Caddy、启动恢复及业务验收的任务和状态仍以 [PLAN.md](PLAN.md) 第三节为唯一入口，本节不另建待办清单。`restart: unless-stopped` 是容器重启策略，不代替 Windows 开机启动 WSL、备份或恢复演练。
+- 镜像和 Compose 检查使用独立临时资源，覆盖运行依赖、空库迁移、媒体基线、worker、挂载和持久化；不连接家庭数据库。
+- HTTPS 检查核对证书、健康接口和伪造转发头，结束后恢复临时修改的 Caddy 配置；多设备访问与入口隔离按部署手册验收。
+- 初始化、服务健康和 HTTPS 可用不等于登录、上传、权限或备份恢复验收完成。容器重启策略不代替 Windows/WSL 开机恢复；任务状态统一以 [PLAN.md](PLAN.md) 为准。

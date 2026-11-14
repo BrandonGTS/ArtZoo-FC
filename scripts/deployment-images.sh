@@ -13,6 +13,7 @@ declare -A refs=() ids=()
 roles=()
 config_files=(compose.yaml .env.example images.env deployment-compose-check.sh)
 maintenance_file=deployment-maintenance.sh
+https_files=(Caddyfile.lan.example Caddyfile.public.example proxy.compose.yaml.example wslconfig.example dev-docker.tmpfiles.conf.example dev-user-retry.conf.example dev-docker-proxy.conf.example deployment-https-check.mjs DEPLOYMENT.md)
 
 fail() { printf '错误：%s\n' "$*" >&2; exit 1; }
 usage() {
@@ -24,6 +25,7 @@ usage() {
   bash deployment-images.sh check 发布包目录 [--database]
 
 build：开发端构建、基础验证并导出；默认三个镜像、干净工作区，输出到仓库外。
+构建步骤需要代理时设置 ARTZOO_BUILD_PROXY=http://主机:端口（不含账号密码）；不写入运行镜像环境。
 verify：仅验证文件清单和校验和，不连接 Docker。
 import：运行端校验并导入；不启动或替换网站。重复导入同一版本可安全跳过。
 check：运行端临时容器验收。--database 额外创建隔离空库，执行迁移和 worker 写操作。
@@ -73,7 +75,7 @@ trap 'exit 143' TERM
 load_bundle() {
   [[ -d "$1" ]] || fail '发布包目录不存在。'
   bundle=$(realpath -e -- "$1")
-  local file hash extra name role ref id platform version='' current config_count=0 maintenance_count=0 expected actual
+  local file hash extra name role ref id platform version='' current config_count=0 maintenance_count=0 https_count=0 expected actual
   local -A sums=() seen=()
   for file in SHA256SUMS images.tsv images.tar source.txt deployment-images.sh deployment-image-check.mjs; do
     [[ -f "$bundle/$file" && ! -L "$bundle/$file" ]] || fail "发布包缺少普通文件：$file"
@@ -85,13 +87,25 @@ load_bundle() {
       images.tsv|images.tar|source.txt|deployment-images.sh|deployment-image-check.mjs) ;;
       deployment-maintenance.sh) maintenance_count=$((maintenance_count + 1)) ;;
       compose.yaml|.env.example|images.env|deployment-compose-check.sh) config_count=$((config_count + 1)) ;;
+      Caddyfile.lan.example|Caddyfile.public.example|proxy.compose.yaml.example|wslconfig.example|dev-docker.tmpfiles.conf.example|dev-user-retry.conf.example|dev-docker-proxy.conf.example|deployment-https-check.mjs|DEPLOYMENT.md) https_count=$((https_count + 1)) ;;
       *) fail '校验清单包含非预期路径。';;
     esac
     [[ -z "${sums[$name]:-}" ]] || fail '校验清单含重复文件。'
     sums[$name]=1
   done < "$bundle/SHA256SUMS"
   [[ "$config_count" == 0 || "$config_count" == 4 ]] || fail '运行模板清单不完整。'
-  ((${#sums[@]} == 5 + config_count + maintenance_count)) || fail '校验清单不完整。'
+  [[ "$https_count" == 0 || "$https_count" == "${#https_files[@]}" ]] || fail 'HTTPS 交付文件不完整。'
+  ((${#sums[@]} == 5 + config_count + maintenance_count + https_count)) || fail '校验清单不完整。'
+  if ((https_count)); then
+    [[ "$config_count" == 4 && "$maintenance_count" == 1 ]] || fail 'HTTPS 交付需要完整运行模板和维护入口。'
+  fi
+  for file in "${https_files[@]}"; do
+    if ((https_count)); then
+      [[ -f "$bundle/$file" && ! -L "$bundle/$file" ]] || fail "HTTPS 交付缺少普通文件：$file"
+    else
+      [[ ! -e "$bundle/$file" && ! -L "$bundle/$file" ]] || fail '发现未经校验的 HTTPS 交付文件。'
+    fi
+  done
   if [[ "$maintenance_count" == 1 ]]; then
     [[ "$config_count" == 4 && -f "$bundle/$maintenance_file" && ! -L "$bundle/$maintenance_file" ]] || fail '维护入口需要完整且经过校验的运行模板。'
   else
@@ -247,7 +261,14 @@ SQL
 }
 
 build_bundle() {
-  local output="${HOME}/artzoo-releases" target=all dirty_allowed=0 root status commit state release role tag id
+  local output="${HOME}/artzoo-releases" target=all dirty_allowed=0 root status commit state release role tag id file
+  local build_proxy=${ARTZOO_BUILD_PROXY:-}
+  local proxy_args=()
+  if [[ -n "$build_proxy" ]]; then
+    [[ "$build_proxy" =~ ^https?://[a-zA-Z0-9][a-zA-Z0-9.-]*:([1-9][0-9]{0,4})/?$ ]] || fail '构建代理必须为无账号密码的 http(s)://主机:端口。'
+    ((10#${BASH_REMATCH[1]} <= 65535)) || fail '构建代理端口无效。'
+    proxy_args=(--build-arg "HTTP_PROXY=$build_proxy" --build-arg "HTTPS_PROXY=$build_proxy" --build-arg 'NO_PROXY=localhost,127.0.0.1,::1')
+  fi
   while (($#)); do
     case "$1" in
       --output|--target)
@@ -277,12 +298,19 @@ build_bundle() {
   cp -- "$script_path" "$helper" "$partial/"
   cp -- "$root/deployment/compose.yaml" "$root/deployment/.env.example" "$partial/"
   cp -- "$root/scripts/deployment-compose-check.sh" "$root/scripts/$maintenance_file" "$partial/"
+  for file in "${https_files[@]}"; do
+    case "$file" in
+      DEPLOYMENT.md) cp -- "$root/docs/$file" "$partial/" ;;
+      deployment-https-check.mjs) cp -- "$root/scripts/$file" "$partial/" ;;
+      *) cp -- "$root/deployment/$file" "$partial/" ;;
+    esac
+  done
   roles=(web worker tools)
   [[ "$target" == all ]] || roles=("$target")
   for role in "${roles[@]}"; do
     tag="artzoo-$role:$release"
     ! d image inspect "$tag" >/dev/null 2>&1 || fail '生成的版本标签已存在，请重新运行。'
-    d buildx build --platform linux/amd64 --load --progress=plain --target "$role" --tag "$tag" "$root"
+    d buildx build --platform linux/amd64 --load --progress=plain "${proxy_args[@]}" --target "$role" --tag "$tag" "$root"
     id=$(d image inspect "$tag" --format '{{.Id}}')
     refs[$role]=$tag; ids[$role]=$id
     printf '%s\t%s\t%s\tlinux/amd64\n' "$role" "$tag" "$id" >> "$partial/images.tsv"
@@ -291,12 +319,12 @@ build_bundle() {
   helper="$partial/deployment-image-check.mjs"
   basic_checks
   image_environment > "$partial/images.env"
-  printf 'format=3\nrelease=%s\ncommit=%s\nworktree=%s\nplatform=linux/amd64\ntarget=%s\n' \
+  printf 'format=4\nrelease=%s\ncommit=%s\nworktree=%s\nplatform=linux/amd64\ntarget=%s\n' \
     "$release" "$commit" "$state" "$target" > "$partial/source.txt"
   local images=()
   for role in "${roles[@]}"; do images+=("${refs[$role]}"); done
   d image save "${images[@]}" > "$partial/images.tar"
-  (cd -- "$partial" && sha256sum images.tar images.tsv source.txt deployment-images.sh deployment-image-check.mjs "${config_files[@]}" "$maintenance_file" > SHA256SUMS)
+  (cd -- "$partial" && sha256sum images.tar images.tsv source.txt deployment-images.sh deployment-image-check.mjs "${config_files[@]}" "$maintenance_file" "${https_files[@]}" > SHA256SUMS)
   [[ ! -e "$output/$release" ]] || fail '发布目录已存在。'
   mv -T -- "$partial" "$output/$release"
   partial=''

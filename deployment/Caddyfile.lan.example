@@ -1,0 +1,10 @@
+{
+	auto_https disable_redirects
+	default_sni LAN_IP
+	skip_install_trust
+}
+
+https://LAN_IP {
+	tls internal
+	reverse_proxy 127.0.0.1:13100
+}
