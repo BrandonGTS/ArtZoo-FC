@@ -14,9 +14,14 @@ usage() {
   owner           本机真实 TTY 初始化首位超管；不接受账号或密码参数
   enable-budget   首次启用配置中的媒体配额并创建应用容器
   config-check    只读核对配置清单；仅报告变量名，不连接 Docker
+  backup          【危险：短暂停站】备份数据库和媒体，成功后保留最近 N 份
+  backup-verify   只读校验 --backup 指定的备份（含临时容器检查）
+  restore         【危险：覆盖当前站点】先另存当前状态，再恢复 --backup
   status          只读核对现有服务、配额、挂载、健康；不要求用量为零
   start           启动已初始化的现有容器；不建库、迁移、初始化或升级
   stop            先停止应用，再停止数据库；保留容器、卷和媒体
+备份选项：--backup-dir 绝对目录（默认 root/backups）、--keep 正整数（默认 7）。
+恢复/验证选项：--backup 完整备份目录；恢复必须使用备份记录的同一发布版本。
 默认只显示帮助。项目名默认 artzoo，跨版本必须保持不变。
 root 下预先准备 secrets 和 media/{original,derived,avatars}，UID/GID 1000、0700。
 秘密文件固定为 root/secrets/compose.env（0600）；不 source、不打印配置。
@@ -32,16 +37,21 @@ HELP
 }
 command=${1:---help}
 [[ $# == 0 ]] || shift
-case "$command" in --help|-h|help) usage; exit 0;; prepare-env|database|migrate|baseline|owner|enable-budget|config-check|status|start|stop) ;; *) fail '未知维护命令。';; esac
-bundle='' root='' project=artzoo origin=''
+case "$command" in --help|-h|help) usage; exit 0;; prepare-env|database|migrate|baseline|owner|enable-budget|config-check|status|start|stop|backup|backup-verify|restore) ;; *) fail '未知维护命令。';; esac
+bundle='' root='' project=artzoo origin='' backup_dir='' backup_source='' keep=7 backup_options=0
 while (($#)); do
   (($# >= 2)) || fail '选项缺少值。'
   case "$1" in
     --bundle) bundle=$2;; --root) root=$2;; --project) project=$2;; --origin) origin=$2;;
+    --backup-dir) backup_dir=$2; backup_options=1;; --backup) backup_source=$2; backup_options=1;;
+    --keep) keep=$2; backup_options=1;;
     *) fail '未知维护选项。';;
   esac
   shift 2
 done
+if [[ "$command" != backup && "$command" != backup-verify && "$command" != restore ]]; then
+  [[ "$backup_options" == 0 ]] || fail '备份选项仅用于备份、验证或恢复。'
+fi
 [[ "$project" =~ ^[a-z][a-z0-9-]{0,47}$ ]] || fail '项目名格式不符。'
 [[ "$root" =~ ^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$ && "$root" != / ]] || fail '站点目录须为无空格的绝对路径。'
 [[ -n "$bundle" && -d "$bundle" ]] || fail '必须指定完整发布目录。'
@@ -221,6 +231,7 @@ cleanup() {
   local status=$?
   trap - EXIT
   set +e
+  if declare -F backup_cleanup >/dev/null; then backup_cleanup || status=1; fi
   if [[ "$status" != 0 && "$apps_touched" == 1 ]]; then
     dc stop --timeout 30 web worker >/dev/null 2>&1 || printf '无法确认应用已停止，请立即核对。\n' >&2
   fi
@@ -372,6 +383,12 @@ if [[ "$command" == database ]]; then
   dc up -d --wait --wait-timeout 90 postgres
 fi
 database_target
+case "$command" in backup|backup-verify|restore)
+  [[ -f "$bundle/deployment-backup.sh" && ! -L "$bundle/deployment-backup.sh" ]] || fail '发布包缺少备份功能。'
+  source "$bundle/deployment-backup.sh"
+  backup_main
+  exit 0;;
+esac
 case "$command" in
   database)
     [[ "$(sql "SELECT current_database(), current_user, (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE');")" == 'artzoo|artzoo|0' ]] || fail '目标不是预期空库。'
