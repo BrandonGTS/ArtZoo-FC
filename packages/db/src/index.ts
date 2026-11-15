@@ -62,6 +62,7 @@ export async function checkDatabase(): Promise<void> {
   await probeDatabase(getPool());
 }
 
+export * from './media-reregistration.js';
 export * from './activity-standing.js';
 export * from './activity-maintenance.js';
 export * from './activity-completion.js';

@@ -19,12 +19,14 @@ usage() {
   restore         【危险：覆盖当前站点】先另存当前状态，再恢复 --backup
   upgrade         【危险：停服升级】--bundle 新包；首次用 --from 当前包登记
   rollback        【危险：丢弃升级后数据】恢复上一级镜像和升级前备份
+  media-reregister 【危险：停写】备份、全量校验并原子登记；失败保持停站
   media-identity  只读比较媒体身份；JSON 计数，0=一致、2=不一致或无法检查、1=失败
   status          只读核对现有服务、配额、挂载、健康；不要求用量为零
   start           启动已初始化的现有容器；不建库、迁移、初始化或升级
   stop            先停止应用，再停止数据库；保留容器、卷和媒体
 备份选项：--backup-dir 绝对目录（默认 root/backups）、--keep 正整数（默认 7）。
 恢复/验证选项：--backup 完整备份目录；恢复必须使用备份记录的同一发布版本。
+restore 可加 --keep-stopped true：恢复后保持停站，登记通过后再单独 start。
 status/start/stop 可省略 --bundle，读取 deploy/current；rollback 使用升级控制包。
 默认只显示帮助。项目名默认 artzoo，跨版本必须保持不变。
 root 下预先准备 secrets 和 media/{original,derived,avatars}，UID/GID 1000、0700。
@@ -41,20 +43,21 @@ HELP
 }
 command=${1:---help}
 [[ $# == 0 ]] || shift
-case "$command" in --help|-h|help) usage; exit 0;; prepare-env|database|migrate|baseline|owner|enable-budget|config-check|media-identity|status|start|stop|backup|backup-verify|restore|upgrade|rollback) ;; *) fail '未知维护命令。';; esac
-bundle='' root='' project=artzoo origin='' backup_dir='' backup_source='' keep=7 backup_options=0 from_bundle='' schema_bundle='' controller=''
+case "$command" in --help|-h|help) usage; exit 0;; prepare-env|database|migrate|baseline|owner|enable-budget|config-check|media-identity|media-reregister|status|start|stop|backup|backup-verify|restore|upgrade|rollback) ;; *) fail '未知维护命令。';; esac
+bundle='' root='' project=artzoo origin='' backup_dir='' backup_source='' keep=7 backup_options=0 from_bundle='' schema_bundle='' controller='' keep_stopped=false
 while (($#)); do
   (($# >= 2)) || fail '选项缺少值。'
   case "$1" in
     --bundle) bundle=$2;; --root) root=$2;; --project) project=$2;; --origin) origin=$2;;
     --backup-dir) backup_dir=$2; backup_options=1;; --backup) backup_source=$2; backup_options=1;;
     --keep) keep=$2; backup_options=1;; --from) from_bundle=$2;;
+    --keep-stopped) keep_stopped=$2; [[ "$command" == restore && "$keep_stopped" == true ]] || fail "--keep-stopped 仅接受 restore 的 true。";;
     *) fail '未知维护选项。';;
   esac
   shift 2
 done
 [[ -z "$from_bundle" || "$command" == upgrade ]] || fail '--from 仅用于 upgrade。'
-if [[ "$command" != upgrade && "$command" != rollback && "$command" != backup && "$command" != backup-verify && "$command" != restore ]]; then
+if [[ "$command" != media-reregister && "$command" != upgrade && "$command" != rollback && "$command" != backup && "$command" != backup-verify && "$command" != restore ]]; then
   [[ "$backup_options" == 0 ]] || fail '备份选项仅用于备份、验证或恢复。'
 fi
 [[ "$project" =~ ^[a-z][a-z0-9-]{0,47}$ ]] || fail '项目名格式不符。'
@@ -92,7 +95,7 @@ flock -n 9 || fail '同一站点有另一维护操作正在执行。'
 fi
 if [[ -z "$bundle" ]]; then
   case "$command" in
-    status|start|stop|media-identity)
+    status|start|stop|media-identity|media-reregister)
       trusted_path "$root/deploy/current"
       read -r bundle recorded_release schema_bundle extra < "$root/deploy/current"
       [[ -z "$extra" && -n "$schema_bundle" ]] || fail '当前版本记录不完整。';;
@@ -381,6 +384,22 @@ status_check() {
   [[ "$(d inspect --format '{{.State.Health.Status}}' "$container")" == healthy ]] || fail 'web 尚未健康。'
   d exec "$container" node -e 'fetch("http://127.0.0.1:3100/api/health",{signal:AbortSignal.timeout(5000)}).then(async r=>{if(!r.ok||(await r.json()).ok!==true)throw Error();console.log("PASS: web health")}).catch(()=>process.exit(1))'
 }
+media_identity() {
+    identity
+    check_app web; check_app worker
+    [[ -f "$bundle/deployment-media-identity.mjs" && ! -L "$bundle/deployment-media-identity.mjs" ]] || fail '发布包缺少媒体身份诊断。'
+    temporary=$(mktemp "$root/secrets/.identity.XXXXXXXX")
+    sql $'SELECT payload FROM (
+      SELECT 0 AS ordinal, jsonb_build_object(\x27type\x27,\x27baseline\x27,\x27fingerprint\x27,(SELECT "baselineFingerprint" FROM "MediaBudgetState" WHERE id=\x27global\x27)) AS payload
+      UNION ALL SELECT 1, to_jsonb(c) || jsonb_build_object(\x27type\x27,\x27component\x27,\x27chargedBytes\x27,c."chargedBytes"::text,\x27credited\x27,EXISTS(SELECT 1 FROM "MediaStorageCredit" cr WHERE cr."componentId"=c.id)) FROM "MediaStoredComponent" c
+      UNION ALL SELECT 2, jsonb_build_object(\x27type\x27,\x27end\x27)
+    ) snapshot ORDER BY ordinal;' > "$temporary" || fail '只读身份快照失败；数据库内容未输出。'
+    mounts=()
+    for dir in original derived avatars; do mounts+=(--mount "type=bind,src=$root/media/$dir,dst=/app/storage/$dir,readonly"); done
+    "${privilege[@]}" timeout --kill-after=5s 300s "$docker_path" --host unix:///var/run/docker.sock run --rm -i --network none --read-only --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges --log-driver none \
+      "${mounts[@]}" --mount "type=bind,src=$bundle/deployment-media-identity.mjs,dst=/app/scripts/deployment-media-identity.mjs,readonly" \
+      --entrypoint node "${ids[tools]}" /app/scripts/deployment-media-identity.mjs < "$temporary"
+}
 if [[ "$command" == prepare-env ]]; then
   [[ ! -e "$config" && ! -L "$config" ]] || fail '配置已存在，不覆盖。'
   no_project
@@ -416,6 +435,13 @@ if [[ "$command" == database ]]; then
 fi
 database_target
 case "$command" in upgrade|rollback) upgrade_main; exit 0;; esac
+if [[ "$command" == media-reregister ]]; then
+  [[ -f "$bundle/deployment-media-reregister.sh" && ! -L "$bundle/deployment-media-reregister.sh" ]] || fail '发布包缺少登记功能。'
+  source "$bundle/deployment-backup.sh"
+  source "$bundle/deployment-media-reregister.sh"
+  register_main
+  exit 0
+fi
 case "$command" in backup|backup-verify|restore)
   [[ -f "$bundle/deployment-backup.sh" && ! -L "$bundle/deployment-backup.sh" ]] || fail '发布包缺少备份功能。'
   source "$bundle/deployment-backup.sh"
@@ -469,22 +495,7 @@ case "$command" in
     write_current "$bundle" "$bundle"
     apps_touched=0
     ;;
-  media-identity)
-    identity
-    check_app web; check_app worker
-    [[ -f "$bundle/deployment-media-identity.mjs" && ! -L "$bundle/deployment-media-identity.mjs" ]] || fail '发布包缺少媒体身份诊断。'
-    temporary=$(mktemp "$root/secrets/.identity.XXXXXXXX")
-    sql $'SELECT payload FROM (
-      SELECT 0 AS ordinal, jsonb_build_object(\x27type\x27,\x27baseline\x27,\x27fingerprint\x27,(SELECT "baselineFingerprint" FROM "MediaBudgetState" WHERE id=\x27global\x27)) AS payload
-      UNION ALL SELECT 1, to_jsonb(c) || jsonb_build_object(\x27type\x27,\x27component\x27,\x27chargedBytes\x27,c."chargedBytes"::text,\x27credited\x27,EXISTS(SELECT 1 FROM "MediaStorageCredit" cr WHERE cr."componentId"=c.id)) FROM "MediaStoredComponent" c
-      UNION ALL SELECT 2, jsonb_build_object(\x27type\x27,\x27end\x27)
-    ) snapshot ORDER BY ordinal;' > "$temporary" || fail '只读身份快照失败；数据库内容未输出。'
-    mounts=()
-    for dir in original derived avatars; do mounts+=(--mount "type=bind,src=$root/media/$dir,dst=/app/storage/$dir,readonly"); done
-    "${privilege[@]}" timeout --kill-after=5s 300s "$docker_path" --host unix:///var/run/docker.sock run --rm -i --network none --read-only --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges --log-driver none \
-      "${mounts[@]}" --mount "type=bind,src=$bundle/deployment-media-identity.mjs,dst=/app/scripts/deployment-media-identity.mjs,readonly" \
-      --entrypoint node "${ids[tools]}" /app/scripts/deployment-media-identity.mjs < "$temporary"
-    ;;
+  media-identity) media_identity;;
   status) status_check;;
   start)
     [[ "${values[ARTZOO_MEDIA_BUDGET_ENABLED]}" == 1 ]] || fail '未启用配额，不能作为已初始化站点启动。'

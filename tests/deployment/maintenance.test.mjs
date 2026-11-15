@@ -1,5 +1,6 @@
 import test from 'node:test';
 import { exerciseMediaIdentity } from './media-identity-cases.mjs';
+import { exerciseRegistration } from './registration-cases.mjs';
 import { exerciseBackups } from './backup-cases.mjs';
 import { exerciseUpgrades } from './upgrade-cases.mjs';
 import assert from 'node:assert/strict';
@@ -418,5 +419,7 @@ test(
     if (!process.env.ARTZOO_UPGRADE_TEST_BUNDLES)
       exerciseBackups({ root, pass, invoke, sql, docker, app, run, args, config });
     exerciseUpgrades({ root, bundle, project, run, sql, docker, app, config });
+    if (!process.env.ARTZOO_UPGRADE_TEST_BUNDLES)
+      exerciseRegistration({ root, pass, invoke, sql, docker, app, compose });
   }
 );

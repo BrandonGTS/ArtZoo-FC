@@ -337,3 +337,129 @@ web、worker 使用 `json-file` 容器日志，每个文件最多 `10m`，最多
 - 镜像和 Compose 检查使用独立临时资源，覆盖运行依赖、空库迁移、媒体基线、worker、挂载和持久化；不连接家庭数据库。
 - HTTPS 检查核对证书、健康接口和伪造转发头，结束后恢复临时修改的 Caddy 配置；多设备访问与入口隔离按部署手册验收。
 - 初始化、服务健康和 HTTPS 可用不等于登录、上传、权限或备份恢复验收完成。容器重启策略不代替 Windows/WSL 开机恢复；任务状态统一以 [PLAN.md](PLAN.md) 为准。
+
+---
+
+## 十、媒体身份重新登记：设计与维护边界
+
+设计比较以包含只读 `media-identity` 的代码 `456ba25` 为依据；站长已在任务对话中同意采用方案 1，当前实现为显式离线登记。方案 2 保留作比较，未实现。新命令仅随包含本功能的新发布包交付，旧包不支持。具体实测证据留在本机或 PR，不写入本架构说明。
+
+### 问题、边界与建议
+
+数据库把文件和媒体目录的物理身份长期保存为哈希。备份解包重建文件，或挂载后设备编号变化，即使内容未变也可能导致身份比较失败。诊断只有哈希和计数时，不能反推究竟是设备号、inode、属主还是路径发生变化；启动顺序相关的实测支持挂载身份变化这一推断，但不能代替原始 `stat` 对照。
+
+本轮采用**方案 1：显式停写、按原内容证明重新登记**。它保留日常删除的物理身份约束，符合本轮“不降低现有安全保证”的要求；代价是每次恢复或身份发生变化后都要再维护一次。方案 2 可免去单纯设备号/inode 变化后的登记，但改变了“同一文件”的含义，需要单独批准安全取舍和迁移方式。
+
+“全部更新”指当前仍需占用磁盘、具有可靠内容证明的组件及当前基线，不包括已经完成删除并返还配额的历史记录。缺失证明、未知类型和无法核实的聚合记录必须整体拒绝，不能用跳过计数伪装成登记成功。不得重建空基线、清零配额、采用磁盘现算哈希覆盖数据库原哈希，或在启动时静默修复。
+
+### 原算法防护的对象
+
+`stock-bound-io.ts` 的目录身份为末级目录的 `[dev, ino, uid]`；所有祖先仍逐个检查类型、属主、写权限和真实路径，但镜像内祖先 inode 不进入长期哈希。`rootHash` 还包含媒体类别和规范化绝对根路径；文件物理指纹包含 `rootHash`、对象 UUID、部件名、文件 `dev/ino/uid` 和原内容哈希；最终数据库指纹再绑定上传 `generation`。
+
+这可以发现同名文件或整个媒体子目录被换成另一个物理对象，包括内容恰好相同的副本；配合 `generation` 防止跨上传批次套用证明。它不等于内容校验：内容被原地改写时仍需 SHA-256、长度和读取前后状态检查。`dev/ino` 是文件系统设备及 inode 编号，不是跨恢复稳定的业务标识，见 [Node 24.21 文件状态定义](https://nodejs.org/download/release/v24.21.0/docs/api/fs.html#statsdev)。
+
+两种方案都必须保留：服务端 UUID 路径、可信目录及祖先、拒绝符号链接/硬链接/特殊文件、文件属主及权限、受限读取、内容与计费字节校验、操作内的根目录和文件身份复核、真实删除证明、目录同步，以及配额返还幂等。删除前后的 `lstat/unlink` 不是原子的“比较后删除”；现有保证依赖私有目录、停写或受控写者和 UUID 不复用，不能声称防住有 root 或同 UID 任意写权限的恶意并发者。
+
+### 两种方案比较
+
+| 比较项 | 方案 1：离线重新登记 | 方案 2：长期逻辑身份，操作内物理身份 |
+|---|---|---|
+| 长期身份 | 保持现有公式；维护时更新当前可信文件的物理身份 | 新公式只绑定稳定命名空间、根路径、文件名、原内容哈希及 `generation` |
+| 同内容文件/目录替换 | 日常拒绝；仅显式维护且全部核验通过后接受新物理对象 | 替换发生在两次操作之间时接受，这是有意降低跨操作物理连续性要求 |
+| 内容篡改、越界及链接 | 沿用原检查并整体拒绝 | 同样拒绝；不能因为逻辑哈希相同就跳过实际内容和路径检查 |
+| 一次删除内发生替换 | 保留打开时、删除前后物理比较 | 保留；必须另存内存中的物理 `rootHash`，不能把它一起改成逻辑哈希 |
+| 恢复/启动顺序变化 | 发现不一致后再次停写登记 | 完成一次转换后，内容、根路径和属主策略未变即可继续使用 |
+| 数据库迁移 | 下述受限方案无结构迁移；显式维护事务重登记 | 建议新增状态与组件的算法版本列；不能根据同样长的 64 位哈希猜版本 |
+| 历史删除凭据 | 完成链原样保留；未完成删除存在冲突则拒绝 | 完成链保持旧版本；活动组件转换，未完成删除仍需专门处理 |
+| 规模估算 | 产品代码约 250–400 行；脚本及测试约 450–600 行 | 产品代码约 500–900 行；脚本及测试约 700–1000 行，预计超过本轮上限 |
+
+规模为设计估算，不是已经验证的承诺。实现前复核，脚本及测试若超过约 600 行必须停下报告；不得通过少测失败路径压缩规模。方案 1 也只在授权维护期间以原内容证明重新建立信任，不保证识别维护前已经替换的同内容副本。
+
+### 方案 1：维护流程与事务边界
+
+维护入口为 `media-reregister`，属于【危险：停写并更新身份】。以现有发布包、镜像、配置和 `deploy/current` 校验为前置，沿用维护互斥锁；已有升级/恢复 `pending` 时拒绝，不能绕过任务 F 的失败保护。
+
+1. 站长安排停写；停止 web、worker 并确认它们退出，禁止其他 tools、宿主脚本和人工写媒体。维护锁只能协调本工具，不能阻止任意外部写者。数据库保持运行；工具使用应用相同 UID 和容器内路径，媒体只读挂载。
+2. 停写后使用现有 `create_snapshot` / `publish_snapshot` 内部原语另存并校验维护前备份；不能调用会自行重启应用的普通 `backup` 入口。备份失败不得进入登记，也不清理现有备份。开始停写后，备份或后续任何阶段失败均保持停站，不自动恢复写入。
+3. 开启一个数据库事务，核对目标库、全局基线和账目。沿用 `packages/db/src/media-baseline.ts` 已列出的媒体/业务表锁清单及 `NOWAIT` 思路，不调用只允许空库的断言；并锁住全局状态。存在并发写事务时直接拒绝。`ReadCommitted` 本身不提供整个流程的稳定快照，必须依赖停写与锁，见 [PostgreSQL 17 隔离说明](https://www.postgresql.org/docs/17/transaction-iso.html#XACT-READ-COMMITTED)。
+4. 按主键分页枚举完整组件集合并核对 receipt、对象、generation、部件完整性、计费总额、intent 与 credit。只支持已初始化且 `baselineBytes=0`、没有 BASELINE 来源聚合组件的现行空站基线；不以文件扫描重建旧聚合账。数据库 bytea 图标不参与磁盘身份更新，仍保留账目关系；未绑定、未知或非零不透明磁盘聚合项导致整体拒绝。
+5. 对所有未返还配额的磁盘组件，使用原 `contentBindingSha256`、原 `chargedBytes` 和可信映射调用 `BoundNamespace.inspect`。普通图片要求完整内容哈希及长度一致；知识库 journal 沿用“prepared 首行哈希 + 合法后续状态行 + 计费上界”的既有协议，不能误当成整文件 SHA-256。任何缺失、链接、不可信权限、内容错误或读取变化都整体拒绝。
+6. 对已完成的 `ACKNOWLEDGED + credit` 链先验证账目关系，再整体保留组件、intent、credit 的历史身份；不要求被正确删除的文件重新出现，不重复返还。任何没有 credit 的现存删除意图（包括 PREPARED），或 ACK/credit 状态矛盾，均整体拒绝。不能只改组件让 intent 悬空，也不能凭 `ENOENT` 伪造删除成功。
+7. 全量核验完成后，在同一事务内重算并更新所有当前磁盘组件的 `storageIdentityFingerprint` 及 `MediaBudgetState.baselineFingerprint`。更新时带原指纹、generation、内容绑定条件并检查影响行数；不改金额、receipt、创建时间、基线初始化时间、业务删除状态和原内容哈希。保持公式与原算法完全一致，重复执行仅报告无变化。
+8. 提交前再次检查目录与每个候选文件的物理身份、内容和集合一致性；任一变化使数据库整体回滚。按页打开、及时关闭句柄：每页 128 行，最多 10000 个组件、10 GB 当前磁盘计费字节、240 秒事务；超过上限报错而非分批提交。事务内两轮全量读取会延长停站；当前限额是保护上限，不代表 10 GB 一定能在时限内处理完，实际吞吐须按站点硬盘验证。
+9. 提交后在继续停写的状态执行独立 `media-identity`，必须所有应检查项一致且 `unchecked=0` 才按原运行状态启动并检查健康。失败保留备份和停站状态，报告明确错误码与数量，不打印秘密、文件内容或完整数据库记录。
+
+数据库事务只能回滚数据库；磁盘是只读的，没有“跨 PostgreSQL 与文件系统的原子事务”。提交前失败保留旧身份；进程被杀、连接中断或提交响应不确定时，保持停站并重新只读检查，不能自动启动或猜测提交结果。提交后检查失败也不得自动恢复数据库。旧备份恢复会再次改变文件身份，恢复后仍需登记，不能把“恢复备份”描述成身份问题的直接解药。
+
+**受限点必须在实施前认可：** 若站长已经尝试删图而留下 PREPARED，或文件已消失但返还尚未确认，本提案会安全拒绝，不能直接修好该现场。应先只读判断是否存在此状态；确有此情况时，补充“取消/承接未完成意图且保留审计”的设计并重新评估迁移与规模，不删记录绕过，也不自动恢复覆盖用户数据。本轮只读诊断未提供 intent/credit 详情，不能假定现场没有这类记录。
+
+### 方案 2：算法及迁移边界
+
+建议以带域标记的规范编码计算 `H(["media-logical-v2", kind, root, UUID, part, expectedHash])`，再绑定 `generation`。长期基线改为带版本标记的固定三根路径指纹；每次仍检查所有祖先、目录属主和权限。真实路径改变仍需维护；如果希望任意搬目录也无需转换，那是另一种方案，不在本提案内。
+
+`BoundNamespace` 必须分离长期逻辑指纹与 `Held` 中的物理根身份、文件句柄及 dev/ino，`capture/remove` 继续复核后者。删除授权、内容证明、回收幂等和各媒体类别的真实 IO 路径都须回归，不能只改 `physicalFingerprint` 一行。同内容目录树换盘后会被接受；如果业务要求连这种替换也要拒绝，应选方案 1。
+
+建议新增显式版本字段（默认旧版），由新迁移增加列与约束；完成删除的历史组件保持旧版，只有全部核验通过的当前组件及基线在一个维护事务里转换到新版。不能从旧 SHA-256 反算路径/dev/ino，SQL 也无法代替应用读取容器挂载文件。此次转换必须解释为显式文件校验维护，而不是应用启动时数据回填；若被要求“所有转换只能写在迁移 SQL 中”，它与此方案冲突，须先批准例外或另设计，不能暗中绕过 `packages/db/AGENTS.md`。
+
+初次转换仍需方案 1 的停写、备份、全量验证和未完成删除处理；转换失败保留旧版并停站。旧程序不识别新版时不得启动；回退使用旧镜像和升级前备份，并处理该备份恢复后的物理身份，不尝试反算旧哈希。新增迁移须按仓库要求在空库跑通、检查 diff 并更新结构快照。现阶段不建议为省去维护命令承担这组额外变化。
+
+### 目录身份与派生引用的完整索引
+
+以下为本次实际全文检索后归纳的生产位置；行号对应本节依据版本，后续以符号检索为准。执行证据和原始匹配输出不入仓库。检查范围包含 `packages`、`apps`、`scripts` 及 schema/迁移，不能只搜字段定义：
+
+```bash
+rg -n 'baselineFingerprint|storageIdentityFingerprint|identityFingerprint|evidenceFingerprint|trustedMediaDirectoryIdentity|rootIdentity|rootHash|physicalFingerprint|namespaceIdentity' packages apps scripts
+rg -n '\.dev\b|\.ino\b|mtimeNs|ctimeNs' packages/media apps/web/server scripts
+```
+
+| 保存位置或派生位置 | 写入、使用位置与含义 |
+|---|---|
+| `MediaBudgetState.baselineFingerprint`（schema:1955） | `packages/media/src/media-baseline.ts:25–32` 生成三根路径及物理身份的整体哈希；`packages/db/src/media-budget.ts:193–199` 写入/幂等比较；`packages/db/src/media-baseline.ts` 锁定维护目标 |
+| `MediaStoredComponent.storageIdentityFingerprint`（schema:2011） | `packages/media/src/stock-bound-io.ts:70–110,254–278` 生成目录及文件身份；`stock-retirement.ts:271,357–362` 绑定 generation 后写入，后续删除全链路比较 |
+| `MediaStoredComponent.baselineFingerprint`（schema:2002）及聚合 `id/objectKey/generation` | `packages/db/src/media-stock-components.ts:251–258` 将基线哈希复制或派生进四个字段；现行空基线 bytes=0 不建该行，但非空基线不能漏掉它们 |
+| `MediaRetirementIntent.identityFingerprint` 及 `id`（schema:2019–2022） | `stock-retirement.ts` 的 prepare 路径、db 各 retirement/orphan 模块复制组件身份，并把它加入意图 ID；并非独立目录字段，却必须纳入更新影响分析 |
+| `MediaStorageCredit.evidenceFingerprint` 及 `intentId`（schema:2033–2036） | `stock-retirement.ts` 以真实 unlink 证明派生；`packages/db/src/media-orphan-completion.ts` 重验 identity、intent ID 和 evidence；历史链不得随登记改写 |
+| 内存中的物理身份及证明 | `stock-bound-io.ts` 的 `Held.rootHash/dev/ino`、私有 `held/written/removed`；`media-baseline.ts:36–59` 的空目录扫描快照；`stock-retirement.ts` 的授权/删除证明及候选描述；不会跨进程持久化 |
+| 独立的操作内文件身份 | `apps/web/server/knowledge/image-upload-receipts.ts:91,122,134–135` 用 dev/ino 守卫 journal 清理；不是长期目录身份，不应一并删除其比较 |
+| 诊断和发布检查 | `scripts/deployment-media-identity.mjs` 重算基线及文件指纹；`scripts/deployment-maintenance.sh` 导出身份快照并校验基线形状；`scripts/deployment-image-check.mjs` 写测试基线值，不是正式登记器 |
+| 数据定义的其他副本 | `packages/db/prisma/migrations/20261111000000_init/migration.sql` 与 `packages/db/prisma/schema-snapshot.txt` 中的表、CHECK、外键及引用；旧迁移不可改 |
+
+除上表的生产写入点，以下消费者也全部命中身份字段，审查不能遗漏（路径均相对仓库）：
+
+- `packages/db/src/official-media-retirement.ts`、`official-media-contract.ts`（后者同属该目录）。
+- `packages/db/src/media-orphan-maintenance.ts`、`media-wish-orphan.ts`、`media-lottery-orphan.ts`、`media-knowledge-orphan.ts`、`media-album-comment-orphan.ts`。
+- `packages/db/src/media-orphan-contract.ts`、`media-wish-orphan-contract.ts`、`media-lottery-orphan-contract.ts`、`media-knowledge-orphan-contract.ts`、`media-album-comment-orphan-contract.ts`。
+- `packages/db/src/media-photo-orphan-checks.ts`、`media-lottery-mount.ts`、`media-quick-icon-stock.ts`；`apps/web/server/albums/service.ts:790,852` 的删除状态查询。
+
+实际目录映射还须覆盖 `original/derived` 下的 `daily`、`wishes`、`lotteries`、`knowledge`、`albums`、`official-events`，以及 `avatars`；knowledge journal 共用 `original/knowledge`，相册照片与评论共用 `albums`，官方类别在数据库为 `official-image`、IO 为 `official`。不能只处理这次照片涉及的三个组件。
+
+### 实施范围与验收
+
+实现涉及 `packages/media` 的校验/登记入口、`packages/db` 的锁定与账目核对、维护脚本、发布包清单、tools 镜像及行为测试；唯一改动文档为本文件。原有身份算法不变，没有数据库结构迁移，也不修改旧发布包。
+
+维护开始前写入 `deploy/media-registration.pending`；失败或进程中断后保留它，普通 start、升级、回退均拒绝。允许只读诊断、停站、重试登记，或显式保持停站的恢复。登记成功、独立诊断和必要的健康检查通过后才移除标记；重复登记不改变金额或历史凭据。不要手动删除标记绕过检查。
+
+Server 由站长在当前发布包变量 `bundle`、站点变量 `root` 已正确设置后单独执行：
+
+```bash
+# 【危险：覆盖当前站点】恢复后保持停写，备份版本必须匹配
+bash "$bundle/deployment-maintenance.sh" restore --bundle "$bundle" --root "$root" --backup "$snapshot" --keep-stopped true
+```
+
+```bash
+# 【危险：停写、备份并登记】也用于重启后发现不一致的现场
+bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$bundle" --root "$root"
+```
+
+登记从运行状态开始则成功后恢复运行；从停止状态开始则保持停止。恢复使用 `--keep-stopped true` 后，登记完成再按部署手册单独 start。普通 restore 未加此选项仍保留原来的自动启动行为；需要登记的恢复流程必须明确加此选项。登记备份使用 `register-*` 前缀，不参与日常 backup 的自动轮换；失败输出的备份和 pending 均应保留。运行中的遗留 tools 容器会使重试拒绝，须核对本次维护容器后由站长处理，不能批量删除其他容器。
+
+实现验收包括下列场景；实际结果与尚待家庭 Server 完成的项目以实现 PR 为准：
+
+- Dev rootless Docker 一次性项目：已存在的图片及各类路径 → 真实备份恢复 → 登记 → 诊断全部一致 → 通过正式删除路径删旧照片，三组件文件消失，配额恰好退回一次，再次重试不重复退回。
+- 原始/缩略/预览、头像、journal、官方及各照片 namespace 均覆盖；已返还历史项保持原样，bytea 不误计为磁盘文件。聚合、不支持类型、缺失绑定和 PREPARED/矛盾账目必须整体拒绝。
+- 同长度不同内容、缺文件、符号链接、硬链接、不可信目录、扫描期间替换、事务末尾失败/连接中断均无部分数据库更新；对比完整状态、组件、intent、credit 和预算。提交成功后验证失败时保持停站。
+- 同路径同内容副本：方案 1 日常删除拒绝，经显式全量登记后接受；方案 2 转换后跨操作接受但操作内替换拒绝，作为安全取舍的明确测试。
+- 站长在家庭 Server 分别完成真实恢复、仅重启容器、Windows 重启的两种启动顺序。方案 1 在每轮需要时登记后全部一致；方案 2 在首次转换后无需因 dev/ino 变化再登记。原始计数和错误码保留，不以容器重启冒充 Windows 验收。
+- 登记前后普通业务数据、每日/全局金额、历史返还凭据保持不变；重新开启后登录、旧图显示、上传、删除及重复删除通过。新算法或登记的真实 Docker 结果写入实现 PR，不能引用任务 D 的旧结果作完成证明。
+
+站长另行维护 DECISIONS。本地测试不代替家庭 Server 现场验收；AI 不操作 Server，实际登记、恢复和 Windows 重启由站长安排。

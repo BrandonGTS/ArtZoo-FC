@@ -15,6 +15,7 @@ config_files=(compose.yaml .env.example images.env deployment-compose-check.sh)
 maintenance_file=deployment-maintenance.sh
 manifest_file=runtime-config.manifest
 upgrade_file=deployment-upgrade.sh
+registration_file=deployment-media-reregister.sh
 diagnostic_files=(deployment-media-identity.mjs deployment-resident.sh artzoo-resident.ps1)
 backup_files=(deployment-backup.sh artzoo-backup.service.example artzoo-backup.timer.example)
 https_files=(Caddyfile.lan.example Caddyfile.public.example proxy.compose.yaml.example wslconfig.example dev-docker.tmpfiles.conf.example dev-user-retry.conf.example dev-docker-proxy.conf.example deployment-https-check.mjs DEPLOYMENT.md)
@@ -79,7 +80,7 @@ trap 'exit 143' TERM
 load_bundle() {
   [[ -d "$1" ]] || fail '发布包目录不存在。'
   bundle=$(realpath -e -- "$1")
-  local file hash extra name role ref id platform version='' current config_count=0 maintenance_count=0 https_count=0 manifest_count=0 backup_count=0 upgrade_count=0 diagnostic_count=0 expected actual
+  local file hash extra name role ref id platform version='' current config_count=0 maintenance_count=0 https_count=0 manifest_count=0 backup_count=0 upgrade_count=0 diagnostic_count=0 registration_count=0 expected actual
   local -A sums=() seen=()
   for file in SHA256SUMS images.tsv images.tar source.txt deployment-images.sh deployment-image-check.mjs; do
     [[ -f "$bundle/$file" && ! -L "$bundle/$file" ]] || fail "发布包缺少普通文件：$file"
@@ -91,6 +92,7 @@ load_bundle() {
       images.tsv|images.tar|source.txt|deployment-images.sh|deployment-image-check.mjs) ;;
       deployment-backup.sh|artzoo-backup.service.example|artzoo-backup.timer.example) backup_count=$((backup_count + 1)) ;;
       deployment-media-identity.mjs|deployment-resident.sh|artzoo-resident.ps1) diagnostic_count=$((diagnostic_count + 1)) ;;
+      deployment-media-reregister.sh) registration_count=$((registration_count + 1)) ;;
       deployment-upgrade.sh) upgrade_count=$((upgrade_count + 1)) ;;
       runtime-config.manifest) manifest_count=$((manifest_count + 1)) ;;
       deployment-maintenance.sh) maintenance_count=$((maintenance_count + 1)) ;;
@@ -103,7 +105,7 @@ load_bundle() {
   done < "$bundle/SHA256SUMS"
   [[ "$config_count" == 0 || "$config_count" == 4 ]] || fail '运行模板清单不完整。'
   [[ "$https_count" == 0 || "$https_count" == "${#https_files[@]}" ]] || fail 'HTTPS 交付文件不完整。'
-  ((${#sums[@]} == 5 + config_count + maintenance_count + https_count + manifest_count + backup_count + upgrade_count + diagnostic_count)) || fail '校验清单不完整。'
+  ((${#sums[@]} == 5 + config_count + maintenance_count + https_count + manifest_count + backup_count + upgrade_count + diagnostic_count + registration_count)) || fail '校验清单不完整。'
   [[ "$backup_count" == 0 || "$backup_count" == "${#backup_files[@]}" ]] || fail '备份交付文件不完整。'
   [[ "$diagnostic_count" == 0 || "$diagnostic_count" == "${#diagnostic_files[@]}" ]] || fail '诊断和常驻交付不完整。'
   for file in "${diagnostic_files[@]}"; do
@@ -113,6 +115,11 @@ load_bundle() {
       [[ ! -e "$bundle/$file" && ! -L "$bundle/$file" ]] || fail '发现未经校验的诊断组件。'
     fi
   done
+  if ((registration_count)); then
+    [[ "$diagnostic_count" == 3 && "$backup_count" == 3 && "$upgrade_count" == 1 && -f "$bundle/$registration_file" && ! -L "$bundle/$registration_file" ]] || fail '登记交付需要完整维护组件。'
+  else
+    [[ ! -e "$bundle/$registration_file" && ! -L "$bundle/$registration_file" ]] || fail '发现未经校验的登记组件。'
+  fi
   if ((upgrade_count)); then
     [[ "$backup_count" == 3 && -f "$bundle/$upgrade_file" && ! -L "$bundle/$upgrade_file" ]] || fail '升级交付需要完整备份组件。'
   else
@@ -335,6 +342,7 @@ build_bundle() {
   cp -- "$script_path" "$helper" "$partial/"
   cp -- "$root/deployment/compose.yaml" "$root/deployment/.env.example" "$root/deployment/$manifest_file" "$partial/"
   cp -- "$root/scripts/deployment-compose-check.sh" "$root/scripts/$maintenance_file" "$partial/"
+  cp -- "$root/scripts/$registration_file" "$partial/"
   cp -- "$root/scripts/$upgrade_file" "$root/scripts/deployment-backup.sh" "$partial/"
   cp -- "$root/deployment/artzoo-backup.service.example" "$root/deployment/artzoo-backup.timer.example" "$partial/"
   for file in "${https_files[@]}"; do
@@ -364,7 +372,7 @@ build_bundle() {
   local images=()
   for role in "${roles[@]}"; do images+=("${refs[$role]}"); done
   d image save "${images[@]}" > "$partial/images.tar"
-  (cd -- "$partial" && sha256sum images.tar images.tsv source.txt deployment-images.sh deployment-image-check.mjs "${config_files[@]}" "$maintenance_file" "$manifest_file" "${https_files[@]}" "${backup_files[@]}" "$upgrade_file" "${diagnostic_files[@]}" > SHA256SUMS)
+  (cd -- "$partial" && sha256sum images.tar images.tsv source.txt deployment-images.sh deployment-image-check.mjs "${config_files[@]}" "$maintenance_file" "$manifest_file" "${https_files[@]}" "${backup_files[@]}" "$upgrade_file" "$registration_file" "${diagnostic_files[@]}" > SHA256SUMS)
   [[ ! -e "$output/$release" ]] || fail '发布目录已存在。'
   mv -T -- "$partial" "$output/$release"
   partial=''
