@@ -159,6 +159,14 @@ backup_main() {
   verify_snapshot "$backup_source"
   printf '【危险】覆盖项目 %s 的数据库和三个媒体目录。\n' "$project"
   resume_apps=0; destructive_restore=1
+  restore_snapshot
+  restart_apps || fail '恢复后启动/健康检查失败。'
+  destructive_restore=0
+  printf 'PASS: restore；请人工检查登录、旧图、删图及配额。\n'
+}
+
+restore_snapshot() {
+  local file
   # Prepare the complete SQL before beginning the transaction: a failed producer
   # must never let psql commit a truncated restore. ArtZoo owns only public schema.
   [[ "$(sql "SELECT count(*) FROM pg_namespace WHERE nspname NOT IN ('public','information_schema') AND nspname NOT LIKE 'pg_%';")" == 0 ]] || fail '存在额外数据库 schema，拒绝覆盖。'
@@ -172,7 +180,4 @@ backup_main() {
     find "$root/media/$file" -xdev -mindepth 1 -delete || fail '清空媒体失败。'
   done
   tar --extract --numeric-owner --same-owner --same-permissions --file "$backup_source/media.tar" --directory "$root/media" 2>/dev/null || fail '媒体恢复失败。'
-  restart_apps || fail '恢复后启动/健康检查失败。'
-  destructive_restore=0
-  printf 'PASS: restore；请人工检查登录、旧图、删图及配额。\n'
 }

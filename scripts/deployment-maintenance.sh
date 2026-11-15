@@ -17,11 +17,14 @@ usage() {
   backup          【危险：短暂停站】备份数据库和媒体，成功后保留最近 N 份
   backup-verify   只读校验 --backup 指定的备份（含临时容器检查）
   restore         【危险：覆盖当前站点】先另存当前状态，再恢复 --backup
+  upgrade         【危险：停服升级】--bundle 新包；首次用 --from 当前包登记
+  rollback        【危险：丢弃升级后数据】恢复上一级镜像和升级前备份
   status          只读核对现有服务、配额、挂载、健康；不要求用量为零
   start           启动已初始化的现有容器；不建库、迁移、初始化或升级
   stop            先停止应用，再停止数据库；保留容器、卷和媒体
 备份选项：--backup-dir 绝对目录（默认 root/backups）、--keep 正整数（默认 7）。
 恢复/验证选项：--backup 完整备份目录；恢复必须使用备份记录的同一发布版本。
+status/start/stop 可省略 --bundle，读取 deploy/current；rollback 使用升级控制包。
 默认只显示帮助。项目名默认 artzoo，跨版本必须保持不变。
 root 下预先准备 secrets 和 media/{original,derived,avatars}，UID/GID 1000、0700。
 秘密文件固定为 root/secrets/compose.env（0600）；不 source、不打印配置。
@@ -37,24 +40,24 @@ HELP
 }
 command=${1:---help}
 [[ $# == 0 ]] || shift
-case "$command" in --help|-h|help) usage; exit 0;; prepare-env|database|migrate|baseline|owner|enable-budget|config-check|status|start|stop|backup|backup-verify|restore) ;; *) fail '未知维护命令。';; esac
-bundle='' root='' project=artzoo origin='' backup_dir='' backup_source='' keep=7 backup_options=0
+case "$command" in --help|-h|help) usage; exit 0;; prepare-env|database|migrate|baseline|owner|enable-budget|config-check|status|start|stop|backup|backup-verify|restore|upgrade|rollback) ;; *) fail '未知维护命令。';; esac
+bundle='' root='' project=artzoo origin='' backup_dir='' backup_source='' keep=7 backup_options=0 from_bundle='' schema_bundle='' controller=''
 while (($#)); do
   (($# >= 2)) || fail '选项缺少值。'
   case "$1" in
     --bundle) bundle=$2;; --root) root=$2;; --project) project=$2;; --origin) origin=$2;;
     --backup-dir) backup_dir=$2; backup_options=1;; --backup) backup_source=$2; backup_options=1;;
-    --keep) keep=$2; backup_options=1;;
+    --keep) keep=$2; backup_options=1;; --from) from_bundle=$2;;
     *) fail '未知维护选项。';;
   esac
   shift 2
 done
-if [[ "$command" != backup && "$command" != backup-verify && "$command" != restore ]]; then
+[[ -z "$from_bundle" || "$command" == upgrade ]] || fail '--from 仅用于 upgrade。'
+if [[ "$command" != upgrade && "$command" != rollback && "$command" != backup && "$command" != backup-verify && "$command" != restore ]]; then
   [[ "$backup_options" == 0 ]] || fail '备份选项仅用于备份、验证或恢复。'
 fi
 [[ "$project" =~ ^[a-z][a-z0-9-]{0,47}$ ]] || fail '项目名格式不符。'
 [[ "$root" =~ ^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$ && "$root" != / ]] || fail '站点目录须为无空格的绝对路径。'
-[[ -n "$bundle" && -d "$bundle" ]] || fail '必须指定完整发布目录。'
 [[ "$(id -u):$(id -g)" == 1000:1000 ]] || fail '请使用镜像对应的 UID/GID 1000 用户执行，不要 sudo 整个脚本。'
 if [[ "$command" == owner ]]; then
   [[ -t 0 && -t 1 && -z "${SSH_CONNECTION:-}${SSH_CLIENT:-}${SSH_TTY:-}" ]] || fail '超管初始化必须使用本机真实 TTY，不能重定向或通过 SSH。'
@@ -79,17 +82,42 @@ for dir in "$root/secrets" "$root/media" "$root/media/"{original,derived,avatars
   trusted_path "$dir"
   [[ "$(stat -c '%u:%g:%a' "$dir")" == 1000:1000:700 ]] || fail '秘密和媒体目录需要 UID/GID 1000、0700。'
 done
+umask 077
+if [[ "$command" != config-check ]]; then
+lock="$root/secrets/.maintenance.lock"
+[[ ! -L "$lock" && ( ! -e "$lock" || ( -f "$lock" && "$(stat -c '%u:%g:%a' "$lock")" == 1000:1000:600 ) ) ]] || fail '维护锁文件不可信。'
+exec 9>"$lock"
+flock -n 9 || fail '同一站点有另一维护操作正在执行。'
+fi
+if [[ -z "$bundle" ]]; then
+  case "$command" in
+    status|start|stop)
+      trusted_path "$root/deploy/current"
+      read -r bundle recorded_release schema_bundle extra < "$root/deploy/current"
+      [[ -z "$extra" && -n "$schema_bundle" ]] || fail '当前版本记录不完整。';;
+    rollback) bundle=$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")");;
+    *) fail '必须指定完整发布目录。';;
+  esac
+fi
+[[ -d "$bundle" ]] || fail '发布目录不存在。'
 bundle=$(realpath -e -- "$bundle")
 config="$root/secrets/compose.env"
+controller=$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")
+[[ -f "$controller/images.tsv" ]] || controller=$bundle
+bash "$controller/deployment-images.sh" verify "$controller" >/dev/null 2>&1 || fail '升级控制包校验失败。'
 # Verify fixed manifests and checksums without importing or starting anything.
-bash "$bundle/deployment-images.sh" verify "$bundle" >/dev/null 2>&1 || fail '发布包校验失败。'
-[[ "$(sha256sum -- "${BASH_SOURCE[0]}" | cut -d ' ' -f 1)" == "$(sha256sum -- "$bundle/deployment-maintenance.sh" | cut -d ' ' -f 1)" ]] || fail '请使用发布包内匹配的维护脚本。'
+if [[ "$bundle" != "$controller" ]]; then
+  bash "$controller/deployment-images.sh" verify "$bundle" >/dev/null 2>&1 || fail '发布包校验失败。'
+fi
+[[ "$(sha256sum -- "${BASH_SOURCE[0]}" | cut -d ' ' -f 1)" == "$(sha256sum -- "$controller/deployment-maintenance.sh" | cut -d ' ' -f 1)" ]] || fail '请使用发布包内匹配的维护脚本。'
 declare -A values=() refs=() ids=()
 while read -r role ref image_id platform extra; do refs[$role]=$ref; ids[$role]=$image_id; done < "$bundle/images.tsv"
 for role in web worker tools; do [[ -n "${ids[$role]:-}" ]] || fail '维护需要完整三镜像包。'; done
 # The bundle manifest is data, never sourced or evaluated.
 [[ -f "$bundle/runtime-config.manifest" && ! -L "$bundle/runtime-config.manifest" ]] || fail '发布包缺少配置清单。'
 declare -A requirements=() rules=() defaults=() destinations=() confidential=() fixed=() expected_env=() input_secrets=()
+load_manifest() {
+requirements=(); rules=(); defaults=(); destinations=(); confidential=(); fixed=(); input_secrets=()
 while IFS='|' read -r key requirement secret rule default services extra; do
   [[ -z "$key" || "$key" == \#* ]] && continue
   [[ "$key" =~ ^[A-Z][A-Z0-9_]*$ && "$secret" =~ ^[01]$ && -z "$extra" ]] || fail '配置清单格式不符。'
@@ -105,6 +133,9 @@ while IFS='|' read -r key requirement secret rule default services extra; do
     if [[ "$requirement" == fixed ]]; then fixed[$service:$key]=$default; fi
   done
 done < "$bundle/runtime-config.manifest"
+}
+load_manifest
+declare -A allowed_extra=()
 # Decimal string comparison avoids shell integer overflow before validation.
 decimal_le() { [[ ${#1} -lt ${#2} || ( ${#1} -eq ${#2} && ( "$1" == "$2" || "$1" < "$2" ) ) ]]; }
 read_config() {
@@ -122,6 +153,7 @@ read_config() {
     if [[ "$line" != *=* || ! "$key" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
       printf '格式不符：无法识别变量名。\n' >&2; errors=1; continue
     fi
+    if [[ ! -v "requirements[$key]" && -v "allowed_extra[$key]" ]]; then continue; fi
     if [[ ! -v "requirements[$key]" ]]; then printf '多余：%s\n' "$key" >&2; errors=1; continue; fi
     if [[ -v "supplied[$key]" ]]; then invalid[$key]=1; fi
     supplied[$key]=1; value=${line#*=}
@@ -202,11 +234,6 @@ if [[ "$command" == config-check ]]; then
   printf 'PASS: config-check；配置符合发布包清单。\n'
   exit 0
 fi
-umask 077
-lock="$root/secrets/.maintenance.lock"
-[[ ! -L "$lock" && ( ! -e "$lock" || ( -f "$lock" && "$(stat -c '%u:%g:%a' "$lock")" == 1000:1000:600 ) ) ]] || fail '维护锁文件不可信。'
-exec 9>"$lock"
-flock -n 9 || fail '同一站点有另一维护操作正在执行。'
 docker_path=$(command -v docker) || fail '缺少 Docker。'
 privilege=()
 if ! timeout 15 "$docker_path" --host unix:///var/run/docker.sock info >/dev/null 2>&1; then
@@ -231,6 +258,7 @@ cleanup() {
   local status=$?
   trap - EXIT
   set +e
+  if declare -F upgrade_cleanup >/dev/null; then upgrade_cleanup "$status" || status=1; fi
   if declare -F backup_cleanup >/dev/null; then backup_cleanup || status=1; fi
   if [[ "$status" != 0 && "$apps_touched" == 1 ]]; then
     dc stop --timeout 30 web worker >/dev/null 2>&1 || printf '无法确认应用已停止，请立即核对。\n' >&2
@@ -375,6 +403,9 @@ if [[ "$command" == prepare-env ]]; then
   printf 'PASS: prepare-env；配置已创建，权限 0600，配额关闭。\n'
   exit 0
 fi
+[[ -f "$controller/deployment-upgrade.sh" && ! -L "$controller/deployment-upgrade.sh" ]] || fail '升级组件缺失。'
+source "$controller/deployment-upgrade.sh"
+upgrade_guard
 configure
 if [[ "$command" == database ]]; then
   no_project
@@ -383,6 +414,7 @@ if [[ "$command" == database ]]; then
   dc up -d --wait --wait-timeout 90 postgres
 fi
 database_target
+case "$command" in upgrade|rollback) upgrade_main; exit 0;; esac
 case "$command" in backup|backup-verify|restore)
   [[ -f "$bundle/deployment-backup.sh" && ! -L "$bundle/deployment-backup.sh" ]] || fail '发布包缺少备份功能。'
   source "$bundle/deployment-backup.sh"
@@ -433,6 +465,7 @@ case "$command" in
     status_check
     [[ "$(sql 'SELECT row_to_json(s)::text FROM "MediaBudgetState" s ORDER BY id;')" == "$before" ]] || fail '基线或用量发生变化。'
     [[ "$(sql "$account_query")" == '1|1|1' ]] || fail '初始化账号计数变化。'
+    write_current "$bundle" "$bundle"
     apps_touched=0
     ;;
   status) status_check;;

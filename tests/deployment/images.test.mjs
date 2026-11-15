@@ -311,6 +311,7 @@ esac
   const verified = f.run('verify', output);
   assert.equal(verified.status, 0, verified.stderr);
   for (const name of [
+    'deployment-upgrade.sh',
     'deployment-backup.sh',
     'artzoo-backup.service.example',
     'artzoo-backup.timer.example'
