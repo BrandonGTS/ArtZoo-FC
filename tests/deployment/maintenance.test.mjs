@@ -1,5 +1,6 @@
 import test from 'node:test';
 import { exerciseBackups } from './backup-cases.mjs';
+import { exerciseUpgrades } from './upgrade-cases.mjs';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import {
@@ -16,9 +17,16 @@ import { join, resolve } from 'node:path';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 
-const script = fileURLToPath(new URL('../../scripts/deployment-maintenance.sh', import.meta.url));
+const script = process.env.ARTZOO_MAINTENANCE_TEST_BUNDLE
+  ? join(resolve(process.env.ARTZOO_MAINTENANCE_TEST_BUNDLE), 'deployment-maintenance.sh')
+  : fileURLToPath(new URL('../../scripts/deployment-maintenance.sh', import.meta.url));
 function run(args, options = {}) {
-  return spawnSync('bash', [script, ...args], { encoding: 'utf8', timeout: 360000, ...options });
+  const { command, entry = script, ...settings } = options;
+  return spawnSync('bash', command ? ['-c', command] : [entry, ...args], {
+    encoding: 'utf8',
+    timeout: 360000,
+    ...settings
+  });
 }
 test('maintenance defaults to help and rejects unknown operations without changing a target', () => {
   assert.equal(run([]).status, 0);
@@ -38,7 +46,7 @@ test(
   'packaged maintenance lifecycle preserves data and refuses repeated initialization',
   {
     skip: !process.env.ARTZOO_MAINTENANCE_TEST_BUNDLE,
-    timeout: 900000
+    timeout: 1800000
   },
   async (t) => {
     assert.equal(process.getuid(), 1000);
@@ -404,6 +412,8 @@ test(
     assert.equal(sql('SELECT row_to_json(s)::text FROM "MediaBudgetState" s;'), before);
     assert.equal(compose('ps', '--quiet', 'postgres').stdout.trim(), database);
     assert.equal(sql('SELECT count(*) FROM "Account";'), '1');
-    exerciseBackups({ root, pass, invoke, sql, docker, app, run, args, config });
+    if (!process.env.ARTZOO_UPGRADE_TEST_BUNDLES)
+      exerciseBackups({ root, pass, invoke, sql, docker, app, run, args, config });
+    exerciseUpgrades({ root, bundle, project, run, sql, docker, app, config });
   }
 );

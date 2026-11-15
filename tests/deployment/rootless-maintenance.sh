@@ -4,11 +4,16 @@
 set -euo pipefail
 if [[ "${1:-}" == --inside ]]; then
   shift
-  scratch=$1 socket=$2 repo=$3 bundle=$4 node_bin=$5 compose_bin=$6
+  scratch=$1 socket=$2 repo=$3 bundle=$4 node_bin=$5 compose_bin=$6 variants=${7:-}
   socket_group=$(stat -c %g "$socket")
   cp -a --reflink=auto -- "$bundle" "$scratch/bundle"
   bundle="$scratch/bundle"
   chown -R 1000:1000 "$bundle"
+  if [[ -n "$variants" ]]; then
+    cp -a --reflink=auto -- "$variants" "$scratch/variants"
+    chown -R 1000:1000 "$scratch/variants"
+    variants="$scratch/variants"
+  fi
   jail="$scratch/jail"
   mkdir "$jail"
   mount -t tmpfs -o mode=755 tmpfs "$jail"
@@ -35,9 +40,10 @@ if [[ "${1:-}" == --inside ]]; then
   exec chroot "$jail" /usr/bin/setpriv --reuid=1000 --regid=1000 --groups="0,$socket_group" \
     /usr/bin/env HOME="$scratch/home" PATH=/tools:/usr/bin:/bin \
     DOCKER_HOST=unix:///var/run/docker.sock ARTZOO_MAINTENANCE_TEST_BUNDLE="$bundle" \
+    ARTZOO_UPGRADE_TEST_BUNDLES="$variants" \
     /bin/bash -c 'cd "$1" && exec node --test "$2/tests/deployment/maintenance.test.mjs"' bash "$scratch" "$repo"
 fi
-[[ $# == 1 ]] || { printf 'Usage: bash tests/deployment/rootless-maintenance.sh RELEASE_DIRECTORY\n' >&2; exit 1; }
+[[ $# == 1 || $# == 2 ]] || { printf 'Usage: bash tests/deployment/rootless-maintenance.sh RELEASE_DIRECTORY [UPGRADE_VARIANTS]\n' >&2; exit 1; }
 [[ "$(id -u):$(id -g)" == 1000:1000 ]]
 docker --host unix:///var/run/docker.sock info --format '{{json .SecurityOptions}}' | grep -q 'name=rootless'
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
@@ -61,4 +67,4 @@ trap cleanup EXIT
 printf 'Isolated rootless maintenance test; scratch: %s\n' "$scratch"
 nsenter --user="/proc/$pid/ns/user" --setuid=0 --setgid=0 -- \
   unshare --mount --propagation private bash "$repo/tests/deployment/rootless-maintenance.sh" \
-  --inside "$scratch" "$socket" "$repo" "$bundle" "$node_bin" "$compose_bin"
+  --inside "$scratch" "$socket" "$repo" "$bundle" "$node_bin" "$compose_bin" "${2:-}"
