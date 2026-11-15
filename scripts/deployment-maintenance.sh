@@ -19,6 +19,7 @@ usage() {
   restore         【危险：覆盖当前站点】先另存当前状态，再恢复 --backup
   upgrade         【危险：停服升级】--bundle 新包；首次用 --from 当前包登记
   rollback        【危险：丢弃升级后数据】恢复上一级镜像和升级前备份
+  media-identity  只读比较媒体身份；JSON 计数，0=一致、2=不一致或无法检查、1=失败
   status          只读核对现有服务、配额、挂载、健康；不要求用量为零
   start           启动已初始化的现有容器；不建库、迁移、初始化或升级
   stop            先停止应用，再停止数据库；保留容器、卷和媒体
@@ -40,7 +41,7 @@ HELP
 }
 command=${1:---help}
 [[ $# == 0 ]] || shift
-case "$command" in --help|-h|help) usage; exit 0;; prepare-env|database|migrate|baseline|owner|enable-budget|config-check|status|start|stop|backup|backup-verify|restore|upgrade|rollback) ;; *) fail '未知维护命令。';; esac
+case "$command" in --help|-h|help) usage; exit 0;; prepare-env|database|migrate|baseline|owner|enable-budget|config-check|media-identity|status|start|stop|backup|backup-verify|restore|upgrade|rollback) ;; *) fail '未知维护命令。';; esac
 bundle='' root='' project=artzoo origin='' backup_dir='' backup_source='' keep=7 backup_options=0 from_bundle='' schema_bundle='' controller=''
 while (($#)); do
   (($# >= 2)) || fail '选项缺少值。'
@@ -91,7 +92,7 @@ flock -n 9 || fail '同一站点有另一维护操作正在执行。'
 fi
 if [[ -z "$bundle" ]]; then
   case "$command" in
-    status|start|stop)
+    status|start|stop|media-identity)
       trusted_path "$root/deploy/current"
       read -r bundle recorded_release schema_bundle extra < "$root/deploy/current"
       [[ -z "$extra" && -n "$schema_bundle" ]] || fail '当前版本记录不完整。';;
@@ -467,6 +468,22 @@ case "$command" in
     [[ "$(sql "$account_query")" == '1|1|1' ]] || fail '初始化账号计数变化。'
     write_current "$bundle" "$bundle"
     apps_touched=0
+    ;;
+  media-identity)
+    identity
+    check_app web; check_app worker
+    [[ -f "$bundle/deployment-media-identity.mjs" && ! -L "$bundle/deployment-media-identity.mjs" ]] || fail '发布包缺少媒体身份诊断。'
+    temporary=$(mktemp "$root/secrets/.identity.XXXXXXXX")
+    sql $'SELECT payload FROM (
+      SELECT 0 AS ordinal, jsonb_build_object(\x27type\x27,\x27baseline\x27,\x27fingerprint\x27,(SELECT "baselineFingerprint" FROM "MediaBudgetState" WHERE id=\x27global\x27)) AS payload
+      UNION ALL SELECT 1, to_jsonb(c) || jsonb_build_object(\x27type\x27,\x27component\x27,\x27chargedBytes\x27,c."chargedBytes"::text,\x27credited\x27,EXISTS(SELECT 1 FROM "MediaStorageCredit" cr WHERE cr."componentId"=c.id)) FROM "MediaStoredComponent" c
+      UNION ALL SELECT 2, jsonb_build_object(\x27type\x27,\x27end\x27)
+    ) snapshot ORDER BY ordinal;' > "$temporary" || fail '只读身份快照失败；数据库内容未输出。'
+    mounts=()
+    for dir in original derived avatars; do mounts+=(--mount "type=bind,src=$root/media/$dir,dst=/app/storage/$dir,readonly"); done
+    "${privilege[@]}" timeout --kill-after=5s 300s "$docker_path" --host unix:///var/run/docker.sock run --rm -i --network none --read-only --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges --log-driver none \
+      "${mounts[@]}" --mount "type=bind,src=$bundle/deployment-media-identity.mjs,dst=/app/scripts/deployment-media-identity.mjs,readonly" \
+      --entrypoint node "${ids[tools]}" /app/scripts/deployment-media-identity.mjs < "$temporary"
     ;;
   status) status_check;;
   start)

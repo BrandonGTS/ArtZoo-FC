@@ -52,7 +52,7 @@ upgrade_guard() {
   if [[ -e "$state/current" || -L "$state/current" ]]; then
     read_current
     [[ "$command" != rollback ]] || allow_schema "$current_schema"
-    case "$command" in status|start|stop|backup|restore)
+    case "$command" in status|start|stop|backup|restore|media-identity)
       [[ "$bundle" == "$current_bundle" ]] || fail '所选发布包与 deploy/current 不一致。'
       allow_schema "$current_schema";;
     esac
