@@ -57,7 +57,7 @@ export function exerciseRegistration({ root, pass, invoke, sql, docker, app, com
   );
   for (const file of fixture.files) {
     const p = file.replace('/app/storage', root + '/media');
-    renameSync(p, p + '.held');
+    renameSync(p, join(root, p.split('/').at(-1) + '.held'));
   }
   pass('restore', ['--backup-dir', backups, '--backup', saved, '--keep-stopped', 'true']);
   stopped();
