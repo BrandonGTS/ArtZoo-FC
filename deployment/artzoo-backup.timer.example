@@ -1,0 +1,10 @@
+[Unit]
+Description=ArtZoo backup at 03:00 Asia/Shanghai
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Shanghai
+Persistent=false
+Unit=artzoo-backup.service
+
+[Install]
+WantedBy=timers.target

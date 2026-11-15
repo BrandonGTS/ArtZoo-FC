@@ -1,0 +1,18 @@
+[Unit]
+Description=ArtZoo daily offline backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=1000
+Group=1000
+SupplementaryGroups=docker
+UMask=0077
+# Replace RELEASE_DIRECTORY with the currently running, verified full release.
+ExecStart=/bin/bash RELEASE_DIRECTORY/deployment-maintenance.sh backup --bundle RELEASE_DIRECTORY --root /srv/artzoo --backup-dir /srv/artzoo/backups --keep 7
+TimeoutStartSec=infinity
+TimeoutStopSec=180
+KillMode=mixed
+StandardOutput=journal
+StandardError=journal

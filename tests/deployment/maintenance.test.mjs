@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { exerciseBackups } from './backup-cases.mjs';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import {
@@ -37,7 +38,7 @@ test(
   'packaged maintenance lifecycle preserves data and refuses repeated initialization',
   {
     skip: !process.env.ARTZOO_MAINTENANCE_TEST_BUNDLE,
-    timeout: 360000
+    timeout: 900000
   },
   async (t) => {
     assert.equal(process.getuid(), 1000);
@@ -403,5 +404,6 @@ test(
     assert.equal(sql('SELECT row_to_json(s)::text FROM "MediaBudgetState" s;'), before);
     assert.equal(compose('ps', '--quiet', 'postgres').stdout.trim(), database);
     assert.equal(sql('SELECT count(*) FROM "Account";'), '1');
+    exerciseBackups({ root, pass, invoke, sql, docker, app, run, args, config });
   }
 );

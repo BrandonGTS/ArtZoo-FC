@@ -231,3 +231,68 @@
 5. 【危险：恢复 WSL 网络】先按第 3 节第 7 步停服务；Windows 还原 `.wslconfig` 备份（原本不存在则移走本次创建的文件），执行 `wsl --shutdown`，重新启动并验证两套 WSL 联网。
 6. Dev rootless 失败：保留 rootless 与旧 Docker 数据，停止 Dev Docker 排查；不要在 Server 在线时重新启用 Dev rootful Docker。
 7. 防火墙规则不符合预期：Windows 管理员执行 `Remove-NetFirewallHyperVRule -Name ArtZoo-HTTPS-LAN`，只撤销本条规则。
+
+## 9. 备份与恢复（Server，任意目录）
+
+所有命令由站长在 Server 执行。先设置 `bundle` 为当前运行的完整发布目录、`root=/srv/artzoo`，并执行第 7 节的 `status`。备份功能需要包含 `deployment-backup.sh` 的新包；旧发布包不可自行补文件或重算校验和。任务 F 完成前，新版本仍按已批准的空站部署流程交付。
+
+备份为 PostgreSQL custom dump、三个媒体目录的 tar、已完成迁移列表和清单（版本、PostgreSQL 镜像 ID、项目、大小、SHA-256）。媒体数字属主和权限保留；拒绝链接、特殊文件、路径穿越及嵌套挂载。`compose.env` 不进入备份；站长须另外离线保存秘密配置。备份目录仍含站点数据，必须按私有数据保管。
+
+### 手动备份与校验
+
+1. 默认备份位置为 `$root/backups`，保留最近 7 份。可用 `--backup-dir` 指定另一块 Linux 文件系统上的专用目录，用 `--keep` 指定 1–9999 份；目录及父级不可由组/其他用户写入，目录须为 UID/GID 1000、0700，不可使用链接、空格或 Windows 挂载目录。不要让多个站点共用一个备份目录。以下选定保留 7 份：
+
+   ```bash
+   backups="$root/backups"
+   ```
+
+2. 【危险：短暂停站】暂停 web、worker，保持宿主机不直接写媒体；数据库继续运行。备份成功后启动应用并检查健康，最后发布正式备份目录、清理超过保留数的旧备份：
+
+   ```bash
+   bash "$bundle/deployment-maintenance.sh" backup --bundle "$bundle" --root "$root" --backup-dir "$backups" --keep 7
+   ```
+
+3. 成功应出现 `PASS: backup` 和备份完整路径。复制该路径后只读验证；这会用无网络临时容器执行 `pg_restore --list`，不修改数据库或媒体：
+
+   ```bash
+   read -r -p '完整备份目录：' snapshot
+   bash "$bundle/deployment-maintenance.sh" backup-verify --bundle "$bundle" --root "$root" --backup "$snapshot"
+   ```
+
+4. 备份失败会尝试重新启动应用并检查健康，不删除旧备份；失败仍返回非零。检查 `status`，未恢复时执行第 7 节的【危险】启动步骤。`.partial.*` 是失败现场，不计入保留份数，也不自动删除；排查后由站长清理。断电、强制杀进程或 Docker 不可用不能保证自动重启，须人工检查。
+
+### 原地恢复演练
+
+1. 先执行并验证一次备份，记录路径。登录家庭站，发一条日常、上传一张图片；记录旧图是否正常。
+2. 【危险：覆盖当前站点】执行以下命令。脚本重新核对校验和、归档路径、发布版本、数据库镜像和项目；不一致时在停站前拒绝。应先按提示切换至备份对应发布包和镜像，不修改清单绕过。停站后自动创建 `rescue-*` 当前状态备份，成功才开始覆盖：
+
+   ```bash
+   bash "$bundle/deployment-maintenance.sh" restore --bundle "$bundle" --root "$root" --backup-dir "$backups" --backup "$snapshot"
+   ```
+
+3. 恢复清空并重建应用的 `public` schema，拒绝额外用户 schema；SQL 在单个事务中恢复，错误回滚。媒体随后清空、解包，启动应用并检查健康。数据库和文件不是同一事务：覆盖阶段任一步失败，应用保持停止，输出恢复前备份路径和恢复命令；排查原因后由站长单独执行该【危险】命令。切勿直接开站或删除备份。恢复前准备失败则尝试恢复启动。
+4. 确认新增日常和新图消失，登录正常、旧图正常显示。再删除一张恢复前已有的相册照片，核对配额是否退回；记录实际结果。文件重新写入会改变 inode，此项可能失败，任务 C 不修复媒体身份；交由任务 D 诊断。
+5. `rescue-*` 不自动轮换删除；需要撤销本次恢复时，将其完整路径作为 `--backup` 再执行第 2 步。日常保留数只覆盖同项目、同 PostgreSQL 镜像且校验通过的 `backup-*` 目录，不删除最后一份成功备份；损坏或未知目录留待人工检查。
+
+### 每日定时备份
+
+1. 模板面向使用系统 Docker 的 Server，不安装到 Dev。确认运行用户 UID/GID 为 1000，且无需 sudo 交互即可访问 Docker。备份模板固定具体发布包；以后换版本必须同步更新路径。先复制到候选文件（已有文件先另存），把服务模板两处 `RELEASE_DIRECTORY` 替换为 `$bundle` 的实际路径，并按需调整 `--backup-dir`、`--keep`：
+
+   ```bash
+   cp "$bundle/artzoo-backup.service.example" "$root/deploy/artzoo-backup.service"
+   cp "$bundle/artzoo-backup.timer.example" "$root/deploy/artzoo-backup.timer"
+   editor "$root/deploy/artzoo-backup.service"
+   systemd-analyze verify "$root/deploy/artzoo-backup.service" "$root/deploy/artzoo-backup.timer"
+   ```
+
+2. 【危险：启用每日停站备份】确认手动备份、验证已通过，且无同名服务，或已备份其旧配置，再安装并启用。模板每天北京时间 03:00 执行；关机时错过不会开机补跑，避免白天意外停站：
+
+   ```bash
+   sudo install -m 644 "$root/deploy/artzoo-backup.service" "$root/deploy/artzoo-backup.timer" /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now artzoo-backup.timer
+   systemctl list-timers artzoo-backup.timer
+   ```
+
+3. 【危险：立即演练一次定时任务】执行 `sudo systemctl start artzoo-backup.service`。检查 `systemctl show artzoo-backup.service -p Result -p ExecMainStatus` 应为 `success`、`0`，并用 `sudo journalctl -u artzoo-backup.service -n 40 --no-pager` 查看 `PASS: backup`。失败显示非零状态并留在 journal；另执行站点 `status`。这些检查不保证 WSL 在关闭终端或 Windows 重启后持续运行，常驻由任务 D 处理。
+4. 回退定时配置：`sudo systemctl disable --now artzoo-backup.timer`；若备份正在运行，等它完成并确认网站健康。恢复此前保存的单元文件，再执行 `sudo systemctl daemon-reload`；不删除任何备份或站点数据。

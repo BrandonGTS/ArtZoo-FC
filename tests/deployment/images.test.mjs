@@ -310,6 +310,20 @@ esac
   const output = result.stdout.match(/发布包已完成：(.+)\n/)[1];
   const verified = f.run('verify', output);
   assert.equal(verified.status, 0, verified.stderr);
+  for (const name of [
+    'deployment-backup.sh',
+    'artzoo-backup.service.example',
+    'artzoo-backup.timer.example'
+  ]) {
+    const file = join(output, name);
+    const content = readFileSync(file);
+    writeFileSync(file, 'tampered');
+    assert.equal(f.run('verify', output).status, 1);
+    rmSync(file);
+    assert.equal(f.run('verify', output).status, 1);
+    writeFileSync(file, content);
+    assert.equal(f.run('verify', output).status, 0);
+  }
   for (const name of httpsFiles) assert.ok(readFileSync(join(output, name)).length > 0, name);
   writeFileSync(join(output, 'Caddyfile.lan.example'), 'tampered');
   assert.equal(f.run('verify', output).status, 1);
