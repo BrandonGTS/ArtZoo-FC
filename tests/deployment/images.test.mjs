@@ -84,6 +84,12 @@ test('help works without a Docker connection', (t) => {
   assert.match(result.stdout, /build/);
   assert.equal(f.calls(), '');
 });
+test('an unchecksummed registration script is refused', (t) => {
+  const f = fixture(t);
+  writeFileSync(join(f.bundle, 'deployment-media-reregister.sh'), 'unexpected');
+  assert.equal(f.run('verify', f.bundle).status, 1);
+  assert.equal(f.calls(), '');
+});
 test('a matching version can be imported repeatedly without loading or starting containers', (t) => {
   const f = fixture(t);
   for (let attempt = 0; attempt < 2; attempt++) assert.equal(f.run('import', f.bundle).status, 0);

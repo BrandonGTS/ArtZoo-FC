@@ -8,14 +8,15 @@ restart_apps() {
   resume_apps=0
 }
 backup_cleanup() {
-  local failed=0
+  local failed=0 stop_option=''
   if [[ "$resume_apps" == 1 ]]; then
     restart_apps || { printf '备份后重启/健康检查失败，请检查并执行同一发布包的 start。\n' >&2; failed=1; }
   fi
   if [[ "$destructive_restore" == 1 ]]; then
     dc stop --timeout 60 web worker >/dev/null 2>&1 || failed=1
     printf '恢复未完成，保持停站。先排查原因；当前状态备份：%s\n' "$saved_snapshot" >&2
-    printf '【危险】恢复命令：bash %q restore --bundle %q --root %q --project %q --backup-dir %q --backup %q\n' "$bundle/deployment-maintenance.sh" "$bundle" "$root" "$project" "$backup_dir" "$saved_snapshot" >&2
+    [[ "$keep_stopped" != true ]] || stop_option=' --keep-stopped true'
+    printf '【危险】恢复命令：bash %q restore --bundle %q --root %q --project %q --backup-dir %q --backup %q%s\n' "$bundle/deployment-maintenance.sh" "$bundle" "$root" "$project" "$backup_dir" "$saved_snapshot" "$stop_option" >&2
   fi
   [[ -z "$restore_sql" ]] || rm -f -- "$restore_sql" || failed=1
   [[ -z "$snapshot" ]] || printf '未发布的临时备份保留在：%s\n' "$snapshot" >&2
@@ -159,7 +160,13 @@ backup_main() {
   verify_snapshot "$backup_source"
   printf '【危险】覆盖项目 %s 的数据库和三个媒体目录。\n' "$project"
   resume_apps=0; destructive_restore=1
+  if [[ "$keep_stopped" == true ]]; then state_write media-registration.pending stopped; fi
   restore_snapshot
+  if [[ "$keep_stopped" == true ]]; then
+    destructive_restore=0
+    printf "PASS: restore；保持停站，请先执行 media-reregister，再单独 start。\n"
+    return
+  fi
   restart_apps || fail '恢复后启动/健康检查失败。'
   destructive_restore=0
   printf 'PASS: restore；请人工检查登录、旧图、删图及配额。\n'

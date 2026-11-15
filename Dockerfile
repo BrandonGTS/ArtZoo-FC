@@ -81,7 +81,7 @@ CMD ["--require-db"]
 FROM deps AS tools
 COPY --from=build /app/packages/ /app/packages/
 COPY --from=build /app/apps/web/server/auth/ /app/apps/web/server/auth/
-COPY scripts/auth-cli-loader.mjs scripts/media-baseline-cli.mjs /app/scripts/
+COPY scripts/auth-cli-loader.mjs scripts/media-baseline-cli.mjs scripts/media-reregister-cli.mjs /app/scripts/
 ENV NODE_ENV=production
 USER node
 ENTRYPOINT []

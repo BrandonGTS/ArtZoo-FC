@@ -46,13 +46,21 @@ allow_schema() {
   done < "$1/runtime-config.manifest"
 }
 upgrade_guard() {
+  if [[ -e "$state/media-registration.pending" || -L "$state/media-registration.pending" ]]; then
+    state_file "$state/media-registration.pending"
+    case "$command" in
+      media-reregister|media-identity|stop) ;;
+      restore) [[ "$keep_stopped" == true ]] || fail '登记未完成；restore 须保持停站。';;
+      *) fail '媒体登记未完成；保持停站，先运行 media-reregister。';;
+    esac
+  fi
   if [[ -e "$state/pending" || -L "$state/pending" ]]; then
     [[ "$command" == rollback || "$command" == stop ]] || fail '升级/恢复尚未完成；保持停站，请先执行 rollback。'
   fi
   if [[ -e "$state/current" || -L "$state/current" ]]; then
     read_current
     [[ "$command" != rollback ]] || allow_schema "$current_schema"
-    case "$command" in status|start|stop|backup|restore|media-identity)
+    case "$command" in status|start|stop|backup|restore|media-identity|media-reregister)
       [[ "$bundle" == "$current_bundle" ]] || fail '所选发布包与 deploy/current 不一致。'
       allow_schema "$current_schema";;
     esac
