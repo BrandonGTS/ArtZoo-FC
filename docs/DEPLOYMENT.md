@@ -294,5 +294,63 @@
    systemctl list-timers artzoo-backup.timer
    ```
 
-3. 【危险：立即演练一次定时任务】执行 `sudo systemctl start artzoo-backup.service`。检查 `systemctl show artzoo-backup.service -p Result -p ExecMainStatus` 应为 `success`、`0`，并用 `sudo journalctl -u artzoo-backup.service -n 40 --no-pager` 查看 `PASS: backup`。失败显示非零状态并留在 journal；另执行站点 `status`。这些检查不保证 WSL 在关闭终端或 Windows 重启后持续运行，常驻由任务 D 处理。
+3. 【危险：立即演练一次定时任务】执行 `sudo systemctl start artzoo-backup.service`。检查 `systemctl show artzoo-backup.service -p Result -p ExecMainStatus` 应为 `success`、`0`，并用 `sudo journalctl -u artzoo-backup.service -n 40 --no-pager` 查看 `PASS: backup`。失败显示非零状态并留在 journal；另执行站点 `status`。这些检查不保证 WSL 在关闭终端或 Windows 重启后持续运行，常驻按第 10 节手动开启。
 4. 回退定时配置：`sudo systemctl disable --now artzoo-backup.timer`；若备份正在运行，等它完成并确认网站健康。恢复此前保存的单元文件，再执行 `sudo systemctl daemon-reload`；不删除任何备份或站点数据。
+
+## 10. 家庭 WSL：手动常驻与媒体身份检查
+
+本节按站长本次要求采用**手动开启、手动关闭**，不创建 Windows 开机或登录计划任务。Windows 重启后要重新执行 Start。Microsoft 说明 [systemd 服务本身不会让 WSL 持续运行](https://learn.microsoft.com/en-us/windows/wsl/systemd)，因此由隐藏的前台 WSL 进程保持发行版存活。Linux 内已有 Docker、Caddy 的服务配置保留；本脚本不阻止其他软件或终端另行启动发行版。
+
+### 开启、查看和关闭
+
+前提：Server 已完成部署，发布包已导入且与现有容器、`deploy/current` 一致；包内须含 `deployment-resident.sh`、`deployment-media-identity.mjs` 和 `artzoo-resident.ps1`。旧包不能手动补文件或重算校验和。脚本只启动已有容器，不建库、不迁移、不升级；Caddy 的 sudo 提示由站长在前台输入，不把密码写入脚本。
+
+1. 准备时把新发布包中的 `artzoo-resident.ps1` 复制到 Windows 上自己选择的固定目录。不要从 WSL UNC 路径直接运行，否则仅查看脚本也可能启动发行版。以注册该 WSL 的 Windows 用户打开 PowerShell，无须另建管理员账号。设置下面变量；脚本或发行版名称不同则按实际填写：
+
+   ```powershell
+   $control = Read-Host 'Windows 上 artzoo-resident.ps1 的完整路径'
+   $bundle = Read-Host 'Server 内当前发布包的 Linux 绝对路径'
+   $distro = 'ArtZoo-FC-Server'
+   ```
+
+2. 【危险：启动网站】Windows PowerShell 执行。启动隐藏常驻进程，再用原维护入口启动数据库、web、worker，最后启动 Caddy：
+
+   ```powershell
+   & $control -Action Start -Bundle $bundle -Distribution $distro
+   ```
+
+   成功看到 `Resident: running` 和 Caddy `active`；随后从手机访问原 HTTPS 地址。关闭所有 WSL 与 PowerShell 终端，等待至少一分钟，再从手机访问。重复 Start 不累积常驻进程。若脚本执行策略拦截，先检查来源，按本机策略放行这一文件，不永久降低全局执行策略。
+
+3. Windows PowerShell 查看：`& $control -Action Status -Bundle $bundle -Distribution $distro`。发行版已停止时仅报告 stopped，不将其启动；常驻运行时还检查网站和 Caddy。常驻 stopped 不代表其他终端维持的网站也已停止。
+4. 【危险：停止网站】Windows PowerShell 执行，正常停止 web、worker、数据库、Caddy 后释放常驻：
+
+   ```powershell
+   & $control -Action Stop -Bundle $bundle -Distribution $distro
+   ```
+
+   成功看到 `Resident: stopped`。保留全部容器、卷、媒体、秘密和备份；不执行 `wsl --shutdown` 或 `--terminate`，不影响 Dev 和其他终端。重复 Stop 安全。发行版若已经停止，不为停站而将其启动。
+5. 失败不会自动覆盖或恢复数据；常驻可能保留，先查看 Status、修复报错，再单独重试 Stop。发布包不匹配时先找回对应发布包，不删除状态文件绕过。撤销本功能只需成功执行 Stop；没有需要移除的开机任务。
+
+### 只读媒体身份诊断
+
+Server 终端，设置当前 `bundle`、`root=/srv/artzoo`。检查期间不要上传或删除媒体，也不要直接修改宿主媒体；命令不自动停站，在线写入可能导致瞬时无法检查，需要在无写入时重测。数据库快照使用只读 SQL，诊断容器无网络、无秘密环境、根文件系统和三个媒体挂载只读；只会创建并清理维护锁、临时快照等控制文件。
+
+```bash
+bash "$bundle/deployment-maintenance.sh" media-identity --bundle "$bundle" --root "$root"
+echo "退出码=$?"
+```
+
+JSON 中 `consistent` 为一致，`inconsistent` 为不一致，`unchecked` 为无法检查；`components` 是文件组件合计，`directories` 按实际子目录统计，`baseline` 单独比较整体媒体基线。整体基线只保存一个哈希，无法倒推出具体哪个根目录变化。`skippedCredited` 是已返还配额的历史组件；`skippedAggregate` 是不对应单文件的基线汇总记录，不计为一致文件。`skippedDatabase` 是存放在数据库 bytea 中的快捷图标，不参加磁盘身份比较。
+
+退出码 `0` 表示所有可检查项一致且没有无法检查项，`2` 表示发现不一致或无法检查，`1` 表示执行失败或快照不完整。缺失身份、未知类型、丢失文件、内容被改、链接或不可信权限均不会误报为一致。文件组件数为零只能证明基线检查结果，不能作为上传媒体验证通过的证据。诊断复用当前 tools 镜像的只读身份核对方法，不重新登记身份，不删除图片，不退还或清零配额。
+
+### 实测记录与重启顺序
+
+各轮先记录版本、文件组件数、诊断 JSON 和退出码。确保有恢复前上传的图片及身份记录；没有非零一致样本就不能确认重启安全。检查完成后另做 HTTPS、登录、旧图显示验收。
+
+- 恢复：按第 9 节完成备份及【危险】原地恢复，比较恢复前后诊断。文件重新写入可能使文件身份变化；根目录保留时整体基线仍可能一致。
+- 容器重启：【危险】Server 按第 7 节正常停止、启动已有容器，再检查诊断；无需重启 Windows 或 WSL。
+- Windows 重启，Dev 先启动：【危险】保存全部工作，先运行 Stop，再由站长重启 Windows。登录后先打开 Dev，再执行 Start 启动 Server，检查诊断与网站。
+- Windows 重启，Server 先启动：【危险】重复上述停站、保存、重启步骤；登录后先执行 Start，再打开 Dev，检查诊断与网站。先确认其他软件没有提前启动另一个发行版；否则本轮不能证明启动顺序。
+
+记录中区分 Dev 临时项目结果与家庭 Server 实测结果。Windows 重启只能由站长安排，未实际完成就保留未验收状态，不用 `wsl --shutdown` 或容器重启冒充。恢复或启动顺序出现不一致时，转入任务 E 的设计讨论；本任务不修改身份算法。

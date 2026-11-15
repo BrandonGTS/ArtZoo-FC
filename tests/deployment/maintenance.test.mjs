@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { exerciseMediaIdentity } from './media-identity-cases.mjs';
 import { exerciseBackups } from './backup-cases.mjs';
 import { exerciseUpgrades } from './upgrade-cases.mjs';
 import assert from 'node:assert/strict';
@@ -412,6 +413,8 @@ test(
     assert.equal(sql('SELECT row_to_json(s)::text FROM "MediaBudgetState" s;'), before);
     assert.equal(compose('ps', '--quiet', 'postgres').stdout.trim(), database);
     assert.equal(sql('SELECT count(*) FROM "Account";'), '1');
+    if (!process.env.ARTZOO_UPGRADE_TEST_BUNDLES)
+      exerciseMediaIdentity({ root, bundle, invoke, pass, sql, docker, app });
     if (!process.env.ARTZOO_UPGRADE_TEST_BUNDLES)
       exerciseBackups({ root, pass, invoke, sql, docker, app, run, args, config });
     exerciseUpgrades({ root, bundle, project, run, sql, docker, app, config });

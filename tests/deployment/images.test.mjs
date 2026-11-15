@@ -170,6 +170,36 @@ function addConfiguration(f, imageEnv = `ARTZOO_WEB_IMAGE=${ref}\n`) {
       .join('')
   );
 }
+test('diagnostics require the complete checksummed group and reject tampering before Docker', (t) => {
+  const names = [
+    'deployment-maintenance.sh',
+    'runtime-config.manifest',
+    'deployment-upgrade.sh',
+    'deployment-backup.sh',
+    'artzoo-backup.service.example',
+    'artzoo-backup.timer.example',
+    'deployment-media-identity.mjs',
+    'deployment-resident.sh',
+    'artzoo-resident.ps1'
+  ];
+  for (const variant of ['complete', 'missing', 'tampered', 'unchecked', 'partial']) {
+    const f = fixture(t);
+    addConfiguration(f);
+    const sums = join(f.bundle, 'SHA256SUMS');
+    let content = readFileSync(sums, 'utf8');
+    for (const name of names) {
+      if (variant === 'partial' && name === 'artzoo-resident.ps1') continue;
+      writeFileSync(join(f.bundle, name), 'fixture\n');
+      if (variant !== 'unchecked' || !names.slice(-3).includes(name))
+        content += `${createHash('sha256').update('fixture\n').digest('hex')}  ${name}\n`;
+    }
+    writeFileSync(sums, content);
+    if (variant === 'missing') rmSync(join(f.bundle, 'deployment-resident.sh'));
+    if (variant === 'tampered') writeFileSync(join(f.bundle, 'deployment-media-identity.mjs'), 'changed');
+    assert.equal(f.run('verify', f.bundle).status, variant === 'complete' ? 0 : 1, variant);
+    assert.equal(f.calls(), '');
+  }
+});
 test('configuration travels with the verified bundle and repeat import remains safe', (t) => {
   const f = fixture(t);
   addConfiguration(f);
