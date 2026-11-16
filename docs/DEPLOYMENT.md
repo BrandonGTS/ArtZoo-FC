@@ -153,7 +153,7 @@ bash "$bundle/deployment-maintenance.sh" upgrade --bundle "$bundle" --root "$roo
    systemctl list-timers artzoo-backup.timer
    ```
 
-   未安装 timer 跳过。升级或回退后都必须同步固定版本路径，不能让定时任务继续引用错误版本。家庭 Windows 常驻控制命令的 `-Bundle` 也改用实际运行包；当前隐藏常驻进程不必为换参数重启。旧包先核对 `--help`，不得自行补文件。
+   未安装 timer 跳过。升级或回退后都必须同步固定版本路径，不能让定时任务继续引用错误版本。固定 Windows 常驻入口自动读取 `deploy/current`，升级后无需修改启动参数或重新复制入口；当前隐藏常驻进程不必重启。旧包先核对 `--help`，不得自行补文件。
 
 ### 1.6 【危险：回退会丢弃升级后数据】Server 单独执行
 
@@ -182,7 +182,7 @@ bash "$current/deployment-maintenance.sh" --help
 bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$current" --root "$root" --project "$project" --backup-dir "$backups"
 ```
 
-失败保持停站，不能绕过标记；成功后重新执行 `status`、`media-identity`，检查登录、旧图、删图退额及 `history.log` 的 `rollback ... result=success`。按 1.5 把 timer 的两处路径和 Windows 常驻的 `-Bundle` 改回实际旧包；仅恢复原本开启的调度。升级后新增的数据消失是回退的预期结果。
+失败保持停站，不能绕过标记；成功后重新执行 `status`、`media-identity`，检查登录、旧图、删图退额及 `history.log` 的 `rollback ... result=success`。按 1.5 把 timer 的两处路径改回实际旧包；Windows 固定入口自动跟随 `current`，无需手工改版本。仅恢复原本开启的调度。升级后新增的数据消失是回退的预期结果。
 
 
 ## 2. 备份与恢复（Server，任意目录）
@@ -483,37 +483,54 @@ bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$current" --
 
 ### 4.3 家庭 WSL：手动常驻与媒体身份检查
 
-本节按站长本次要求采用**手动开启、手动关闭**，不创建 Windows 开机或登录计划任务。Windows 重启后要重新执行 Start。Microsoft 说明 [systemd 服务本身不会让 WSL 持续运行](https://learn.microsoft.com/en-us/windows/wsl/systemd)，因此由隐藏的前台 WSL 进程保持发行版存活。Linux 内已有 Docker、Caddy 的服务配置保留；本脚本不阻止其他软件或终端另行启动发行版。
+本节按站长本次要求采用**手动开启、手动关闭**，不创建 Windows 开机或登录计划任务。Windows 重启后要重新执行 `-start`。Microsoft 说明 [systemd 服务本身不会让 WSL 持续运行](https://learn.microsoft.com/en-us/windows/wsl/systemd)，因此由隐藏的前台 WSL 进程保持发行版存活。Linux 内已有 Docker、Caddy 的服务配置保留；本脚本不阻止其他软件或终端另行启动发行版。
 
-#### 开启、查看和关闭
+#### 固定 Windows 入口：开启、查看和关闭
 
-前提：Server 已完成部署，发布包已导入且与现有容器、`deploy/current` 一致；包内须含 `deployment-resident.sh`、`deployment-media-identity.mjs` 和 `artzoo-resident.ps1`。旧包不能手动补文件或重算校验和。脚本只启动已有容器，不建库、不迁移、不升级；Caddy 的 sudo 提示由站长在前台输入，不把密码写入脚本。
+Windows 只保存一个小型控制脚本，默认操作 `ArtZoo-FC-Server`、站点 `/srv/artzoo`、项目 `artzoo`。不用输入发布包名或 Linux 绝对路径；每次从 `deploy/current` 读取当前部署记录，核对路径权限、包完整性及现有容器。不能把文件名最新的目录当成正在使用的版本。
 
-1. 准备时把新发布包中的 `artzoo-resident.ps1` 复制到 Windows 上自己选择的固定目录。不要从 WSL UNC 路径直接运行，否则仅查看脚本也可能启动发行版。以注册该 WSL 的 Windows 用户打开 PowerShell，无须另建管理员账号。设置下面变量；脚本或发行版名称不同则按实际填写：
+前提：Server 已完成部署并有有效 `deploy/current`；对应包须包含 `deployment-resident.sh` 和维护脚本。入口可以控制具备这些能力的已有完整包，不要求为了安装 Windows 入口重建网站，也不修改已交付包。旧站没有 `current` 时，先通过已授权的首次部署或 `upgrade --from` 建立记录；入口不猜版本、不自行初始化。升级或媒体恢复未完成时拒绝启动，保留现场。
 
-   ```powershell
-   $control = Read-Host 'Windows 上 artzoo-resident.ps1 的完整路径'
-   $bundle = Read-Host 'Server 内当前发布包的 Linux 绝对路径'
-   $distro = 'ArtZoo-FC-Server'
-   ```
-
-2. 【危险：启动网站】Windows PowerShell 执行。启动隐藏常驻进程，再用原维护入口启动数据库、web、worker，最后启动 Caddy：
+1. **首次安装，仅一次。** 使用仓库 `deployment/artzoo-resident.ps1` 或包含新入口的完整发布包内同名文件。在 Windows PowerShell 输入该文件的完整路径，复制为固定文件名；不是复制整个发布包。默认目录为当前用户的 `Documents\ArtZoo-FC`：
 
    ```powershell
-   & $control -Action Start -Bundle $bundle -Distribution $distro
+   $source = Read-Host '新版 artzoo-resident.ps1 的完整路径'
+   $directory = Join-Path $env:USERPROFILE 'Documents\ArtZoo-FC'
+   New-Item -ItemType Directory -Path $directory -Force | Out-Null
+   $control = Join-Path $directory 'ArtZoo-FC-Server.ps1'
+   if (Test-Path -LiteralPath $control) { throw '固定入口已存在，请先核对，不覆盖' }
+   Copy-Item -LiteralPath $source -Destination $control
    ```
 
-   成功看到 `Resident: running` 和 Caddy `active`；随后从手机访问原 HTTPS 地址。关闭所有 WSL 与 PowerShell 终端，等待至少一分钟，再从手机访问。重复 Start 不累积常驻进程。若脚本执行策略拦截，先检查来源，按本机策略放行这一文件，不永久降低全局执行策略。
+   已经安装固定入口则跳过；网站升级、回退后不用再次复制。只有 Windows 入口代码本身变化时才更新这一文件，更新前另存原入口。不要直接从 WSL UNC 路径运行入口，避免在查看关闭状态时唤醒发行版。不创建快捷方式、计划任务或开机自启。
 
-3. Windows PowerShell 查看：`& $control -Action Status -Bundle $bundle -Distribution $distro`。发行版已停止时仅报告 stopped，不将其启动；常驻运行时还检查网站和 Caddy。常驻 stopped 不代表其他终端维持的网站也已停止。
-4. 【危险：停止网站】Windows PowerShell 执行，正常停止 web、worker、数据库、Caddy 后释放常驻：
+2. Windows PowerShell 进入固定目录，查看帮助或状态（任意工作目录可先执行下面的 `Set-Location`）：
 
    ```powershell
-   & $control -Action Stop -Bundle $bundle -Distribution $distro
+   Set-Location (Join-Path $env:USERPROFILE 'Documents\ArtZoo-FC')
+   .\ArtZoo-FC-Server.ps1
+   .\ArtZoo-FC-Server.ps1 -status
    ```
 
-   成功看到 `Resident: stopped`。保留全部容器、卷、媒体、秘密和备份；不执行 `wsl --shutdown` 或 `--terminate`，不影响 Dev 和其他终端。重复 Stop 安全。发行版若已经停止，不为停站而将其启动。
-5. 失败不会自动覆盖或恢复数据；常驻可能保留，先查看 Status、修复报错，再单独重试 Stop。发布包不匹配时先找回对应发布包，不删除状态文件绕过。撤销本功能只需成功执行 Stop；没有需要移除的开机任务。
+   无参数只显示用法；每次只选一个小写模式。PowerShell 从当前目录调用脚本要带 `.\`，不需要把目录加入 PATH。`-status` 显示已记录版本、发布目录、常驻、网站及 Caddy 检查结果。WSL 已关闭时只报告关闭，不读取包、不将其启动，也不把缓存当实时版本。常驻关闭但 WSL 仍运行时继续检查网站；有终端维持网站运行时，不误报网站已经停止。
+
+3. 【危险：启动网站】在这个 Windows 目录单独执行：
+
+   ```powershell
+   .\ArtZoo-FC-Server.ps1 -start
+   ```
+
+   自动选择当前部署包，启动隐藏常驻进程，再启动已有数据库、web、worker 和 Caddy；不建库、不迁移、不升级。Caddy 的 sudo 提示仍由站长在前台输入，不保存密码。看到 `Resident: running`、Caddy `active` 后，用手机访问 HTTPS。关闭所有 WSL 和 PowerShell 终端，等至少一分钟后再访问，确认常驻有效。重复启动不累积常驻进程；Windows 重启后需重新执行 `-start`。
+
+4. 【危险：停止网站】在同一目录单独执行：
+
+   ```powershell
+   .\ArtZoo-FC-Server.ps1 -stop
+   ```
+
+   正常停止 web、worker、数据库、Caddy 后释放常驻，成功显示 `Resident: stopped`。保留全部容器和数据，不执行 `wsl --shutdown` 或 `--terminate`，不影响 Dev。发行版已经关闭时直接报告关闭；停止服务失败时保留常驻，先排错再重试。
+
+5. 验证：依次查看 `-status`、执行一次【危险】`-start`、检查 HTTPS 与关闭终端后的访问，再单独执行【危险】`-stop`。下次正常升级或回退后，再用同一入口查看状态，确认记录及容器版本匹配。任何失败返回错误；不要通过删除 `current` 或维护标记绕过。回退入口更新时恢复原先另存的 Windows 文件，不恢复或修改站点数据。脚本被执行策略拦截时先核对来源，按本机策略处理这一文件，不永久降低全局执行策略。
 
 #### 只读媒体身份诊断
 
@@ -534,8 +551,8 @@ JSON 中 `consistent` 为一致，`inconsistent` 为不一致，`unchecked` 为�
 
 - 恢复：按第 2 节完成备份及【危险】原地恢复，在停站状态分别记录登记前、登记后的诊断。文件重新写入可能使文件身份变化；根目录保留时整体基线仍可能一致。
 - 容器重启：【危险】Server 按第 2 节正常停止、启动已有容器，再检查诊断；无需重启 Windows 或 WSL。
-- Windows 重启，Dev 先启动：【危险】保存全部工作，先运行 Stop，再由站长重启 Windows。登录后先打开 Dev，再执行 Start 启动 Server，检查诊断与网站。
-- Windows 重启，Server 先启动：【危险】重复上述停站、保存、重启步骤；登录后先执行 Start，再打开 Dev，检查诊断与网站。先确认其他软件没有提前启动另一个发行版；否则本轮不能证明启动顺序。
+- Windows 重启，Dev 先启动：【危险】保存全部工作，先运行 `-stop`，再由站长重启 Windows。登录后先打开 Dev，再执行 `-start` 启动 Server，检查诊断与网站。
+- Windows 重启，Server 先启动：【危险】重复上述停站、保存、重启步骤；登录后先执行 `-start`，再打开 Dev，检查诊断与网站。先确认其他软件没有提前启动另一个发行版；否则本轮不能证明启动顺序。
 
 记录中区分 Dev 临时项目结果与家庭 Server 实测结果。Windows 重启只能由站长安排，未实际完成就保留未验收状态，不用 `wsl --shutdown` 或容器重启冒充。恢复或启动顺序出现不一致时，按第 2 节执行已交付的媒体身份登记流程；登记失败保持停站，核对文件完整性和权限，不改身份算法或清零配额。
 ## 5. 失败回退（只执行对应项）
