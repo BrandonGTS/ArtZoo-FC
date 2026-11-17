@@ -176,7 +176,7 @@ read -r current current_release current_schema < "$root/deploy/current"
 bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$current" --root "$root" --project "$project" --backup-dir "$backups"
 ```
 
-登记成功后按 `running` 标记自动启动旧版本并检查健康；再执行 `status`、`media-identity`，检查登录、旧图、删图退额及 `history.log`。失败保持停站，保留备份和维护标记，不强开网站。按 1.5 把 timer 的两处路径改回实际旧包；Windows 固定入口自动跟随 `current`，无需手工改版本。仅恢复原本开启的调度。升级后新增的数据消失是回退的预期结果。
+登记成功后按 `running` 标记自动启动旧版本并检查健康；再执行 `status`、`media-identity`，检查登录、旧图、删图退额及 `history.log`。失败保持停站，保留备份和维护标记，不强开网站。按 1.5 查看最近备份结果并仅恢复原本开启的调度；新备份入口与 Windows 固定入口自动跟随 `current`，无需手工改版本。回退到不支持新备份入口的旧包时，按第 2 节的旧包步骤处理。升级后新增的数据消失是回退的预期结果。
 
 以上停站保护只随新控制包生效，已交付旧包不改文件、不重算校验和。旧包的 `rollback` 仍可能直接开站，不用它代替本流程；先取得包含本修复的完整控制包并校验。目标旧包还必须自带登记脚本和兼容 tools；不支持时保留现场，另行评审恢复方案，不把新 tools 强塞给旧包。
 
