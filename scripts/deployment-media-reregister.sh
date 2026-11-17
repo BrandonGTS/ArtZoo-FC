@@ -11,6 +11,7 @@ register_main() {
   backup_dir=${backup_dir:-$root/backups}; backup_location "$backup_dir"
   if [[ ! -e "$backup_dir" ]]; then trusted_path "$(dirname "$backup_dir")"; mkdir -m 700 -- "$backup_dir"; fi
   private_directory "$backup_dir"
+  backup_space_check
   for service in web worker; do
     running+="$(d inspect --format '{{.State.Running}}' "$(dc ps --all --quiet "$service")") "
   done
@@ -56,5 +57,6 @@ EOF
   if [[ "$previous" == running ]]; then restart_apps || fail '登记后健康检查失败；保持停站。'; fi
   rm -- "$mark"
   apps_touched=0
+  prune_backups
   printf 'PASS: media-reregister；原运行状态=%s，金额及历史删除凭据未修改。\n' "$previous"
 }

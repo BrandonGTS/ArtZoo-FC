@@ -24,7 +24,8 @@ usage() {
   status          只读核对现有服务、配额、挂载、健康；不要求用量为零
   start           启动已初始化的现有容器；不建库、迁移、初始化或升级
   stop            先停止应用，再停止数据库；保留容器、卷和媒体
-备份选项：--backup-dir 绝对目录（默认 root/backups）、--keep 正整数（默认 7）。
+备份选项：--backup-dir 绝对目录（默认 root/backups）、--keep 正整数（默认 7）、--keep-maintenance 1–99（维护备份每类默认 3）。
+status 仅接受 --backup-dir 作只读统计，不接受其他备份选项。
 恢复/验证选项：--backup 完整备份目录；恢复必须使用备份记录的同一发布版本。
 restore/rollback 恢复后保持停站，必须执行输出的 media-reregister 命令。
 restore 默认登记成功后恢复原运行状态；--keep-stopped true 强制登记后仍停站，再单独 start。
@@ -45,18 +46,21 @@ HELP
 command=${1:---help}
 [[ $# == 0 ]] || shift
 case "$command" in --help|-h|help) usage; exit 0;; prepare-env|database|migrate|baseline|owner|enable-budget|config-check|media-identity|media-reregister|status|start|stop|backup|backup-verify|restore|upgrade|rollback) ;; *) fail '未知维护命令。';; esac
-bundle='' root='' project=artzoo origin='' backup_dir='' backup_source='' keep=7 backup_options=0 from_bundle='' schema_bundle='' controller='' keep_stopped=false
+bundle='' root='' project=artzoo origin='' backup_dir='' backup_source='' keep=7 keep_maintenance=3 backup_options=0 from_bundle='' schema_bundle='' controller='' keep_stopped=false
 while (($#)); do
   (($# >= 2)) || fail '选项缺少值。'
   case "$1" in
     --bundle) bundle=$2;; --root) root=$2;; --project) project=$2;; --origin) origin=$2;;
-    --backup-dir) backup_dir=$2; backup_options=1;; --backup) backup_source=$2; backup_options=1;;
+    --backup-dir) backup_dir=$2; [[ "$command" == status ]] || backup_options=1;; --backup) backup_source=$2; backup_options=1;;
+    --keep-maintenance) keep_maintenance=$2; backup_options=1;;
     --keep) keep=$2; backup_options=1;; --from) from_bundle=$2;;
     --keep-stopped) keep_stopped=$2; [[ "$command" == restore && "$keep_stopped" == true ]] || fail "--keep-stopped 仅接受 restore 的 true。";;
     *) fail '未知维护选项。';;
   esac
   shift 2
 done
+[[ "$keep_maintenance" =~ ^[1-9][0-9]?$ ]] || fail "维护备份保留份数必须为 1–99。"
+[[ "$keep" =~ ^[1-9][0-9]{0,3}$ ]] || fail "保留份数必须为 1–9999。"
 [[ -z "$from_bundle" || "$command" == upgrade ]] || fail '--from 仅用于 upgrade。'
 if [[ "$command" != media-reregister && "$command" != upgrade && "$command" != rollback && "$command" != backup && "$command" != backup-verify && "$command" != restore ]]; then
   [[ "$backup_options" == 0 ]] || fail '备份选项仅用于备份、验证或恢复。'
@@ -497,7 +501,10 @@ case "$command" in
     apps_touched=0
     ;;
   media-identity) media_identity;;
-  status) status_check;;
+  status)
+    source "$controller/deployment-backup.sh"
+    (backup_status) || printf "警告：备份统计未完成；继续原有站点检查。\n"
+    status_check;;
   start)
     [[ "${values[ARTZOO_MEDIA_BUDGET_ENABLED]}" == 1 ]] || fail '未启用配额，不能作为已初始化站点启动。'
     check_app web; check_app worker

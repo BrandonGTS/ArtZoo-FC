@@ -451,7 +451,7 @@ bash "$bundle/deployment-maintenance.sh" restore --bundle "$bundle" --root "$roo
 bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$bundle" --root "$root"
 ```
 
-登记从运行状态开始则成功后恢复运行；从停止状态开始则保持停止。恢复使用 `--keep-stopped true` 后，登记完成再按部署手册单独 start。普通 restore 未加此选项仍保留原来的自动启动行为；需要登记的恢复流程必须明确加此选项。登记备份使用 `register-*` 前缀，不参与日常 backup 的自动轮换；失败输出的备份和 pending 均应保留。运行中的遗留 tools 容器会使重试拒绝，须核对本次维护容器后由站长处理，不能批量删除其他容器。
+登记从运行状态开始则成功后恢复运行；从停止状态开始则保持停止。恢复使用 `--keep-stopped true` 后，登记完成再按部署手册单独 start。当前 restore 和 rollback 恢复媒体后统一停站并写登记标记；restore 记录原运行状态，`--keep-stopped true` 强制登记后仍停止，rollback 标记为 running。登记成功后按标记恢复运行；旧包行为以其随包手册为准。登记备份使用 `register-*` 前缀，和 `upgrade-*`、`rescue-*` 一样每类默认保留 3 份，可用 `--keep-maintenance` 调整；只在成功维护后清理已校验的同项目、同 PostgreSQL 镜像备份，并保护 previous 引用、每类最新及本次备份。停站和写登记标记前先检查备份空间，失败不改变应用状态；停写后失败则保留现场和标记。详细空间与保留规则见 DEPLOYMENT 第 2 节。运行中的遗留 tools 容器会使重试拒绝，须核对本次维护容器后由站长处理，不能批量删除其他容器。
 
 实现验收包括下列场景；实际结果与尚待家庭 Server 完成的项目以实现 PR 为准：
 
