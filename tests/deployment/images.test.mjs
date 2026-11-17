@@ -90,6 +90,13 @@ test('an unchecksummed registration script is refused', (t) => {
   assert.equal(f.run('verify', f.bundle).status, 1);
   assert.equal(f.calls(), '');
 });
+test('unchecked backup launchers are refused while old bundle formats remain valid', (t) => {
+  const f = fixture(t);
+  assert.equal(f.run('verify', f.bundle).status, 0);
+  writeFileSync(join(f.bundle, 'artzoo-backup-launcher.sh'), 'unexpected');
+  assert.equal(f.run('verify', f.bundle).status, 1);
+  assert.equal(f.calls(), '');
+});
 test('a matching version can be imported repeatedly without loading or starting containers', (t) => {
   const f = fixture(t);
   for (let attempt = 0; attempt < 2; attempt++) assert.equal(f.run('import', f.bundle).status, 0);
@@ -350,7 +357,8 @@ esac
     'deployment-upgrade.sh',
     'deployment-backup.sh',
     'artzoo-backup.service.example',
-    'artzoo-backup.timer.example'
+    'artzoo-backup.timer.example',
+    'artzoo-backup-launcher.sh'
   ]) {
     const file = join(output, name);
     const content = readFileSync(file);

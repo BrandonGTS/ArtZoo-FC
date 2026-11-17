@@ -116,7 +116,7 @@ rsync -a --partial -e ssh -- "$bundle" "${remote}:/srv/artzoo/releases/"
    df -h "$root" "$backups" 2>/dev/null
    ```
 
-   服务仍为 `active`/`activating` 时等备份完成，不杀进程；`inactive` 或未安装表示无需等待。备份目录尚不存在时检查其父目录空间。预留新旧镜像、完整数据库及媒体备份空间，并确保宿主机没有其他媒体写入者。若此时取消发版，恢复原本开启的 timer；网站尚未停服。
+   服务仍为 `active`/`activating` 时等备份完成，不杀进程；`inactive` 或未安装表示无需等待。备份目录尚不存在时检查其父目录空间。预留新旧镜像、完整数据库及媒体备份空间，并确保宿主机没有其他媒体写入者。若此时取消发版，恢复原本开启的 timer；网站尚未停服。即使未暂停 timer，维护锁也会让同时触发的备份安全失败，新入口会记录 `maintenance-locked`，不会与升级并发停站或写备份。
 
 ### 1.4 【危险：停服升级】Server 单独执行
 
@@ -144,16 +144,15 @@ bash "$bundle/deployment-maintenance.sh" upgrade --bundle "$bundle" --root "$roo
    后端端口若已有定制，使用原端口。应返回 `{"ok":true}`；`current` 指向新包，`previous` 保留旧包及升级前备份，最新历史为 `upgrade ... result=success`。媒体诊断退出码 `0` 才表示一致；`2` 表示不一致或无法检查，`1` 表示执行失败。不把 HTTP 健康等同于业务验收。
 
 2. 在浏览器和另一台家庭设备打开 `$origin`；家庭证书警告可以手动继续，正式域名须证书可信。验证登录、旧图显示、本次小改动，并上传、删除一张测试照片，确认配额退回。失败先停止验收，按 1.6 决定回退；不要把失败版本标为发布成功。
-3. 已安装定时备份时，先另存旧单元，再用 `sudoedit /etc/systemd/system/artzoo-backup.service` 把 `ExecStart` 中脚本路径和 `--bundle` 的两处旧版本目录都改为 `current` 的实际运行目录；保留原站点根目录、备份目录和保留份数。检查并恢复原调度：
+3. 已按第 2 节迁移到固定启动器的定时备份会自动跟随 `deploy/current`，升级、回退无需修改 service。恢复原调度：
 
    ```bash
-   sudo systemd-analyze verify /etc/systemd/system/artzoo-backup.service /etc/systemd/system/artzoo-backup.timer
-   sudo systemctl daemon-reload
    if test "$timer_was_active" = 1; then sudo systemctl start artzoo-backup.timer; fi
    systemctl list-timers artzoo-backup.timer
+   bash "$bundle/deployment-maintenance.sh" status --root "$root" --backup-dir "$backups"
    ```
 
-   未安装 timer 跳过。升级或回退后都必须同步固定版本路径，不能让定时任务继续引用错误版本。固定 Windows 常驻入口自动读取 `deploy/current`，升级后无需修改启动参数或重新复制入口；当前隐藏常驻进程不必重启。旧包先核对 `--help`，不得自行补文件。
+   未安装 timer 跳过。仍使用旧 service 的站点先完成第 2 节的一次性迁移。检查最近备份结果；升级本身不会触发日常备份，上一条结果可能属于旧版本。固定 Windows 常驻入口也自动读取 `deploy/current`，无需修改参数、重新复制入口或重启当前隐藏常驻进程。
 
 ### 1.6 【危险：回退会丢弃升级后数据】Server 单独执行
 
@@ -250,27 +249,67 @@ bash "$bundle/deployment-maintenance.sh" status --root "$root" --backup-dir "$ba
 
 ### 每日定时备份
 
-1. 模板面向使用系统 Docker 的 Server，不安装到 Dev。确认运行用户 UID/GID 为 1000，且无需 sudo 交互即可访问 Docker。备份模板固定具体发布包；以后换版本必须同步更新路径。先复制到候选文件（已有文件先另存），把服务模板两处 `RELEASE_DIRECTORY` 替换为 `$bundle` 的实际路径，并按需调整 `--backup-dir`、`--keep`：
+固定入口只安装一次；每次读取 `deploy/current` 的单行记录，校验可信路径、版本和完整发布包，再执行当前包的 `backup`。不 source 记录、不按目录时间猜版本。模板面向系统 Docker 的 Server，不安装到 Dev；UID/GID 1000 须无需 sudo 交互即可访问 Docker。以下步骤均在 Server 任意目录执行，沿用已校验的新包 `$bundle`、站点 `$root` 和备份目录 `$backups`。
+
+1. 首次安装或从旧 service 迁移前，记录 timer 是否开启并暂停；正在运行的备份须等其结束，不杀进程。已有单元先另存，`saved` 使用全新目录，不覆盖历史副本：
 
    ```bash
-   cp "$bundle/artzoo-backup.service.example" "$root/deploy/artzoo-backup.service"
-   cp "$bundle/artzoo-backup.timer.example" "$root/deploy/artzoo-backup.timer"
-   editor "$root/deploy/artzoo-backup.service"
-   systemd-analyze verify "$root/deploy/artzoo-backup.service" "$root/deploy/artzoo-backup.timer"
+   timer_was_active=0
+   if systemctl is-active --quiet artzoo-backup.timer; then
+     timer_was_active=1
+     sudo systemctl stop artzoo-backup.timer
+   fi
+   systemctl is-active artzoo-backup.service
+   saved=$(mktemp -d "$root/deploy/backup-units.XXXXXXXX")
+   for unit in artzoo-backup.service artzoo-backup.timer; do
+     if test -f "/etc/systemd/system/$unit"; then sudo cp -a "/etc/systemd/system/$unit" "$saved/"; fi
+   done
+   cp "$bundle/artzoo-backup.service.example" "$saved/artzoo-backup.service.new"
+   cp "$bundle/artzoo-backup.timer.example" "$saved/artzoo-backup.timer.new"
+   editor "$saved/artzoo-backup.service.new"
    ```
 
-2. 【危险：启用每日停站备份】确认手动备份、验证已通过，且无同名服务，或已备份其旧配置，再安装并启用。模板每天北京时间 03:00 执行；关机时错过不会开机补跑，避免白天意外停站：
+   服务仍为 `active`/`activating` 时先等完成，确认网站健康再继续。候选 service 的 `ExecStart` 固定为 `/usr/local/libexec/artzoo-backup`；仅沿用站点的 `--root`、`--backup-dir`、`--keep`、`--keep-maintenance`（默认 3）。非默认项目加 `--project` 原项目名。启动器为 root 所有、0755，运行进程仍是 UID/GID 1000；以后发版不重复覆盖它。旧 service 的两处发布目录不再使用。
+
+2. 安装一次性启动器并替换单元（若固定入口已经存在，先核对其来源，不覆盖）。这些命令不启动备份；任何一步失败即停，用第 5 步回退单元：
 
    ```bash
-   sudo install -m 644 "$root/deploy/artzoo-backup.service" "$root/deploy/artzoo-backup.timer" /etc/systemd/system/
+   sudo install -d -o root -g root -m 755 /usr/local/libexec
+   if test -e /usr/local/libexec/artzoo-backup; then
+     printf '固定入口已存在，请核对来源和权限；不覆盖。\n'
+   else
+     sudo install -o root -g root -m 755 "$bundle/artzoo-backup-launcher.sh" /usr/local/libexec/artzoo-backup
+   fi
+   stat -c '%U:%G %a %n' /usr/local/libexec/artzoo-backup
+   sudo install -m 644 "$saved/artzoo-backup.service.new" /etc/systemd/system/artzoo-backup.service
+   sudo install -m 644 "$saved/artzoo-backup.timer.new" /etc/systemd/system/artzoo-backup.timer
+   sudo systemd-analyze verify /etc/systemd/system/artzoo-backup.service /etc/systemd/system/artzoo-backup.timer
    sudo systemctl daemon-reload
-   sudo systemctl enable --now artzoo-backup.timer
+   ```
+
+   `stat` 应为 `root:root 755`，verify 须通过。timer 时间不变：北京时间 03:00，关机错过不补跑。旧发布包不补文件、不重算校验和；当前包须包含本次新入口与结果记录功能。回退到不支持的新入口之前的旧包时，固定入口会拒绝并记录 `bundle-invalid`；暂停 timer，由站长恢复另存的旧 service 并按旧手册核对版本，或正常升级回支持包后恢复新单元。
+
+3. 【危险：立即停站备份一次】单独触发服务，成功后才能恢复定时调度：
+
+   ```bash
+   sudo systemctl start artzoo-backup.service
+   ```
+
+4. 检查结果，并恢复原调度；首次安装需要每日备份时单独执行 `sudo systemctl enable --now artzoo-backup.timer`。家庭 Server 再按第 1 节升级一个小版本，不改 service，重复第 3 步确认仍成功：
+
+   ```bash
+   systemctl show artzoo-backup.service -p Result -p ExecMainStatus
+   bash "$bundle/deployment-maintenance.sh" status --root "$root" --backup-dir "$backups"
+   sudo journalctl -u artzoo-backup.service -n 40 --no-pager
+   if test "$timer_was_active" = 1; then sudo systemctl start artzoo-backup.timer; fi
    systemctl list-timers artzoo-backup.timer
    ```
 
-3. 【危险：立即演练一次定时任务】执行 `sudo systemctl start artzoo-backup.service`。检查 `systemctl show artzoo-backup.service -p Result -p ExecMainStatus` 应为 `success`、`0`，并用 `sudo journalctl -u artzoo-backup.service -n 40 --no-pager` 查看 `PASS: backup`。失败显示非零状态并留在 journal；另执行站点 `status`。这些检查不保证 WSL 在关闭终端或 Windows 重启后持续运行，常驻按附录 4.3 手动开启。
-4. 回退定时配置：`sudo systemctl disable --now artzoo-backup.timer`；若备份正在运行，等它完成并确认网站健康。恢复此前保存的单元文件，再执行 `sudo systemctl daemon-reload`；不删除任何备份或站点数据。
+   服务结果应为 `success`、`0`，`status` 的最近备份结果应为 `result=success`、当前 `release` 和实际 `backup` 路径。Windows 固定入口 `-status` 同样显示结果。`backup` 可省略 `--bundle`；固定脚本路径的需求应使用启动器，而非长期调用旧包脚本。
 
+   每次正常退出或可捕获中断都原子写入 `deploy/backup-last`：UTC 时间、成功/失败、版本、备份路径或固定原因代码。`pending`、`media-registration.pending`、`maintenance-locked` 表示维护未完成或锁被占用；`current-invalid` / `bundle-invalid` 表示记录或发布包异常；`preflight`、`space-check`、`snapshot-failed`、`restart-failed`、`publish-failed`、`prune-failed` 结合本次 journal 排查。失败会告警，原有 `status` 退出码不变；锁或 pending 拒绝前也显示最近结果。记录不可信时仅警告，不执行内容。根目录不可信、权限/磁盘故障可能无法写入；断电或 SIGKILL 无法保证记录，仍须结合备份时间和 journal。不要删除维护标记绕过失败。
+
+5. 回退本次单元迁移：停止 timer，等待正在运行的备份结束；从 `$saved` 恢复原有单元，运行 `systemd-analyze verify`、`daemon-reload`，确认网站健康后恢复原 timer 状态。首次安装没有旧单元时保持 timer 禁用。固定入口可保留，不删除备份、发布包或站点数据。WSL 常驻仍按附录 4.3 手动开启。
 
 ### 日常查看与启停（Server，任意目录）
 
@@ -584,4 +623,4 @@ JSON 中 `consistent` 为一致，`inconsistent` 为不一致，`unchecked` 为�
 8. 升级配置、包校验或迁移比较失败：在停站前修正；不删版本指针、不重置数据库。迁移前停站阶段失败，确认旧版已恢复；迁移开始后失败，按 1.6 单独执行输出的【危险】`rollback`。
 9. 备份失败：保留已有备份及 `.partial.*` 现场，检查服务是否自动恢复；断电或 Docker 不可用时人工核对。不要因失败删除最后一份有效备份。
 10. 恢复覆盖阶段、媒体登记或回退失败：保持停站，保留输出的 `rescue-*`、`register-*` 备份和维护标记；按报错核对内容、权限与空间。不要直接开站，或用旧脚本绕过标记。修复后再执行对应的【危险】恢复/登记命令。
-11. 升级或回退后定时备份失败：核对 service 中两处发布目录是否与 `current` 一致；先修正、校验并 reload，确认站点正常，再恢复原 timer 调度。
+11. 定时备份失败：查看 `status` 中的最近备份结果（Windows 入口 `-status` 同样可见），按原因代码结合 `journalctl -u artzoo-backup.service` 排查；确认维护完成、站点健康后手动触发验证。已迁移的 service 自动跟随当前版本；旧 service 按第 2 节迁移。

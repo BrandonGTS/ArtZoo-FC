@@ -220,15 +220,20 @@ backup_main() {
     done
     case "$running" in 'true true ') previous=running;; 'false false ') previous=stopped;; *) fail '应用运行状态不一致，请先明确停站。';; esac
   fi
+  backup_reason=space-check
   backup_space_check
+  backup_reason=snapshot-failed
   printf '【危险】停止 web、worker 并保持宿主媒体停写；项目 %s。\n' "$project"
   [[ "$previous" != running ]] || resume_apps=1
   dc stop --timeout 60 web worker >/dev/null 2>&1 || fail '停止应用失败。'
   stopped_writers
   create_snapshot
   if [[ "$command" == backup ]]; then
+    backup_reason=restart-failed
     restart_apps || fail '备份后启动/健康检查失败。'
+    backup_reason=publish-failed
     publish_snapshot backup
+    backup_reason=prune-failed
     prune_backups
     printf 'PASS: backup。\n'; return
   fi

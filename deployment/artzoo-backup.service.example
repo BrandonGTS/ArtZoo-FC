@@ -9,8 +9,8 @@ User=1000
 Group=1000
 SupplementaryGroups=docker
 UMask=0077
-# Replace RELEASE_DIRECTORY with the currently running, verified full release.
-ExecStart=/bin/bash RELEASE_DIRECTORY/deployment-maintenance.sh backup --bundle RELEASE_DIRECTORY --root /srv/artzoo --backup-dir /srv/artzoo/backups --keep 7
+# The fixed launcher follows deploy/current after upgrades and rollbacks.
+ExecStart=/usr/local/libexec/artzoo-backup --root /srv/artzoo --backup-dir /srv/artzoo/backups --keep 7 --keep-maintenance 3
 TimeoutStartSec=infinity
 TimeoutStopSec=180
 KillMode=mixed

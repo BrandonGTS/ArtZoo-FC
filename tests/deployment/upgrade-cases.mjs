@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { backupLauncher } from './backup-launcher-cases.mjs';
 import { refuseLowSpace } from './retention-cases.mjs';
 import {
   constants,
@@ -41,6 +42,7 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
   const backups = () =>
     existsSync(store) ? readdirSync(store).filter((n) => n.startsWith('upgrade-')).length : 0;
   const spaceContext = { root, docker, app, invoke: (command, extra) => invoke(command, good, extra) };
+  const launcher = backupLauncher({ root, bundle, project, run, docker, app });
   const current = () => readFileSync(join(state, 'current'), 'utf8').split(' ')[0];
   sql('UPDATE "MediaBudgetState" SET "committedBytes"=0;');
   const { seed, remove } = recoveryFixture({ compose, sql });
@@ -177,6 +179,7 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
   assert.equal(successful.status, 0, successful.stderr);
   assert.match(successful.stdout, /upgrade_probe_migration/);
   assert.equal(current(), good);
+  launcher.success();
   assert.equal(sql("SELECT count(*) FROM information_schema.tables WHERE table_name='upgrade_marker';"), '1');
   assert.equal(sql('SELECT value FROM upgrade_probe;'), 'before');
   console.log('PASS: harmless migration applied and existing data preserved');
@@ -190,6 +193,7 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
   writeFileSync(image, 'after');
   rejectLegacy(true);
   rollback();
+  launcher.success();
   assert.equal(sql('SELECT value FROM upgrade_probe;'), 'before');
   assert.equal(readFileSync(image, 'utf8'), 'before');
   assert.equal(sql("SELECT count(*) FROM information_schema.tables WHERE table_name='upgrade_marker';"), '0');

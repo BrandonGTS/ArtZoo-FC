@@ -29,7 +29,7 @@ status 仅接受 --backup-dir 作只读统计，不接受其他备份选项。
 恢复/验证选项：--backup 完整备份目录；恢复必须使用备份记录的同一发布版本。
 restore/rollback 恢复后保持停站，必须执行输出的 media-reregister 命令。
 restore 默认登记成功后恢复原运行状态；--keep-stopped true 强制登记后仍停站，再单独 start。
-status/start/stop 可省略 --bundle，读取 deploy/current；rollback 使用升级控制包。
+status/start/stop/backup 可省略 --bundle，读取 deploy/current；rollback 使用升级控制包。
 默认只显示帮助。项目名默认 artzoo，跨版本必须保持不变。
 root 下预先准备 secrets 和 media/{original,derived,avatars}，UID/GID 1000、0700。
 秘密文件固定为 root/secrets/compose.env（0600）；不 source、不打印配置。
@@ -47,6 +47,17 @@ command=${1:---help}
 [[ $# == 0 ]] || shift
 case "$command" in --help|-h|help) usage; exit 0;; prepare-env|database|migrate|baseline|owner|enable-budget|config-check|media-identity|media-reregister|status|start|stop|backup|backup-verify|restore|upgrade|rollback) ;; *) fail '未知维护命令。';; esac
 bundle='' root='' project=artzoo origin='' backup_dir='' backup_source='' keep=7 keep_maintenance=3 backup_options=0 from_bundle='' schema_bundle='' controller='' keep_stopped=false
+trusted_path() {
+  local path=$1 owner mode
+  [[ "$(realpath -e -- "$path")" == "$path" ]] || fail '目录缺失或路径含符号链接。'
+  while :; do
+    owner=$(stat -c %u "$path"); mode=$(stat -c %a "$path")
+    [[ "$owner" == 0 || "$owner" == 1000 ]] || fail '目录所有者不可信。'
+    (( (8#$mode & 022) == 0 )) || fail '目录允许组或其他用户写入。'
+    [[ "$path" != / ]] || break
+    path=$(dirname -- "$path")
+  done
+}
 while (($#)); do
   (($# >= 2)) || fail '选项缺少值。'
   case "$1" in
@@ -59,6 +70,34 @@ while (($#)); do
   esac
   shift 2
 done
+[[ "$root" =~ ^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$ && "$root" != / ]] || fail '站点目录须为无空格的绝对路径。'
+[[ "$(id -u):$(id -g)" == 1000:1000 ]] || fail '请使用镜像对应的 UID/GID 1000 用户执行，不要 sudo 整个脚本。'
+backup_result() {
+  local code=$1 result=failed detail="reason=$backup_reason" record="$root/deploy/backup-last" temp version=${backup_release:-unknown}
+  [[ "$code" != 0 ]] || { result=success; detail="backup=${saved_snapshot:--}"; }
+  if [[ "$version" == unknown ]] && (trusted_path "$root/deploy/current" && [[ -f "$root/deploy/current" && "$(stat -c %s "$root/deploy/current")" -le 4096 ]]) >/dev/null 2>&1; then
+    read -r _ version _ < "$root/deploy/current" || version=unknown
+    [[ "$version" =~ ^(git|dev)-[0-9a-f]{12}-[0-9]{14}-[0-9]+$ ]] || version=unknown
+  fi
+  (trusted_path "$root/deploy" && { [[ ! -e "$record" && ! -L "$record" ]] || { [[ -f "$record" && ! -L "$record" ]] && trusted_path "$record"; }; }) >/dev/null 2>&1 || return 1
+  temp=$(mktemp "$root/deploy/.backup-last.XXXXXXXX") || return 1
+  if ! printf '%s result=%s release=%s %s\n' "$(date -u +%FT%TZ)" "$result" "$version" "$detail" > "$temp" || ! mv -T -- "$temp" "$record"; then
+    rm -f -- "$temp"; return 1
+  fi
+}
+backup_exit() {
+  local code=$?
+  trap - EXIT
+  if ! backup_result "$code"; then printf '警告：无法安全写入 deploy/backup-last。\n' >&2; code=1; fi
+  exit "$code"
+}
+umask 077
+backup_reason=preflight backup_release=unknown
+if [[ "$command" == backup ]]; then
+  trap backup_exit EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+fi
 [[ "$keep_maintenance" =~ ^[1-9][0-9]?$ ]] || fail "维护备份保留份数必须为 1–99。"
 [[ "$keep" =~ ^[1-9][0-9]{0,3}$ ]] || fail "保留份数必须为 1–9999。"
 [[ -z "$from_bundle" || "$command" == upgrade ]] || fail '--from 仅用于 upgrade。'
@@ -66,8 +105,6 @@ if [[ "$command" != media-reregister && "$command" != upgrade && "$command" != r
   [[ "$backup_options" == 0 ]] || fail '备份选项仅用于备份、验证或恢复。'
 fi
 [[ "$project" =~ ^[a-z][a-z0-9-]{0,47}$ ]] || fail '项目名格式不符。'
-[[ "$root" =~ ^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$ && "$root" != / ]] || fail '站点目录须为无空格的绝对路径。'
-[[ "$(id -u):$(id -g)" == 1000:1000 ]] || fail '请使用镜像对应的 UID/GID 1000 用户执行，不要 sudo 整个脚本。'
 if [[ "$command" == owner ]]; then
   [[ -t 0 && -t 1 && -z "${SSH_CONNECTION:-}${SSH_CLIENT:-}${SSH_TTY:-}" ]] || fail '超管初始化必须使用本机真实 TTY，不能重定向或通过 SSH。'
 fi
@@ -76,31 +113,35 @@ if [[ "$command" == prepare-env ]]; then
 else
   [[ -z "$origin" ]] || fail '--origin 仅用于新建配置；现有配置不自动改写来源。'
 fi
-trusted_path() {
-  local path=$1 owner mode
-  [[ "$(realpath -e -- "$path")" == "$path" ]] || fail '目录缺失或路径含符号链接。'
-  while :; do
-    owner=$(stat -c %u "$path"); mode=$(stat -c %a "$path")
-    [[ "$owner" == 0 || "$owner" == 1000 ]] || fail '目录所有者不可信。'
-    (( (8#$mode & 022) == 0 )) || fail '目录允许组或其他用户写入。'
-    [[ "$path" != / ]] || break
-    path=$(dirname -- "$path")
-  done
-}
 for dir in "$root/secrets" "$root/media" "$root/media/"{original,derived,avatars}; do
   trusted_path "$dir"
   [[ "$(stat -c '%u:%g:%a' "$dir")" == 1000:1000:700 ]] || fail '秘密和媒体目录需要 UID/GID 1000、0700。'
 done
 umask 077
+backup_last_status() {
+  local record="$root/deploy/backup-last" line
+  [[ -e "$record" || -L "$record" ]] || { printf '备份：最近结果=无\n'; return; }
+  if ! (trusted_path "$record" && [[ -f "$record" && ! -L "$record" && "$(stat -c %s "$record")" -le 4096 ]]) >/dev/null 2>&1; then
+    printf '警告：最近备份结果不可安全读取。\n'; return
+  fi
+  line=$(cat -- "$record")
+  if [[ "$line" =~ ^[0-9T:Z-]+\ result=(success|failed)\ release=(unknown|(git|dev)-[0-9a-f]{12}-[0-9]{14}-[0-9]+)\ (backup|reason)=[a-zA-Z0-9_./-]+$ ]]; then
+    printf '备份：最近结果 %s\n' "$line"
+    [[ "$line" != *' result=failed '* ]] || printf '警告：最近一次备份失败，请按原因代码检查。\n'
+  else printf '警告：最近备份结果格式不符。\n'; fi
+}
+[[ "$command" != status ]] || backup_last_status
 if [[ "$command" != config-check ]]; then
 lock="$root/secrets/.maintenance.lock"
 [[ ! -L "$lock" && ( ! -e "$lock" || ( -f "$lock" && "$(stat -c '%u:%g:%a' "$lock")" == 1000:1000:600 ) ) ]] || fail '维护锁文件不可信。'
 exec 9>"$lock"
+backup_reason=maintenance-locked
 flock -n 9 || fail '同一站点有另一维护操作正在执行。'
 fi
+backup_reason=current-invalid
 if [[ -z "$bundle" ]]; then
   case "$command" in
-    status|start|stop|media-identity|media-reregister)
+    status|start|stop|backup|media-identity|media-reregister)
       trusted_path "$root/deploy/current"
       read -r bundle recorded_release schema_bundle extra < "$root/deploy/current"
       [[ -z "$extra" && -n "$schema_bundle" ]] || fail '当前版本记录不完整。';;
@@ -110,6 +151,7 @@ if [[ -z "$bundle" ]]; then
 fi
 [[ -d "$bundle" ]] || fail '发布目录不存在。'
 bundle=$(realpath -e -- "$bundle")
+backup_reason=bundle-invalid
 config="$root/secrets/compose.env"
 controller=$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")
 [[ -f "$controller/images.tsv" ]] || controller=$bundle
@@ -122,6 +164,8 @@ fi
 declare -A values=() refs=() ids=()
 while read -r role ref image_id platform extra; do refs[$role]=$ref; ids[$role]=$image_id; done < "$bundle/images.tsv"
 for role in web worker tools; do [[ -n "${ids[$role]:-}" ]] || fail '维护需要完整三镜像包。'; done
+backup_release=${refs[web]#*:}
+backup_reason=preflight
 # The bundle manifest is data, never sourced or evaluated.
 [[ -f "$bundle/runtime-config.manifest" && ! -L "$bundle/runtime-config.manifest" ]] || fail '发布包缺少配置清单。'
 declare -A requirements=() rules=() defaults=() destinations=() confidential=() fixed=() expected_env=() input_secrets=()
@@ -276,6 +320,9 @@ cleanup() {
   [[ -z "$temporary" ]] || rm -f -- "$temporary" || status=1
   [[ -z "$override" ]] || rm -f -- "$override" || status=1
   [[ "$status" == 0 ]] || printf '操作未全部完成；数据库、媒体和秘密配置保留，不自动回退或清零。\n' >&2
+  if [[ "$command" == backup ]] && ! backup_result "$status"; then
+    printf '警告：无法安全写入 deploy/backup-last。\n' >&2; status=1
+  fi
   exit "$status"
 }
 trap cleanup EXIT
@@ -430,6 +477,11 @@ if [[ "$command" == prepare-env ]]; then
 fi
 [[ -f "$controller/deployment-upgrade.sh" && ! -L "$controller/deployment-upgrade.sh" ]] || fail '升级组件缺失。'
 source "$controller/deployment-upgrade.sh"
+if [[ "$command" == backup ]]; then
+  for mark in pending media-registration.pending; do
+    if [[ -e "$state/$mark" || -L "$state/$mark" ]]; then backup_reason=$mark; fail "维护尚未完成：$mark；不执行备份。"; fi
+  done
+fi
 upgrade_guard
 configure
 if [[ "$command" == database ]]; then
