@@ -121,6 +121,8 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
     );
   };
   assert.equal(current(), bundle, 'enable-budget registers the initial version');
+  launcher.success();
+  launcher.failures();
   const initialRecord = readFileSync(join(state, 'current'), 'utf8');
   const initialVersion = initialRecord.trim().split(' ')[1];
   const mismatched = initialRecord.trim().split(' ');

@@ -124,7 +124,7 @@ backup_last_status() {
   if ! (trusted_path "$record" && [[ -f "$record" && ! -L "$record" && "$(stat -c %s "$record")" -le 4096 ]]) >/dev/null 2>&1; then
     printf '警告：最近备份结果不可安全读取。\n'; return
   fi
-  line=$(cat -- "$record")
+  line=$(cat -- "$record" 2>/dev/null) || { printf '警告：最近备份结果读取失败。\n'; return; }
   if [[ "$line" =~ ^[0-9T:Z-]+\ result=(success|failed)\ release=(unknown|(git|dev)-[0-9a-f]{12}-[0-9]{14}-[0-9]+)\ (backup|reason)=[a-zA-Z0-9_./-]+$ ]]; then
     printf '备份：最近结果 %s\n' "$line"
     [[ "$line" != *' result=failed '* ]] || printf '警告：最近一次备份失败，请按原因代码检查。\n'

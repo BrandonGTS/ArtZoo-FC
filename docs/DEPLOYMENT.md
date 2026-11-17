@@ -295,7 +295,7 @@ bash "$bundle/deployment-maintenance.sh" status --root "$root" --backup-dir "$ba
    sudo systemctl start artzoo-backup.service
    ```
 
-4. 检查结果，并恢复原调度；首次安装需要每日备份时单独执行 `sudo systemctl enable --now artzoo-backup.timer`。家庭 Server 再按第 1 节升级一个小版本，不改 service，重复第 3 步确认仍成功：
+4. 检查结果，并恢复原调度；首次安装需要每日备份时，单独执行【危险：启用每日停站备份】`sudo systemctl enable --now artzoo-backup.timer`。家庭 Server 再按第 1 节升级一个小版本，不改 service，重复第 3 步确认仍成功：
 
    ```bash
    systemctl show artzoo-backup.service -p Result -p ExecMainStatus

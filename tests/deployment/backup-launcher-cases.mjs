@@ -121,6 +121,11 @@ export function backupLauncher({ root, bundle, project, run, docker, app }) {
     chmodSync(current, 0o666);
     assert.notEqual(launch().status, 0);
     chmodSync(current, 0o600);
+    chmodSync(record, 0o000);
+    const unreadable = status();
+    assert.equal(unreadable.status, 0, unreadable.stderr);
+    assert.match(unreadable.stdout, /警告：最近备份结果读取失败/);
+    chmodSync(record, 0o600);
     const protectedFile = join(root, 'protected-record');
     writeFileSync(protectedFile, 'unchanged');
     rmSync(record);
