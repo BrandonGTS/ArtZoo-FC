@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { backupLauncher } from './backup-launcher-cases.mjs';
 import { exerciseRetention } from './retention-cases.mjs';
 import { exerciseMediaIdentity } from './media-identity-cases.mjs';
 import { exerciseRegistration } from './registration-cases.mjs';
@@ -419,6 +420,12 @@ test(
       exerciseMediaIdentity({ root, bundle, invoke, pass, sql, docker, app });
     if (!process.env.ARTZOO_UPGRADE_TEST_BUNDLES)
       exerciseBackups({ root, pass, invoke, sql, docker, app, run, args, config });
+    if (!process.env.ARTZOO_UPGRADE_TEST_BUNDLES) {
+      const launcher = backupLauncher({ root, bundle, project, run, docker, app });
+      launcher.success();
+      launcher.failures();
+      launcher.success();
+    }
     exerciseUpgrades({ root, bundle, project, run, sql, docker, app, config, compose });
     if (!process.env.ARTZOO_UPGRADE_TEST_BUNDLES)
       exerciseRegistration({ root, pass, invoke, sql, docker, app, compose });

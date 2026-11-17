@@ -130,6 +130,11 @@ export function exerciseBackups({ root, pass, invoke, sql, docker, app, run, arg
       })
     );
   assert.notEqual(injected('backup').status, 0);
+  assert.match(
+    readFileSync(join(root, 'deploy/backup-last'), 'utf8'),
+    /result=failed .*reason=snapshot-failed/
+  );
+  assert.match(pass('status').stdout, /警告：最近一次备份失败/);
   assert.equal(snapshots().length, 1);
   assert.ok(snapshots('.partial.').some((n) => statSync(join(store, n, 'database.dump')).size > 0));
   pass('status');

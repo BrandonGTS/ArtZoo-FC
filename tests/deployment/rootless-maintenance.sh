@@ -23,6 +23,9 @@ if [[ "${1:-}" == --inside ]]; then
     mkdir -p "$jail$directory"
     mount --rbind "$directory" "$jail$directory"
   done
+  mount -t tmpfs -o mode=755 tmpfs "$jail/usr/local"
+  mkdir "$jail/usr/local/libexec"
+  install -o 0 -g 0 -m 755 "$bundle/artzoo-backup-launcher.sh" "$jail/usr/local/libexec/artzoo-backup"
   mkdir -p "$jail/run" "$jail/var" "$jail/tools" "$jail/tmp" \
     "$jail$repo/scripts" "$jail$repo/tests/deployment" "$jail$bundle" "$jail$scratch"
   chmod 1777 "$jail/tmp"
@@ -42,6 +45,7 @@ if [[ "${1:-}" == --inside ]]; then
   exec chroot "$jail" /usr/bin/setpriv --reuid=1000 --regid=1000 --groups="0,$socket_group" \
     /usr/bin/env HOME="$scratch/home" PATH=/tools:/usr/bin:/bin \
     DOCKER_HOST=unix:///var/run/docker.sock ARTZOO_MAINTENANCE_TEST_BUNDLE="$bundle" \
+    ARTZOO_BACKUP_LAUNCHER=/usr/local/libexec/artzoo-backup ARTZOO_BACKUP_SERVICE_PROBE="${ARTZOO_BACKUP_SERVICE_PROBE:-}" \
     ARTZOO_LOW_SPACE_DIR="$scratch/low-space" ARTZOO_UPGRADE_TEST_BUNDLES="$variants" \
     /bin/bash -c 'cd "$1" && exec node --test "$2/tests/deployment/maintenance.test.mjs"' bash "$scratch" "$repo"
 fi
