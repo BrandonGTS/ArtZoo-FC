@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   cpSync,
+  chmodSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -64,6 +65,7 @@ export function exerciseRetention(context) {
   const clone = (name) => {
     const path = join(directory, name);
     cpSync(source, path, { recursive: true });
+    chmodSync(path, 0o700);
     return path;
   };
   const saved = {};
@@ -71,6 +73,7 @@ export function exerciseRetention(context) {
     saved[kind] = [];
     for (let i = 1; i <= 5; i++) saved[kind].push(clone(`${kind}-2000010${i}T000000000000000-${suffix}`));
   }
+  pass('backup-verify', ['--backup', saved.backup[0]]);
   const damaged = clone(`upgrade-19990101T000000000000000-${suffix}`);
   writeFileSync(
     join(damaged, 'manifest'),
