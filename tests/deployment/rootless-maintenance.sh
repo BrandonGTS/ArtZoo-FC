@@ -35,12 +35,14 @@ if [[ "${1:-}" == --inside ]]; then
   for directory in "$repo/scripts" "$repo/tests/deployment" "$bundle" "$scratch"; do
     mount --bind "$directory" "$jail$directory"
   done
+  mkdir "$jail$scratch/low-space"
+  mount -t tmpfs -o size=32m,uid=1000,gid=1000,mode=700 tmpfs "$jail$scratch/low-space"
   install -d -o 1000 -g 1000 -m 700 "$scratch/home"
   chown 1000:1000 "$scratch"
   exec chroot "$jail" /usr/bin/setpriv --reuid=1000 --regid=1000 --groups="0,$socket_group" \
     /usr/bin/env HOME="$scratch/home" PATH=/tools:/usr/bin:/bin \
     DOCKER_HOST=unix:///var/run/docker.sock ARTZOO_MAINTENANCE_TEST_BUNDLE="$bundle" \
-    ARTZOO_UPGRADE_TEST_BUNDLES="$variants" \
+    ARTZOO_LOW_SPACE_DIR="$scratch/low-space" ARTZOO_UPGRADE_TEST_BUNDLES="$variants" \
     /bin/bash -c 'cd "$1" && exec node --test "$2/tests/deployment/maintenance.test.mjs"' bash "$scratch" "$repo"
 fi
 [[ $# == 1 || $# == 2 ]] || { printf 'Usage: bash tests/deployment/rootless-maintenance.sh RELEASE_DIRECTORY [UPGRADE_VARIANTS]\n' >&2; exit 1; }

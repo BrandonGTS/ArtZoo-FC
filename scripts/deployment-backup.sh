@@ -108,20 +108,90 @@ publish_snapshot() {
   mv -T -- "$snapshot" "$saved_snapshot"; snapshot=''
   printf '备份已保存：%s\n' "$saved_snapshot"
 }
+backup_estimate() {
+  local database media
+  database=$(sql 'SELECT pg_database_size(current_database());') || fail '无法估算数据库大小。'
+  media=$(du --apparent-size --block-size=1 --summarize --total -- "$root/media/"{original,derived,avatars}) || fail '无法估算媒体大小。'
+  media=${media##*$'\n'}; media=${media%%$'\t'*}
+  [[ "$database" =~ ^[0-9]{1,16}$ && "$media" =~ ^[0-9]{1,16}$ ]] || fail '备份估算值不符。'
+  estimate=$((database + media))
+}
+backup_available() {
+  local location=$backup_dir
+  while [[ ! -e "$location" ]]; do location=$(dirname -- "$location"); done
+  trusted_path "$location"
+  available=$(df --block-size=1 --output=avail -- "$location" | awk 'NR==2 {print $1}') || fail '无法读取备份文件系统空间。'
+  [[ "$available" =~ ^[0-9]{1,16}$ ]] || fail '备份剩余空间值不符。'
+}
+backup_space_check() {
+  local estimate available required
+  backup_estimate; backup_available
+  required=$(((estimate * 3 + 1) / 2 + 1000000000))
+  ((available >= required)) || fail "备份空间不足：需要 ${required} 字节，剩余 ${available} 字节；尚未停站。"
+}
+snapshot_name() { [[ "$1" =~ ^(backup|upgrade|register|rescue)-[0-9]{8}T[0-9]{15}-(git|dev)-[0-9a-f]{12}-[0-9]{14}-[0-9]+$ ]]; }
 prune_backups() {
-  local directory count=1
+  local directory kind count limit newest protected='' old version next extra
   local -a candidates=()
-  mapfile -t candidates < <(find "$backup_dir" -mindepth 1 -maxdepth 1 -type d -name "backup-*" -print | LC_ALL=C sort -r)
-  for directory in "${candidates[@]}"; do
-    [[ "$directory" != "$saved_snapshot" ]] || continue
-    # The just-published snapshot is protected even if the wall clock moved backward.
-    # Only verified snapshots of this site qualify. Rescue/partial backups stay.
-    [[ "${directory##*/}" =~ ^backup-[0-9]{8}T[0-9]{15}-(git|dev)-[0-9a-f]{12}-[0-9]{14}-[0-9]+$ ]] || continue
-    if (verify_snapshot "$directory" 0) >/dev/null 2>&1; then
-      count=$((count + 1))
-      if ((count > keep)); then rm -rf --one-file-system -- "$directory"; fi
-    fi
+  if [[ -e "$state/previous" || -L "$state/previous" ]]; then
+    state_file "$state/previous"
+    read -r old version protected next extra < "$state/previous"
+    [[ -n "$old" && -n "$next" && -z "$extra" && "$version" =~ ^(git|dev)-[0-9a-f]{12}-[0-9]{14}-[0-9]+$ ]] || fail '回退记录不符，拒绝清理备份。'
+    backup_location "$protected"
+  fi
+  for kind in backup upgrade register rescue; do
+    count=0; newest=''; limit=$keep_maintenance
+    [[ "$kind" != backup ]] || limit=$keep
+    mapfile -d '' -t candidates < <(find "$backup_dir" -mindepth 1 -maxdepth 1 -type d -name "$kind-*" -print0 | LC_ALL=C sort -zr)
+    for directory in "${candidates[@]}"; do
+      if ! snapshot_name "${directory##*/}"; then printf '保留未知备份目录：%q\n' "$directory"; continue; fi
+      [[ -n "$newest" ]] || newest=$directory
+      if (verify_snapshot "$directory" 0) >/dev/null 2>&1; then
+        count=$((count + 1))
+        # Protected copies may exceed the limit, including after a backward clock jump.
+        if ((count > limit)) && [[ "$directory" != "$newest" && "$directory" != "$saved_snapshot" && "$directory" != "$protected" ]]; then
+          rm -rf --one-file-system -- "$directory"
+        fi
+      else printf '保留未通过校验的备份：%q\n' "$directory"
+      fi
+    done
   done
+}
+backup_status() {
+  local directory name kind stamp epoch latest_time count used=0 partial=0 other=0 estimate available
+  local -A counts=() latest=()
+  backup_dir=${backup_dir:-$root/backups}; backup_location "$backup_dir"
+  printf '备份：目录=%s\n' "$backup_dir"
+  if [[ -e "$backup_dir" ]]; then
+    private_directory "$backup_dir"
+    used=$(du --summarize --block-size=1 -- "$backup_dir") || fail '无法统计备份占用。'
+    used=${used%%$'\t'*}
+    while IFS= read -r -d '' directory; do
+      name=${directory##*/}; kind=${name%%-*}
+      case "$name" in
+        .partial.*) partial=$((partial + 1)); printf '保留临时目录：%q\n' "$directory"; continue;;
+        backup-*|upgrade-*|register-*|rescue-*) counts[$kind]=$((${counts[$kind]:-0} + 1));;
+        *) other=$((other + 1)); printf '保留未知目录：%q\n' "$directory"; continue;;
+      esac
+      if ! snapshot_name "$name"; then printf '保留未知备份目录：%q\n' "$directory"; continue; fi
+      stamp=${name#*-}; stamp=${stamp%%-*}
+      epoch=$(date -u -d "${stamp:0:4}-${stamp:4:2}-${stamp:6:2} ${stamp:9:2}:${stamp:11:2}:${stamp:13:2}" +%s 2>/dev/null) || continue
+      if ((epoch > ${latest[$kind]:-0})); then latest[$kind]=$epoch; fi
+    done < <(find "$backup_dir" -mindepth 1 -maxdepth 1 -type d -print0)
+  fi
+  backup_available
+  printf '总占用=%s 字节；文件系统剩余=%s 字节\n' "$used" "$available"
+  for kind in backup upgrade register rescue; do
+    latest_time=无
+    [[ ! -v "latest[$kind]" ]] || latest_time=$(date -u -d "@${latest[$kind]}" +%FT%TZ)
+    printf '%s：份数=%s；最新时间=%s\n' "$kind" "${counts[$kind]:-0}" "$latest_time"
+  done
+  printf '.partial.*：数量=%s；其他目录=%s（统计不代表校验通过）\n' "$partial" "$other"
+  if [[ ! -v 'latest[backup]' ]]; then printf '警告：没有可识别时间的 backup 备份。\n'
+  elif (($(date -u +%s) - latest[backup] > 129600)); then printf '警告：最新 backup 备份已超过 36 小时。\n'; fi
+  backup_estimate
+  printf '下次备份估算=%s 字节\n' "$estimate"
+  if ((available < estimate * 2)); then printf '警告：剩余空间低于下次备份估算值的 2 倍。\n'; fi
 }
 backup_main() {
   local reference file running='' previous=running
@@ -150,6 +220,7 @@ backup_main() {
     done
     case "$running" in 'true true ') previous=running;; 'false false ') previous=stopped;; *) fail '应用运行状态不一致，请先明确停站。';; esac
   fi
+  backup_space_check
   printf '【危险】停止 web、worker 并保持宿主媒体停写；项目 %s。\n' "$project"
   [[ "$previous" != running ]] || resume_apps=1
   dc stop --timeout 60 web worker >/dev/null 2>&1 || fail '停止应用失败。'
@@ -161,7 +232,7 @@ backup_main() {
     prune_backups
     printf 'PASS: backup。\n'; return
   fi
-  # Rescue snapshots never participate in automatic retention.
+  # Rescue snapshots are retained until a later successful maintenance operation.
   publish_snapshot rescue
   verify_snapshot "$backup_source"
   printf '【危险】覆盖项目 %s 的数据库和三个媒体目录。\n' "$project"

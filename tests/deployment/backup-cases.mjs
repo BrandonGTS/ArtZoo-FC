@@ -191,12 +191,16 @@ export function exerciseBackups({ root, pass, invoke, sql, docker, app, run, arg
   assert.equal(existsSync(original), false, 'oldest successful backup pruned only after new success');
   pass('backup', ['--backup-dir', store, '--keep', '1']);
   assert.equal(snapshots().length, 1);
-  assert.equal(snapshots('rescue-').length, 3, 'rescue copies never automatically pruned');
+  assert.equal(snapshots('rescue-').length, 3, 'three rescue copies fit the default maintenance retention');
   pass('backup-verify', ['--backup', join(store, snapshots()[0])]);
   pass('status');
   writeFileSync(join(bin, 'date'), '#!/bin/bash\nprintf "20000101T000000000000000\\n"\n', { mode: 0o700 });
   assert.equal(injected('backup', ['--keep', '1']).status, 0);
-  assert.equal(snapshots().length, 1);
+  assert.equal(
+    snapshots().length,
+    2,
+    'both the newest timestamp and the just-published backup survive a backward clock jump'
+  );
   assert.ok(snapshots()[0].startsWith('backup-20000101T000000000000000-'));
   rmSync(join(bin, 'date'));
   pass('backup-verify', ['--backup', join(store, snapshots()[0])]);

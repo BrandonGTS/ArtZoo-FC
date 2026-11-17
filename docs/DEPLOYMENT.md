@@ -190,26 +190,42 @@ bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$current" --
 
 ### 手动备份与校验
 
-1. 默认备份位置为 `$root/backups`，保留最近 7 份。可用 `--backup-dir` 指定另一块 Linux 文件系统上的专用目录，用 `--keep` 指定 1–9999 份；目录及父级不可由组/其他用户写入，目录须为 UID/GID 1000、0700，不可使用链接、空格或 Windows 挂载目录。不要让多个站点共用一个备份目录。以下选定保留 7 份：
+1. 默认备份位置为 `$root/backups`，`backup-*` 保留最近 7 份；`upgrade-*`、`register-*`、`rescue-*` 每类各保留最近 3 份，可用 `--keep-maintenance 1–99` 调整。可用 `--backup-dir` 指定另一块 Linux 文件系统上的专用目录，用 `--keep` 指定 1–9999 份；目录及父级不可由组/其他用户写入，目录须为 UID/GID 1000、0700，不可使用链接、空格或 Windows 挂载目录。不要让多个站点共用一个备份目录。以下选定保留 7 份：
 
    ```bash
    backups="$root/backups"
    ```
 
-2. 【危险：短暂停站】暂停 web、worker，保持宿主机不直接写媒体；数据库继续运行。备份成功后启动应用并检查健康，最后发布正式备份目录、清理超过保留数的旧备份：
+2. 停站前先检查备份所在文件系统的可用空间：至少为“数据库 `pg_database_size` + 三个媒体目录的内容字节数”之和 × 1.5 + 1 GB（1,000,000,000 字节，向上取整）。媒体按逻辑大小计算，避免稀疏文件在 tar 中展开时低估。空间不足会打印需要/剩余字节并拒绝，不停应用、不写维护标记、不留下 `.partial.*`；`backup`、`upgrade`、`rollback`、`media-reregister` 和 `restore` 的救援备份都适用。估算不能预留空间或阻止其他进程继续占用磁盘。
+
+3. 【危险：短暂停站】暂停 web、worker，保持宿主机不直接写媒体；数据库继续运行。备份成功后启动应用并检查健康，最后发布正式备份目录、清理超过保留数的旧备份：
 
    ```bash
    bash "$bundle/deployment-maintenance.sh" backup --bundle "$bundle" --root "$root" --backup-dir "$backups" --keep 7
    ```
 
-3. 成功应出现 `PASS: backup` 和备份完整路径。复制该路径后只读验证；这会用无网络临时容器执行 `pg_restore --list`，不修改数据库或媒体：
+4. 成功应出现 `PASS: backup` 和备份完整路径。复制该路径后只读验证；这会用无网络临时容器执行 `pg_restore --list`，不修改数据库或媒体：
 
    ```bash
    read -r -p '完整备份目录：' snapshot
    bash "$bundle/deployment-maintenance.sh" backup-verify --bundle "$bundle" --root "$root" --backup "$snapshot"
    ```
 
-4. 备份失败会尝试重新启动应用并检查健康，不删除旧备份；失败仍返回非零。检查 `status`，未恢复时执行本节末尾的【危险】启动步骤。`.partial.*` 是失败现场，不计入保留份数，也不自动删除；排查后由站长清理。断电、强制杀进程或 Docker 不可用不能保证自动重启，须人工检查。
+5. 备份失败会尝试重新启动应用并检查健康，不删除旧备份；失败仍返回非零。检查 `status`，未恢复时执行本节末尾的【危险】启动步骤。`.partial.*` 是失败现场，不计入保留份数，也不自动删除；排查后由站长清理。断电、强制杀进程或 Docker 不可用不能保证自动重启，须人工检查。
+
+### 保留规则与只读统计
+
+`backup`、`upgrade`、`rollback`、`media-reregister` 成功后，在本次 `--backup-dir` 内按类别清理；失败时不清理。只删除同项目、同 PostgreSQL 镜像、完整校验通过且名称符合脚本格式的旧备份。各类按名称中的 UTC 创建时间排序；`deploy/previous` 引用、各类最新的一份和本次新备份始终保留，即使时钟回拨或因此超过保留数。损坏、其他项目/镜像、未知名称和 `.partial.*` 保留现场，不能靠调整保留数清除它们。空间不足时也不会先删旧备份腾空间。
+
+只读查看默认目录，或明确传入日常使用的外置备份目录：
+
+```bash
+bash "$bundle/deployment-maintenance.sh" status --root "$root" --backup-dir "$backups"
+```
+
+“备份”段显示总磁盘占用、文件系统剩余字节、四类目录的份数和最新 UTC 创建时间，以及 `.partial.*` 数量；损坏目录照常计数，未知和临时目录列出供人工处理。统计不会逐份校验，恢复前仍须 `backup-verify`。没有备份时输出 0 和“无”，不创建目录。最新 `backup-*` 超过 36 小时、无可识别的日常备份，或可用空间低于下次备份估算值的 2 倍时输出“警告”；统计失败也仅告警，不改变原有站点检查和退出码。`status` 只接受 `--backup-dir`，不接受保留数量或 `--backup`。
+
+这些规则仅随新发布包生效；旧包仍按旧规则运行，不补文件或重算校验和。升级取得新包后，后续成功维护会处理指定目录内兼容的既有备份；换用不同备份目录时，其他目录不会自动清理。回退到旧包后须按该旧包的实际能力检查空间与保留情况，不能假定它具有新预检功能。
 
 ### 原地恢复演练
 
@@ -228,7 +244,7 @@ bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$current" --
    ```
 
 5. 标记为 `running` 时，登记成功会自动开站并检查健康，再运行 `status` 和 `media-identity`（退出码须为 0）。标记为 `stopped` 时仍停止；需要开站时，由站长单独执行【危险：恢复开站】`bash "$bundle/deployment-maintenance.sh" start --root "$root"`，然后检查。确认新增日常和新图消失、登录及旧图显示正常；删除一张恢复前已有的相册照片，核对配额恰好退回一次。
-6. `rescue-*` 不自动轮换删除；需要撤销本次恢复时，将其完整路径作为 `--backup` 再执行第 2 步。日常保留数只覆盖同项目、同 PostgreSQL 镜像且校验通过的 `backup-*` 目录，不删除最后一份成功备份；损坏或未知目录留待人工检查。
+6. 需要撤销本次恢复时，将输出的 `rescue-*` 完整路径作为 `--backup` 再执行第 2 步。恢复本身不清理备份；随后登记成功会按维护保留规则清理。需要长期保存的恢复点应由站长另外归档。
 
 旧发布包不会获得默认停站行为：若已有包支持登记和 `--keep-stopped true`，恢复时必须显式加该选项，登记后再单独 `start`；不支持则停止演练，先通过正常发版取得完整支持包。不要改写旧发布包。
 

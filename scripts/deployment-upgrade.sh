@@ -158,12 +158,13 @@ upgrade_main() {
     [[ -z "${current_schema:-}" ]] || allow_schema "$current_schema"
     activate_bundle "$old_bundle"; status_check
     [[ "${refs[web]#*:}" != "$(awk '$1=="web" {sub(/^.*:/,"",$2);print $2}' "$new_bundle/images.tsv")" ]] || fail '相同版本，无需升级。'
-    if [[ ! -e "$state/current" ]]; then write_current "$old_bundle" "$new_bundle"; fi
     activate_bundle "$new_bundle"; compare_migrations
     activate_bundle "$old_bundle"
     backup_location "$backup_dir"
     [[ -e "$backup_dir" ]] || { trusted_path "$(dirname "$backup_dir")"; mkdir -m 700 -- "$backup_dir"; }
     private_directory "$backup_dir"
+    backup_space_check
+    if [[ ! -e "$state/current" ]]; then write_current "$old_bundle" "$new_bundle"; fi
     printf '【危险】停止应用、强制备份后迁移；项目 %s。\n' "$project"
     upgrade_phase=before
     dc stop --timeout 60 web worker >/dev/null 2>&1 || fail '停止应用失败。'
@@ -198,6 +199,7 @@ upgrade_main() {
     backup_location "$rollback_snapshot"; verify_snapshot "$rollback_snapshot"
     [[ -e "$backup_dir" ]] || { trusted_path "$(dirname "$backup_dir")"; mkdir -m 700 -- "$backup_dir"; }
     private_directory "$backup_dir"
+    backup_space_check
     printf '【危险】恢复升级前备份，升级后数据将丢弃；项目 %s。\n' "$project"
     state_write pending rollback
     upgrade_phase=after
@@ -218,6 +220,7 @@ upgrade_main() {
   [[ "$command" != rollback ]] || rm -f -- "$state/previous"
   rm -f -- "$state/pending"
   upgrade_phase=''
+  prune_backups
   printf 'PASS: %s。\n' "$command"
   if [[ "$command" == rollback ]]; then
     printf '保持停站；登记成功后自动启动旧版本并检查健康。\n'

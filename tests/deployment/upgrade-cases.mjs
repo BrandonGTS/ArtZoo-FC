@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { refuseLowSpace } from './retention-cases.mjs';
 import {
   constants,
   cpSync,
@@ -39,6 +40,7 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
   const upgrade = (selected, extra = []) => invoke('upgrade', selected, ['--backup-dir', store, ...extra]);
   const backups = () =>
     existsSync(store) ? readdirSync(store).filter((n) => n.startsWith('upgrade-')).length : 0;
+  const spaceContext = { root, docker, app, invoke: (command, extra) => invoke(command, good, extra) };
   const current = () => readFileSync(join(state, 'current'), 'utf8').split(' ')[0];
   sql('UPDATE "MediaBudgetState" SET "committedBytes"=0;');
   const { seed, remove } = recoveryFixture({ compose, sql });
@@ -50,6 +52,7 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
   };
   const rollback = (failure) => {
     let result;
+    refuseLowSpace(spaceContext, 'rollback');
     if (failure) {
       const line = failure.stderr.split('\n').find((s) => s.includes('回退会丢弃'));
       assert.ok(line, 'failure prints an executable rollback command');
@@ -168,6 +171,7 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
   );
   rmSync(join(state, 'current'));
   assert.notEqual(upgrade(good).status, 0);
+  refuseLowSpace(spaceContext, 'upgrade', ['--from', bundle]);
   photo = seed().photo;
   const successful = upgrade(good, ['--from', bundle]);
   assert.equal(successful.status, 0, successful.stderr);
