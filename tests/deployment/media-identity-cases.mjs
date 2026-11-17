@@ -106,13 +106,15 @@ export function exerciseMediaIdentity({ root, bundle, invoke, pass, sql, docker,
     'MEDIA IDENTITY: container restart 3 consistent; restore 3 inconsistent, baseline consistent; read-only verified.'
   );
   // Restore the exact original fixture directories and remove only synthetic ledger rows.
-  pass('stop');
+  assert.equal(docker('stop', app('web'), app('worker')).status, 0);
   for (const directory of ['original', 'derived', 'avatars']) {
     for (const name of readdirSync(join(root, 'media', directory)))
       rmSync(join(root, 'media', directory, name), { recursive: true });
     for (const name of readdirSync(join(held, directory)))
       renameSync(join(held, directory, name), join(root, 'media', directory, name));
   }
-  pass('start');
   sql(`DELETE FROM "MediaStoredComponent" WHERE id IN (${rows.map((row) => `'${row.id}'`).join(',')});`);
+  sql('UPDATE "MediaBudgetState" SET "committedBytes"=0;');
+  pass('media-reregister', ['--backup-dir', backups]);
+  pass('status');
 }

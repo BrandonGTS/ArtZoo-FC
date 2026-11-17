@@ -88,6 +88,9 @@ history() {
 rollback_command() {
   printf '【危险】回退会丢弃升级后写入的数据：bash %q rollback --bundle %q --root %q --project %q --backup-dir %q\n' "$controller/deployment-maintenance.sh" "$controller" "$root" "$project" "$backup_dir" >&2
 }
+registration_command() {
+  printf '【危险】重新登记媒体身份：bash %q media-reregister --bundle %q --root %q --project %q --backup-dir %q\n' "$controller/deployment-maintenance.sh" "$bundle" "$root" "$project" "$backup_dir"
+}
 upgrade_cleanup() {
   [[ "$1" != 0 && -n "$upgrade_phase" ]] || return 0
   resume_apps=0; destructive_restore=0; apps_touched=0
@@ -129,6 +132,7 @@ console.log(n+"|"+crypto.createHash("sha256").update(fs.readFileSync(dir+"/"+n+"
 rebuild_apps() {
   dc up --no-start --no-deps --no-build --pull never --force-recreate web worker >/dev/null 2>&1 || fail '应用容器重建失败。'
   check_app web; check_app worker
+  [[ "$command" != rollback ]] || return 0
   dc start --wait --wait-timeout 120 web worker >/dev/null 2>&1 || fail '应用启动或健康检查失败。'
   status_check
 }
@@ -178,6 +182,7 @@ upgrade_main() {
     [[ -z "$extra" && -n "$new_bundle" ]] || fail '回退记录格式不符。'
     verified_bundle "$new_bundle"; allow_schema "$new_bundle"
     verified_bundle "$old_bundle"
+    [[ -f "$old_bundle/deployment-media-reregister.sh" && ! -L "$old_bundle/deployment-media-reregister.sh" ]] || fail '旧包不支持登记，回退后无法安全开站。'
     [[ "$current_bundle" == "$old_bundle" || "$current_bundle" == "$new_bundle" ]] || fail '当前版本不属于回退记录。'
     # Both running and partially recreated containers must belong to this transition.
     for role in web worker; do
@@ -206,6 +211,7 @@ upgrade_main() {
     verify_snapshot "$backup_source"
     restore_snapshot
     rebuild_apps
+    state_write media-registration.pending running
     write_current "$old_bundle" "$new_bundle"
   fi
   history success
@@ -213,4 +219,8 @@ upgrade_main() {
   rm -f -- "$state/pending"
   upgrade_phase=''
   printf 'PASS: %s。\n' "$command"
+  if [[ "$command" == rollback ]]; then
+    printf '保持停站；登记成功后自动启动旧版本并检查健康。\n'
+    registration_command
+  fi
 }

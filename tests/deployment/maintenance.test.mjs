@@ -418,7 +418,7 @@ test(
       exerciseMediaIdentity({ root, bundle, invoke, pass, sql, docker, app });
     if (!process.env.ARTZOO_UPGRADE_TEST_BUNDLES)
       exerciseBackups({ root, pass, invoke, sql, docker, app, run, args, config });
-    exerciseUpgrades({ root, bundle, project, run, sql, docker, app, config });
+    exerciseUpgrades({ root, bundle, project, run, sql, docker, app, config, compose });
     if (!process.env.ARTZOO_UPGRADE_TEST_BUNDLES)
       exerciseRegistration({ root, pass, invoke, sql, docker, app, compose });
   }
