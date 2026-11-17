@@ -163,7 +163,11 @@ export function exerciseBackups({ root, pass, invoke, sql, docker, app, run, arg
   }
   assert.equal(snapshots('rescue-').length, 1);
   rmSync(join(bin, 'docker'));
-  cleanOutput(pass('restore', [...options, ...verify]));
+  assert.equal(readFileSync(join(root, 'deploy/media-registration.pending'), 'utf8'), 'running\n');
+  assert.notEqual(invoke('start').status, 0);
+  cleanOutput(pass('restore', [...options, ...verify, '--keep-stopped', 'true']));
+  pass('media-reregister', options);
+  pass('start');
   assert.equal(sql('SELECT value FROM backup_probe;'), 'before');
   assert.equal(sql("SELECT count(*) FROM information_schema.tables WHERE table_name='backup_extra';"), '0');
   for (const directory of ['original', 'derived', 'avatars']) {
@@ -177,6 +181,8 @@ export function exerciseBackups({ root, pass, invoke, sql, docker, app, run, arg
   assert.deepEqual(readFileSync(config), secretConfig, 'secret configuration is never restored');
   const rescue = join(store, snapshots('rescue-').at(-1));
   cleanOutput(pass('restore', [...options, '--backup', rescue]));
+  assert.equal(readFileSync(join(root, 'deploy/media-registration.pending'), 'utf8'), 'running\n');
+  pass('media-reregister', options);
   assert.equal(sql('SELECT value FROM backup_probe;'), 'after', 'automatic rescue is usable');
   assert.equal(readFileSync(image, 'utf8'), 'changed');
   pass('backup', options);

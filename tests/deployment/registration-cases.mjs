@@ -1,37 +1,13 @@
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, readdirSync, renameSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, writeFileSync, readdirSync, renameSync, existsSync } from 'node:fs';
+import { recoveryFixture } from './recovery-fixture.mjs';
 import { join } from 'node:path';
 
 export function exerciseRegistration({ root, pass, invoke, sql, docker, app, compose }) {
-  const helper = fileURLToPath(new URL('./registration-fixture.mjs', import.meta.url));
-  const tool = (code) => {
-    const result = compose(
-      'run',
-      '--rm',
-      '--no-deps',
-      '-T',
-      '--volume',
-      helper + ':/app/tests/deployment/registration-fixture.mjs:ro',
-      '--entrypoint',
-      'node',
-      'tools',
-      '--input-type=module',
-      '-e',
-      `
-      const {getDatabase,disconnectDatabase}=await import('/app/packages/db/dist/index.js');
-      const db=getDatabase();try{${code}}finally{await disconnectDatabase();}`
-    );
-    assert.equal(result.status, 0, result.stderr);
-    return result.stdout.trim();
-  };
+  const { seed, remove } = recoveryFixture({ compose, sql });
   // The older lifecycle check deliberately left an unallocated 64-byte scalar counter.
   sql('UPDATE "MediaBudgetState" SET "committedBytes"=0;');
-  const fixture = JSON.parse(
-    tool(`const {seedRegistration}=await import('/app/tests/deployment/registration-fixture.mjs');
-    const f=await seedRegistration(db,['/app/storage/original','/app/storage/derived','/app/storage/avatars'],['album-photo']);
-    console.log(JSON.stringify({files:f.files,photo:f.albumPhoto}));`)
-  );
+  const fixture = seed();
   const path = fixture.files[0].replace('/app/storage', root + '/media');
   const snapshot = () =>
     sql(`SELECT jsonb_build_array(
@@ -55,12 +31,35 @@ export function exerciseRegistration({ root, pass, invoke, sql, docker, app, com
     backups,
     readdirSync(backups).find((n) => n.startsWith('backup-'))
   );
+  const mark = join(root, 'deploy/media-registration.pending');
+  for (const mode of ['running', 'stopped']) {
+    if (mode === 'stopped') assert.equal(docker('stop', app('web'), app('worker')).status, 0);
+    const restored = pass('restore', ['--backup-dir', backups, '--backup', saved]);
+    assert.match(
+      restored.stdout,
+      /bash .* media-reregister --bundle .* --root .* --project .* --backup-dir /
+    );
+    stopped();
+    assert.equal(readFileSync(mark, 'utf8'), mode + '\n');
+    assert.equal(invoke('start').status, 1);
+    pass('media-reregister', ['--backup-dir', backups]);
+    assert.equal(existsSync(mark), false);
+    if (mode === 'stopped') {
+      stopped();
+      pass('start');
+    }
+    pass('status');
+    assert.equal(check().components.consistent, 3);
+    if (mode === 'running') remove(fixture.photo);
+    console.log(`PASS: restore from ${mode}, registration state preserved`);
+  }
   for (const file of fixture.files) {
     const p = file.replace('/app/storage', root + '/media');
     renameSync(p, join(root, p.split('/').at(-1) + '.held'));
   }
   pass('restore', ['--backup-dir', backups, '--backup', saved, '--keep-stopped', 'true']);
   stopped();
+  assert.equal(readFileSync(mark, 'utf8'), 'stopped\n');
   assert.equal(invoke('start').status, 1);
   pass('media-reregister', ['--backup-dir', backups]);
   stopped();
@@ -80,13 +79,7 @@ export function exerciseRegistration({ root, pass, invoke, sql, docker, app, com
   pass('media-reregister', ['--backup-dir', backups]);
   pass('status');
   assert.equal(check().components.consistent, 3);
-  const p = fixture.photo;
-  tool(`const {BoundNamespace,prepareAlbumPhotoRemoval,retireAlbumPhotoRemovals}=await import('/app/packages/media/dist/stock-retirement.js');
-    const p=${JSON.stringify({ id: p.id, albumId: p.albumId })};
-    await db.albumPhoto.update({where:{id:p.id},data:{removedAt:new Date()}});
-    await db.$transaction(tx=>prepareAlbumPhotoRemoval(tx,p.id,p.albumId));
-    const ns={original:new BoundNamespace('/app/storage/original/albums','album-photo'),derived:new BoundNamespace('/app/storage/derived/albums','album-photo')};
-    for(let i=0;i<2;i++)if((await retireAlbumPhotoRemovals(db,ns,[p.id],()=>new Date())).status!=='complete')throw Error('DELETE_FAILED');`);
+  remove(fixture.photo);
   assert.equal(sql('SELECT "creditedBytes" FROM "MediaBudgetState";'), '384');
   const history = snapshot();
   pass('media-reregister', ['--backup-dir', backups]);

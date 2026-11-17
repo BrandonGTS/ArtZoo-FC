@@ -163,18 +163,13 @@ bash "$bundle/deployment-maintenance.sh" upgrade --bundle "$bundle" --root "$roo
 bash "$bundle/deployment-maintenance.sh" rollback --bundle "$bundle" --root "$root" --project "$project" --backup-dir "$backups"
 ```
 
-回退会另存当前状态、恢复 `previous` 记录的升级前数据库与媒体、重建旧镜像；只支持一级，成功后消耗 `previous`。失败保持停站并保留现场，不删 `pending`，不手动强开网站。脚本不自动回退数据库，也不执行逆向迁移。
+回退在停站和覆盖前检查旧包是否支持媒体登记；不支持就拒绝，运行中的网站保持原状，已因迁移失败停站的网站继续停止。通过后另存当前状态、恢复 `previous` 记录的升级前数据库与媒体、重建并核对旧镜像容器，但不启动 web、worker。成功后 `current` 改回旧包，历史记录 `rollback ... result=success`，消耗 `previous` 并删除升级 `pending`，留下值为 `running` 的 `media-registration.pending`。只支持一级回退，不执行逆向迁移。
 
-看到 `PASS: rollback` 后读取恢复的版本并检查。恢复媒体会改变 inode，当前 `rollback` **不自动重新登记媒体身份**；需要下面的独立步骤，不能只看健康检查就结束：
+看到 `PASS: rollback` 后网站仍停止，必须执行输出的完整 `media-reregister` 命令；`start` 和 Windows 固定入口都会拒绝提前开站。恢复媒体会改变 inode，登记须全量核验内容。沿用本章变量时，先读取恢复后的旧包：
 
 ```bash
 read -r current current_release current_schema < "$root/deploy/current"
-bash "$bundle/deployment-maintenance.sh" status --root "$root" --project "$project"
-bash "$bundle/deployment-maintenance.sh" media-identity --root "$root" --project "$project"
-bash "$current/deployment-maintenance.sh" --help
 ```
-
-若诊断不一致，且恢复的旧包及 tools 支持 `media-reregister`，执行下一项；若不支持，【危险：停止网站】单独执行 `bash "$bundle/deployment-maintenance.sh" stop --root "$root" --project "$project"`，保留备份，另行评审兼容恢复方案，不把新 tools 强塞给旧包。
 
 【危险：停写并重新登记】Server 单独执行；登记会先备份，逐项核对内容后原子更新身份，不清零用量：
 
@@ -182,7 +177,9 @@ bash "$current/deployment-maintenance.sh" --help
 bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$current" --root "$root" --project "$project" --backup-dir "$backups"
 ```
 
-失败保持停站，不能绕过标记；成功后重新执行 `status`、`media-identity`，检查登录、旧图、删图退额及 `history.log` 的 `rollback ... result=success`。按 1.5 把 timer 的两处路径改回实际旧包；Windows 固定入口自动跟随 `current`，无需手工改版本。仅恢复原本开启的调度。升级后新增的数据消失是回退的预期结果。
+登记成功后按 `running` 标记自动启动旧版本并检查健康；再执行 `status`、`media-identity`，检查登录、旧图、删图退额及 `history.log`。失败保持停站，保留备份和维护标记，不强开网站。按 1.5 把 timer 的两处路径改回实际旧包；Windows 固定入口自动跟随 `current`，无需手工改版本。仅恢复原本开启的调度。升级后新增的数据消失是回退的预期结果。
+
+以上停站保护只随新控制包生效，已交付旧包不改文件、不重算校验和。旧包的 `rollback` 仍可能直接开站，不用它代替本流程；先取得包含本修复的完整控制包并校验。目标旧包还必须自带登记脚本和兼容 tools；不支持时保留现场，另行评审恢复方案，不把新 tools 强塞给旧包。
 
 
 ## 2. 备份与恢复（Server，任意目录）
@@ -220,18 +217,20 @@ bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$current" --
 2. 【危险：覆盖当前站点】执行以下命令。脚本重新核对校验和、归档路径、发布版本、数据库镜像和项目；不一致时在停站前拒绝。本流程只恢复当前版本的备份；跨版本退回上一版用 1.6 的 `rollback`，不手动改 `current` 或修改备份清单绕过。停站后自动创建 `rescue-*` 当前状态备份，成功才开始覆盖：
 
    ```bash
-   bash "$bundle/deployment-maintenance.sh" restore --bundle "$bundle" --root "$root" --backup-dir "$backups" --backup "$snapshot" --keep-stopped true
+   bash "$bundle/deployment-maintenance.sh" restore --bundle "$bundle" --root "$root" --backup-dir "$backups" --backup "$snapshot"
    ```
 
-3. 恢复清空并重建应用的 `public` schema，拒绝额外用户 schema；SQL 在单个事务中恢复，错误回滚。媒体随后清空、解包；本例用 `--keep-stopped true` 保持停站，先完成媒体身份登记。数据库和文件不是同一事务：覆盖阶段任一步失败，应用保持停止，输出恢复前备份路径和恢复命令；排查原因后由站长单独执行该【危险】命令。切勿直接开站或删除备份。恢复前准备失败则尝试恢复启动。
-4. 【危险：停写并重新登记】恢复成功仍保持停站；先执行以下命令，成功须出现 `PASS: media-reregister`。文件重新写入会改变 inode，因此登记前全量校验内容并更新身份。任一文件缺失或内容不符会拒绝，失败保留停站标记，不删除标记绕过。
+3. 恢复清空并重建应用的 `public` schema，拒绝额外用户 schema；SQL 在单个事务中恢复，错误回滚。媒体随后清空、解包；恢复一律保持停站并写 `media-registration.pending`：恢复前 web、worker 均在运行则为 `running`，均停止则为 `stopped`；状态不一致时在停站前拒绝。仍接受 `--keep-stopped true`，强制登记后继续停站。数据库和文件不是同一事务：覆盖阶段任一步失败，保持停站，输出恢复前备份路径及带 `--keep-stopped true` 的恢复命令；排查后由站长单独执行。准备阶段失败仅在应用原本运行时尝试恢复启动，不启动原本已停的应用。
+4. 【危险：停写并重新登记】恢复成功仍保持停站；执行脚本输出的完整命令，或以下等价命令，成功须出现 `PASS: media-reregister`。登记前全量校验内容并更新身份；任一文件缺失或内容不符会拒绝。登记完成前 `start` 和 Windows 入口拒绝开站，失败保留停站标记，不删除标记绕过。
 
    ```bash
    bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$bundle" --root "$root" --backup-dir "$backups"
    ```
 
-5. 【危险：恢复开站】登记成功后单独执行 `bash "$bundle/deployment-maintenance.sh" start --root "$root"`；再运行 `status` 和 `media-identity`。确认新增日常和新图消失、登录及旧图显示正常；删除一张恢复前已有的相册照片，核对配额退回并记录结果。
+5. 标记为 `running` 时，登记成功会自动开站并检查健康，再运行 `status` 和 `media-identity`（退出码须为 0）。标记为 `stopped` 时仍停止；需要开站时，由站长单独执行【危险：恢复开站】`bash "$bundle/deployment-maintenance.sh" start --root "$root"`，然后检查。确认新增日常和新图消失、登录及旧图显示正常；删除一张恢复前已有的相册照片，核对配额恰好退回一次。
 6. `rescue-*` 不自动轮换删除；需要撤销本次恢复时，将其完整路径作为 `--backup` 再执行第 2 步。日常保留数只覆盖同项目、同 PostgreSQL 镜像且校验通过的 `backup-*` 目录，不删除最后一份成功备份；损坏或未知目录留待人工检查。
+
+旧发布包不会获得默认停站行为：若已有包支持登记和 `--keep-stopped true`，恢复时必须显式加该选项，登记后再单独 `start`；不支持则停止演练，先通过正常发版取得完整支持包。不要改写旧发布包。
 
 ### 每日定时备份
 

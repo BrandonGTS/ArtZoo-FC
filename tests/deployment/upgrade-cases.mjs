@@ -1,9 +1,19 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  constants,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs';
 import { join } from 'node:path';
+import { recoveryFixture } from './recovery-fixture.mjs';
 
 // Real, separately built bundles: harmless migration, failing SQL, unhealthy web, new configuration.
-export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app, config }) {
+export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app, config, compose }) {
   const variants = process.env.ARTZOO_UPGRADE_TEST_BUNDLES;
   if (!variants) return;
   const good = join(variants, 'good');
@@ -30,12 +40,16 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
   const backups = () =>
     existsSync(store) ? readdirSync(store).filter((n) => n.startsWith('upgrade-')).length : 0;
   const current = () => readFileSync(join(state, 'current'), 'utf8').split(' ')[0];
+  sql('UPDATE "MediaBudgetState" SET "committedBytes"=0;');
+  const { seed, remove } = recoveryFixture({ compose, sql });
+  let photo;
   const stopped = () => {
     for (const service of ['web', 'worker'])
       assert.equal(docker('inspect', '--format', '{{.State.Running}}', app(service)).stdout.trim(), 'false');
     assert.notEqual(invoke('start', bundle).status, 0, 'pending migration cannot be bypassed with start');
   };
   const rollback = (failure) => {
+    let result;
     if (failure) {
       const line = failure.stderr.split('\n').find((s) => s.includes('回退会丢弃'));
       assert.ok(line, 'failure prints an executable rollback command');
@@ -43,10 +57,63 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
       // The printed command consists only of shell-escaped fixture paths and fixed options.
       const executed = run([], { command });
       assert.equal(executed.status, 0, executed.stderr);
-    } else pass('rollback', good, ['--backup-dir', store]);
+      result = executed;
+    } else result = pass('rollback', good, ['--backup-dir', store]);
     assert.equal(current(), bundle);
     assert.equal(existsSync(join(state, 'pending')), false);
+    assert.equal(existsSync(join(state, 'previous')), false);
+    assert.equal(readFileSync(join(state, 'media-registration.pending'), 'utf8'), 'running\n');
+    stopped();
+    const line = result.stdout
+      .split('\n')
+      .find((s) => s.includes('bash ') && s.includes(' media-reregister '));
+    assert.ok(line, 'rollback prints the complete registration command');
+    const registered = run([], { command: line.slice(line.indexOf('bash ')) });
+    assert.equal(registered.status, 0, registered.stderr);
+    assert.equal(existsSync(join(state, 'media-registration.pending')), false);
     pass('status');
+    pass('media-identity');
+    remove(photo);
+    console.log(
+      'PASS: rollback stopped with running marker; printed registration reopened old version; deletion credited 384 bytes once'
+    );
+  };
+  // A separate immutable test package models the pre-registration release format.
+  const legacy = join(root, 'legacy-bundle');
+  cpSync(bundle, legacy, { recursive: true, mode: constants.COPYFILE_FICLONE });
+  rmSync(join(legacy, 'deployment-media-reregister.sh'));
+  writeFileSync(
+    join(legacy, 'SHA256SUMS'),
+    readFileSync(join(legacy, 'SHA256SUMS'), 'utf8')
+      .split('\n')
+      .filter((line) => !line.endsWith('  deployment-media-reregister.sh'))
+      .join('\n')
+  );
+  const rejectLegacy = (running) => {
+    const record = readFileSync(join(state, 'previous'), 'utf8');
+    const pointers = ['current', 'pending'].map((name) =>
+      existsSync(join(state, name)) ? readFileSync(join(state, name), 'utf8') : null
+    );
+    const changed = record.replace(bundle + ' ', legacy + ' ');
+    writeFileSync(join(state, 'previous'), changed);
+    const count = readdirSync(store).length;
+    const result = invoke('rollback', good, ['--backup-dir', store]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /旧包不支持登记，回退后无法安全开站/);
+    assert.equal(readFileSync(join(state, 'previous'), 'utf8'), changed);
+    assert.deepEqual(
+      ['current', 'pending'].map((name) =>
+        existsSync(join(state, name)) ? readFileSync(join(state, name), 'utf8') : null
+      ),
+      pointers
+    );
+    assert.equal(readdirSync(store).length, count, 'legacy refusal precedes rescue and restore');
+    if (running) pass('status');
+    else stopped();
+    writeFileSync(join(state, 'previous'), record);
+    console.log(
+      `PASS: unsupported old bundle refused before mutation; site stayed ${running ? 'running' : 'stopped'}`
+    );
   };
   assert.equal(current(), bundle, 'enable-budget registers the initial version');
   const initialRecord = readFileSync(join(state, 'current'), 'utf8');
@@ -101,6 +168,7 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
   );
   rmSync(join(state, 'current'));
   assert.notEqual(upgrade(good).status, 0);
+  photo = seed().photo;
   const successful = upgrade(good, ['--from', bundle]);
   assert.equal(successful.status, 0, successful.stderr);
   assert.match(successful.stdout, /upgrade_probe_migration/);
@@ -116,6 +184,7 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
   pass('status');
   sql("UPDATE upgrade_probe SET value='after';");
   writeFileSync(image, 'after');
+  rejectLegacy(true);
   rollback();
   assert.equal(sql('SELECT value FROM upgrade_probe;'), 'before');
   assert.equal(readFileSync(image, 'utf8'), 'before');
@@ -123,9 +192,11 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
   assert.notEqual(invoke('rollback', good).status, 0, 'only one rollback level');
   console.log('PASS: manual rollback restored data/media/schema and consumed the previous pointer');
   for (const candidate of [bad, unhealthy]) {
+    photo = seed().photo;
     const failed = upgrade(candidate);
     assert.notEqual(failed.status, 0);
     stopped();
+    rejectLegacy(false);
     rollback(failed);
     assert.equal(sql('SELECT value FROM upgrade_probe;'), 'before');
     assert.equal(readFileSync(image, 'utf8'), 'before');
@@ -140,6 +211,7 @@ export function exerciseUpgrades({ root, bundle, project, run, sql, docker, app,
   }
   // A new host setting is accepted, but does not prevent old-version recovery/status.
   writeFileSync(config, originalConfig + '\nARTZOO_UPGRADE_REQUIRED=1\n');
+  photo = seed().photo;
   const withConfig = upgrade(required);
   assert.equal(withConfig.status, 0, withConfig.stderr);
   rollback();

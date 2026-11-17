@@ -26,7 +26,8 @@ usage() {
   stop            先停止应用，再停止数据库；保留容器、卷和媒体
 备份选项：--backup-dir 绝对目录（默认 root/backups）、--keep 正整数（默认 7）。
 恢复/验证选项：--backup 完整备份目录；恢复必须使用备份记录的同一发布版本。
-restore 可加 --keep-stopped true：恢复后保持停站，登记通过后再单独 start。
+restore/rollback 恢复后保持停站，必须执行输出的 media-reregister 命令。
+restore 默认登记成功后恢复原运行状态；--keep-stopped true 强制登记后仍停站，再单独 start。
 status/start/stop 可省略 --bundle，读取 deploy/current；rollback 使用升级控制包。
 默认只显示帮助。项目名默认 artzoo，跨版本必须保持不变。
 root 下预先准备 secrets 和 media/{original,derived,avatars}，UID/GID 1000、0700。
