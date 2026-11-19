@@ -267,7 +267,7 @@ Caddy 部署通过 web 专用 Compose 覆盖文件设置 `ARTZOO_TRUSTED_PROXY=c
 
 ## 九、部署镜像与交付
 
-部署决定见 [DECISIONS.md](DECISIONS.md) 第 8–12 条；安装、配置、构建、验收、启停和回退步骤统一见[部署配置操作手册](DEPLOYMENT.md)。
+部署决定见 [DECISIONS.md](DECISIONS.md) 第 8–16 条。安装、配置、发版、备份、恢复和验收步骤见[部署操作手册](DEPLOYMENT.md)。
 
 ### 运行布局
 
@@ -275,6 +275,8 @@ Caddy 部署通过 web 专用 Compose 覆盖文件设置 `ARTZOO_TRUSTED_PROXY=c
 - **Server**：安装 Caddy、Docker 和 Docker Compose，接收版本化发布包，不拉取源码，也不需要宿主 Node、pnpm 或 Python。web、worker、PostgreSQL 由 Compose 管理；tools 只用于显式维护。
 - **Windows**：WSL 使用 mirrored、DNS 隧道、自动代理及本机 IP 回环；宿主防火墙将家庭入口限定为指定局域网到 TCP 443。Windows 不安装 Caddy，不配置家庭公网端口映射。
 - **正式服务器**：沿用镜像发布方式；独立 Linux 服务器不需要 WSL 配置，域名入口使用单独的 Caddy 模板。
+
+Windows 固定入口 `artzoo-resident.ps1` 按 `deploy/current` 选择并校验当前发布包。`-start` 先启动隐藏的 WSL 常驻进程，再启动已有的 PostgreSQL、web、worker 和 Caddy。关闭终端后网站可以继续运行，Windows 重启后由站长重新执行 `-start`。`-status` 分别检查常驻、应用版本与健康状态，以及 Caddy 服务。发行版已关闭时，查询会直接返回关闭状态。
 
 ### HTTPS 与代理
 
@@ -290,7 +292,7 @@ Caddy 覆盖转发头；应用仅在 `ARTZOO_TRUSTED_PROXY=caddy` 时信任来�
 |---|---|
 | web | Next standalone、静态资源、独立 BMP 线程及生产依赖 |
 | worker | 编译后的后台程序及生产依赖，默认要求数据库配置 |
-| tools | Prisma CLI、迁移、媒体基线和受保护的超管初始化入口；默认只显示说明 |
+| tools | Prisma CLI、迁移、媒体基线、媒体身份重新登记和受保护的超管初始化入口，默认只显示说明 |
 
 应用镜像统一使用锁文件和固定 Node 基础镜像，默认以 UID/GID 1000 运行。`.dockerignore` 排除宿主依赖、私有配置、密钥和运行数据；Compose 仅引用镜像，不挂源码、不执行构建。
 
@@ -300,6 +302,10 @@ Caddy 覆盖转发头；应用仅在 `ARTZOO_TRUSTED_PROXY=caddy` 时信任来�
 | 运行配置 | `compose.yaml`、`.env.example`、`runtime-config.manifest`、由镜像清单生成的 `images.env` |
 | 构建与验收工具 | `deployment-images.sh`、`deployment-image-check.mjs`、`deployment-compose-check.sh`、`deployment-https-check.mjs` |
 | 维护入口 | `deployment-maintenance.sh` |
+| 备份与恢复 | `deployment-backup.sh`、`artzoo-backup-launcher.sh`、`artzoo-backup.service.example`、`artzoo-backup.timer.example` |
+| 升级与回退 | `deployment-upgrade.sh` |
+| 家庭站常驻 | `artzoo-resident.ps1`、`deployment-resident.sh` |
+| 媒体身份 | `deployment-media-identity.mjs`、`deployment-media-reregister.sh` |
 | 配置模板 | 七份 Caddy、代理覆盖、WSL 网络及 Dev Docker 配置模板，源文件位于 `deployment/` |
 | 操作手册 | `DEPLOYMENT.md` |
 
@@ -327,16 +333,26 @@ web、worker 使用 `json-file` 容器日志，每个文件最多 `10m`，最多
 | 代理覆盖 | `/srv/artzoo/deploy/proxy.compose.yaml` | 仅覆盖 web 的代理信任配置，文件及上级目录不可被组或其他用户写入 |
 | Caddy 配置与状态 | `/etc/caddy/Caddyfile`、`/var/lib/caddy/` | 配置、证书和私钥留在 Server；模板单独入库 |
 | 发布包 | `/srv/artzoo/releases/<版本>` | 保留旧版本，不原地修改已校验的包 |
+| 部署状态 | `/srv/artzoo/deploy/` | `current` 记录当前发布包、版本和配置清单来源，`previous` 记录一级回退所需的旧包及备份 |
+| 备份 | 默认 `/srv/artzoo/backups/` | 一份备份包含 PostgreSQL 导出、迁移列表、原图/衍生图/头像归档和校验清单 |
 
 媒体使用 Linux 文件系统；目录及祖先须属于 root 或运行用户，不能被组或其他用户写入。Compose 拒绝缺失的挂载目录，不自动创建或放宽权限。
 
 迁移、媒体基线和首位超管初始化均为显式维护，不随网站启动执行。配额须在基线完成后启用；worker 开启认证记录清理，孤儿媒体删除、官方采集和 QQ 固定关闭；短信默认关闭，仅 web 可按清单启用。维护入口核对发布包、镜像及运行配置；日常启停保留数据，不执行初始化或升级。
 
+### 备份、升级与回退
+
+- **【危险】备份会短暂停站。** 手动和定时备份都先停止 web、worker，校验数据库导出和媒体归档，恢复应用并检查健康后才发布新备份。定时入口按 `deploy/current` 找版本，维护未完成时拒绝备份，最近一次结果记在 `deploy/backup-last`。启用随包的 systemd 定时器后，按北京时间每天 03:00 运行，Server 关闭时错过的那次不会补跑。
+- **【危险】升级会停站并执行迁移。** 维护脚本核对发布包及镜像、当前容器和迁移记录，停写后先生成并校验升级前备份，再执行向前迁移、重建应用并检查健康。新版本通过健康检查后才更新 `current`。迁移开始后失败时保留备份和待处理标记，保持停站以便处理。
+- **【危险】回退会丢弃升级后写入的数据。** 使用本次新包的维护入口，先核对旧包具备媒体登记能力并另存当前状态，再还原升级前的数据库和媒体、重建旧版容器。回退只支持一级，数据库随备份恢复。此时 `current` 已指向旧版，web、worker 继续停止，开站条件见第十节。
+
+日常备份默认保留 7 份，升级前、救援和登记前备份每类默认保留 3 份。备份或维护成功后才清理已校验的同项目、同 PostgreSQL 镜像备份，并保护回退引用、每类最新及本次备份。完整操作与失败处理见[部署操作手册](DEPLOYMENT.md)第 1、2 节。
+
 ### 验证与边界
 
 - 镜像和 Compose 检查使用独立临时资源，覆盖运行依赖、空库迁移、媒体基线、worker、挂载和持久化；不连接家庭数据库。
 - HTTPS 检查核对证书、健康接口和伪造转发头，结束后恢复临时修改的 Caddy 配置；多设备访问与入口隔离按部署手册验收。
-- 初始化、服务健康和 HTTPS 可用不等于登录、上传、权限或备份恢复验收完成。容器重启策略不代替 Windows/WSL 开机恢复；任务状态统一以 [PLAN.md](PLAN.md) 为准。
+- 配置检查、容器健康和 HTTPS 访问分别记录。登录、上传、权限和备份恢复按各自的实际操作验收，任务状态见 [PLAN.md](PLAN.md)。
 
 ---
 
@@ -437,7 +453,7 @@ rg -n '\.dev\b|\.ino\b|mtimeNs|ctimeNs' packages/media apps/web/server scripts
 
 实现涉及 `packages/media` 的校验/登记入口、`packages/db` 的锁定与账目核对、维护脚本、发布包清单、tools 镜像及行为测试；唯一改动文档为本文件。原有身份算法不变，没有数据库结构迁移，也不修改旧发布包。
 
-维护开始前写入 `deploy/media-registration.pending`；失败或进程中断后保留它，普通 start、升级、回退均拒绝。允许只读诊断、停站、重试登记，或显式保持停站的恢复。登记成功、独立诊断和必要的健康检查通过后才移除标记；重复登记不改变金额或历史凭据。不要手动删除标记绕过检查。
+当前脚本执行原地恢复或回退后，web、worker 保持停止，并留下 `deploy/media-registration.pending`。标记存在时，普通 `start`、升级和回退均被拒绝。此时可执行只读诊断、停站、重试登记，或带 `--keep-stopped true` 的恢复。登记完成、独立诊断及必要的健康检查通过后才移除标记。失败时保留备份和标记，由站长核对现场。旧包的恢复和回退能力见[部署操作手册](DEPLOYMENT.md)中的版本说明。
 
 Server 由站长在当前发布包变量 `bundle`、站点变量 `root` 已正确设置后单独执行：
 
@@ -451,7 +467,13 @@ bash "$bundle/deployment-maintenance.sh" restore --bundle "$bundle" --root "$roo
 bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$bundle" --root "$root"
 ```
 
-登记从运行状态开始则成功后恢复运行；从停止状态开始则保持停止。恢复使用 `--keep-stopped true` 后，登记完成再按部署手册单独 start。当前 restore 和 rollback 恢复媒体后统一停站并写登记标记；restore 记录原运行状态，`--keep-stopped true` 强制登记后仍停止，rollback 标记为 running。登记成功后按标记恢复运行；旧包行为以其随包手册为准。登记备份使用 `register-*` 前缀，和 `upgrade-*`、`rescue-*` 一样每类默认保留 3 份，可用 `--keep-maintenance` 调整；只在成功维护后清理已校验的同项目、同 PostgreSQL 镜像备份，并保护 previous 引用、每类最新及本次备份。停站和写登记标记前先检查备份空间，失败不改变应用状态；停写后失败则保留现场和标记。详细空间与保留规则见 DEPLOYMENT 第 2 节。运行中的遗留 tools 容器会使重试拒绝，须核对本次维护容器后由站长处理，不能批量删除其他容器。
+开站前先完成独立的 `media-identity` 检查，基线和文件组件的 `inconsistent`、`unchecked` 都须为 0。登记脚本在停写状态下执行这项检查，之后按记录的运行状态处理。
+
+- 回退记录为 `running`。看到 `PASS: rollback` 时仍处于停站状态。站长按脚本输出执行【危险】`media-reregister`，通过后自动启动旧版并检查健康。
+- 原地恢复在覆盖前另存现场。登记成功后默认回到恢复前的运行状态。若恢复前已停站，或恢复时显式指定 `--keep-stopped true`，登记成功后仍保持停止，由站长按[部署操作手册](DEPLOYMENT.md)单独启动。
+- 开站后查看 `status`，通过 HTTPS 登录并查看恢复前上传的图片。用已恢复的测试图片验证删除和配额退回，重试删除时配额只退回一次。
+
+登记前检查备份空间，停写后先生成并校验 `register-*` 备份。登记或独立诊断失败时保持停站。自动启动后健康检查失败时，脚本尝试停止应用并保留标记。运行中的遗留 tools 容器会使重试被拒绝，由站长核对本次维护容器。
 
 实现验收包括下列场景；实际结果与尚待家庭 Server 完成的项目以实现 PR 为准：
 
