@@ -1,42 +1,143 @@
 # 部署操作手册
 
-所有 Server 命令由站长执行。按步骤逐条运行，失败即停；不要把整章一次粘贴执行。发布包不可改文件或重算校验和；保留旧包、镜像和备份。秘密配置、证书私钥不随发布包传输，也不输出到终端或日志。以下默认根目录 `/srv/artzoo`、Compose 项目 `artzoo`、运行用户 UID/GID `1000:1000`；已有站点使用原值，跨版本保持一致。不要 sudo 整个维护脚本。
+这份手册写给站长本人：怎么发新版本、怎么备份和恢复、出问题时怎么办，以及第一次搭建新站点的步骤。所有命令都由站长亲自执行。
 
-## 1. 日常发版：构建、传输、升级、验证与回退
+> 本文件会随每个发布包一起交付。在服务器上请以**当前发布包里附带的 DEPLOYMENT.md** 为准，它和那个版本的脚本是配套的。
 
-本节面向已经可用的站点，正常发版不需要重新初始化或查看其他章节。首次部署用第 3 节。家庭 Server 必须已启动并保持常驻；升级不负责开启 WSL。正式服务器使用同一发布包和维护命令，仅传输方式不同。
+---
 
-### 1.1 Dev：构建完整发布包（仓库根目录）
+## 0. 开始之前
 
-1. 将本次改动通过 PR 合并到 `main`，在干净工作区更新代码；有未提交内容时先处理，不强制切分支或覆盖文件。
+### 0.1 三个地方
 
-   ```bash
-   git status --short
-   git switch main
-   git pull --ff-only origin main
-   node scripts/check-rules.mjs --base origin/main
-   pnpm format:check && pnpm lint && pnpm typecheck && pnpm build
-   ```
+| 名称 | 是什么 | 在这里做什么 |
+|---|---|---|
+| **Dev** | 开发用的 WSL（`ArtZoo-FC-Dev`），有源码 | 构建发布包 |
+| **Server** | 运行网站的机器。家庭是 WSL `ArtZoo-FC-Server`，以后是正式 Linux 服务器 | 导入发布包、升级、备份、恢复 |
+| **Windows** | 家庭电脑本身 | 把发布包从 Dev 复制到 Server；用固定入口启停家庭网站 |
 
-2. 家庭 Dev 确认 `docker info --format '{{json .SecurityOptions}}'` 包含 `rootless`；保持现有隔离配置。需要构建代理时设置 `ARTZOO_BUILD_PROXY=http://10.0.2.2:7890`，端口按本机实际值；代理不得含账号密码。构建三镜像完整包，不加 `--allow-dirty` 或单镜像 `--target`：
+Server 上没有源码，也不需要 Node、pnpm、Python，只需要 Docker、Docker Compose 和 Caddy。
 
-   ```bash
-   bash scripts/deployment-images.sh build --output "$(dirname "$PWD")/artzoo-runtime-releases"
-   ```
+网站以**发布包**的形式交付：一个版本一个目录，名字形如 `git-<12 位提交号>-<UTC 时间>-<随机数>`。目录里有三个镜像（web、worker、tools）、校验和、运行配置模板、维护脚本和这份手册。`dev-` 开头的是开发测试包，不用于正式发版。
 
-3. 成功后复制输出的完整版本目录，记录版本名。随包已包含维护脚本、配置模板及本手册，无须另外复制文件。核对包并测量大小：
+### 0.2 Server 上的目录
 
-   ```bash
-   read -r -p 'Dev 完整发布目录：' bundle
-   bash scripts/deployment-images.sh verify "$bundle"
-   du -sb "$bundle"
-   ```
+| 位置 | 内容 |
+|---|---|
+| `/srv/artzoo/releases/<版本>/` | 各版本的发布包。保留旧版本，不修改里面的文件 |
+| `/srv/artzoo/secrets/compose.env` | 运行配置，含数据库密码、邀请密钥、短信凭证。权限 0600；不在备份里，要另外离线保存一份 |
+| `/srv/artzoo/media/{original,derived,avatars}` | 上传的原图、缩略图和预览图、头像 |
+| `/srv/artzoo/backups/` | 备份（默认位置） |
+| `/srv/artzoo/deploy/` | 部署记录：`current`（当前版本）、`previous`（可回退的上一版）、`history.log`、`backup-last` 等，见 7.2 |
+| Docker 卷 `artzoo_postgres-data` | 数据库 |
+| `/etc/caddy/Caddyfile`、`/var/lib/caddy/` | Caddy 配置、证书和私钥 |
 
-   2026-11-16 实测并校验的完整包 `git-f53effefd26a-20261115141618-27895` 为 **557,236,851 字节，约 557 MB（531 MiB）**；其中 `images.tar` 为 557,082,112 字节。该包用于说明实际体量，不代表今后的当前版本。未超过约 1 GB；以后超过时在 PLAN 技术改进中登记“发布包压缩或增量传输”，本流程不实现。
+### 0.3 几条规矩
 
-### 1.2 传输：家庭和正式服务器二选一
+- **一次只执行一步**，看到成功标志再做下一步；失败就停下处理，不要整段粘贴。
+- 标着 **【危险】** 的命令会停站、覆盖数据或重启服务，要单独执行，执行前确认变量是对的。
+- Server 上用 **UID/GID 1000 的运行用户**执行维护脚本，**不要 `sudo` 整个脚本**；需要权限时脚本会自己请求 `sudo`。
+- 不修改发布包里的任何文件，不重算校验和；不为了省事删除旧发布包、旧镜像或备份。
+- 不手动删除 `deploy/` 里的标记文件来绕过检查。
+- 密码、密钥、证书私钥不放进发布包，不打印到终端，不发给 AI。
 
-**家庭：Windows PowerShell，任意目录。** 沿用站长的 `Copy-Item` 跨 WSL 直接复制方式，不经过 Windows 中转目录。输入版本名和 Dev 发布包父目录的完整 UNC 路径（以 `\\wsl.localhost\ArtZoo-FC-Dev\` 开头，后接实际 Linux 目录）。只复制该版本目录；Server 的 releases 目录应已存在。
+### 0.4 每次打开 Server 终端，先设置变量
+
+家庭 Server：先在 Windows 用固定入口 `-status` 确认看到 `Resident: running`（3.2），再打开 Server 终端。这样 WSL 不会在你操作到一半时被关闭。
+
+```bash
+root=/srv/artzoo
+backups=/srv/artzoo/backups     # 备份放在别的盘时改成那个目录，以后每次都用同一个
+read -r bundle _ < "$root/deploy/current"
+printf '当前发布包：%s\n' "$bundle"
+```
+
+- `bundle` 是当前正在运行的发布包，第 3、4 节的命令都用它。第 5 节（搭建新站点）还没有 `current` 记录，按那一节自己设置变量。
+- 项目名默认 `artzoo`，下面的命令都省略了 `--project`。项目名决定用哪个数据库卷，站点建好后所有版本都不能改。如果你的站点用了别的项目名，每条维护命令都要加 `--project 项目名`。
+- 查看维护命令的完整用法：`bash "$bundle/deployment-maintenance.sh" --help`。
+
+---
+
+## 1. 速查
+
+| 我要…… | 看哪里 |
+|---|---|
+| 看网站是否正常 | 3.1 |
+| 发布新版本 | 第 2 节 |
+| 新版本有问题，退回上一版 | 2.6 |
+| 启动或停止网站 | 3.2 |
+| 手动备份一次 | 3.3 |
+| 检查定时备份 | 3.4 |
+| 从备份恢复 | 第 4 节 |
+| 第一次搭建新站点（正式服务器上线） | 第 5 节 |
+| 看到报错不知道怎么办 | 第 6 节 |
+
+家庭 Server 和正式服务器用同一套发布包和维护命令，区别只有这些：
+
+| | 家庭 Server | 正式服务器 |
+|---|---|---|
+| 发布包怎么传过去 | Windows PowerShell 复制（2.2） | 在 Dev 上用 rsync（2.2） |
+| 启动和停止 | Windows 固定入口 `-start` / `-stop` | 维护脚本 `start` / `stop`，再加 Caddy |
+| HTTPS | 固定局域网 IP + Caddy 内部证书，浏览器会提示证书不受信任，可以手动继续 | 域名 + 自动申请的证书 |
+| 首位超管 | 在 Server 的 WSL 终端里创建 | 必须在服务器的真实控制台（如 VNC）创建，SSH 不行 |
+| 一次性环境配置 | 仓库里的 `docs/HOME_WSL_SETUP.md` | 无 |
+
+---
+
+## 2. 发布新版本
+
+流程：Dev 构建发布包 → 复制到 Server → 校验和导入 → 【危险】升级 → 验证。升级会停站几分钟（期间打开网站会看到 502），脚本自动先备份再迁移数据库，不需要手动迁移。
+
+### 2.1 Dev：构建发布包
+
+在 Dev 的仓库根目录执行。
+
+**第 1 步：更新到最新的 main 并检查。** 本次改动应该已经通过 PR 合并到 `main`。
+
+```bash
+git status --short                 # 应该没有输出；有未提交的改动先处理
+git switch main
+git pull --ff-only origin main
+node scripts/check-rules.mjs --base origin/main
+pnpm format:check && pnpm lint && pnpm typecheck && pnpm build
+```
+
+全部通过再继续。
+
+**第 2 步：确认 Dev 的 Docker 是 rootless 模式。**
+
+```bash
+docker info --format '{{json .SecurityOptions}}'
+```
+
+输出里要有 `rootless`。没有就停下：家庭 Dev 必须用 rootless Docker，否则会影响 Server 的网络（见 `docs/HOME_WSL_SETUP.md`）。
+
+**第 3 步：构建。** 需要走代理下载时，先设置构建代理（端口按 FLClash 的实际端口；代理地址里不能带账号密码）：
+
+```bash
+export ARTZOO_BUILD_PROXY=http://10.0.2.2:7890     # 不需要代理就跳过这一行
+bash scripts/deployment-images.sh build --output "$(dirname "$PWD")/artzoo-runtime-releases"
+```
+
+成功时会打印 `发布包已完成：<完整目录>`，记下这个目录；目录的最后一段就是版本名。
+
+不要加 `--allow-dirty` 或 `--target`，那样得到的是 `dev-` 开头的测试包。
+
+**第 4 步：校验刚构建的包。**
+
+```bash
+read -r -p '刚构建的发布包完整目录：' new
+bash scripts/deployment-images.sh verify "$new"
+du -sh "$new"
+```
+
+看到 `PASS: 发布包文件校验完成。`。包目前约 560 MB；如果以后超过 1 GB，在 PLAN 的技术改进里登记"发布包压缩或增量传输"。
+
+### 2.2 复制到 Server
+
+二选一。
+
+**家庭：在 Windows PowerShell 里执行（任意目录）。** 直接从 Dev 的 WSL 复制到 Server 的 WSL，不经过 Windows 中转目录。要输入两样东西：版本名，以及 Dev 上发布包**父目录**的 UNC 路径（以 `\\wsl.localhost\ArtZoo-FC-Dev\` 开头，后面接 Linux 路径，用反斜杠分隔）。
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -58,569 +159,831 @@ Copy-Item -LiteralPath $src -Destination $dst -Recurse -Force
 Write-Host "复制完成：$dst"
 ```
 
-复制失败只留下未完成的新目录，旧站不受影响；不要导入、升级或覆盖重传。先核对失败目录，另选全新目标重新复制；复制完成仍须在 Server 校验。
+看到 `复制完成：...` 即可。中途失败时旧网站不受影响；不要导入或升级这个不完整的目录，查明原因后复制到一个**新的**目标，不要覆盖。复制完都要在 Server 上校验（2.3）。
 
-**正式服务器：Dev 终端，仓库根目录。** 服务器需已配置 SSH 和 `rsync`，且运行用户可写 `/srv/artzoo/releases/`；不把密码写在命令中。`bundle` 为上一步的 Dev 版本目录，目标同名版本应尚未交付使用：
-
-```bash
-read -r -p 'SSH 目标（用户@主机或已配置别名）：' remote
-rsync -a --partial -e ssh -- "$bundle" "${remote}:/srv/artzoo/releases/"
-```
-
-源目录末尾不加 `/`，这样传输的是整个版本目录。中断时仅对同一个未交付的新包重复此命令续传，不覆盖已使用的发布目录；不要加 `--delete`。传完登录服务器，执行下面的 `verify`，通过前不导入、不升级。
-
-### 1.3 Server：校验、导入与升级前检查（任意目录）
-
-1. 重新输入 **Server 内**的新包路径，不沿用 Dev 的变量；核对站点地址、项目和旧版本。备份目录若原来在另一块盘，继续填原目录。以下示例使用默认值：
-
-   ```bash
-   read -r -p 'Server 新包完整目录：' bundle
-   read -r -p '站点 HTTPS 地址（无尾斜杠）：' origin
-   root=/srv/artzoo
-   project=artzoo
-   backups="$root/backups"
-   bash "$bundle/deployment-images.sh" verify "$bundle"
-   bash "$bundle/deployment-images.sh" import "$bundle"
-   bash "$bundle/deployment-images.sh" check "$bundle"
-   bash "$bundle/deployment-maintenance.sh" config-check --bundle "$bundle" --root "$root" --project "$project"
-   ```
-
-   `verify` 只核对文件；`import` 核对镜像 ID 并导入，不替换网站；`check` 使用临时容器验收。此处不加 `--database`。配置不合格时只报告变量名；站长用 `editor "$root/secrets/compose.env"` 私下补齐，再运行 `config-check`，不复制新模板覆盖已有秘密。
-
-2. 确认当前站点健康；`current` 是数据记录，不是符号链接，也不能 `source`：
-
-   ```bash
-   from_args=()
-   if test -f "$root/deploy/current"; then
-     read -r current current_release current_schema < "$root/deploy/current"
-     bash "$bundle/deployment-maintenance.sh" status --root "$root" --project "$project"
-   else
-     read -r -p '当前正在运行的旧发布包完整目录：' current
-     from_args=(--from "$current")
-     bash "$bundle/deployment-maintenance.sh" status --bundle "$current" --root "$root" --project "$project"
-   fi
-   printf '升级前发布目录：%s\n' "$current"
-   ```
-
-   缺少 `current` 才使用 `--from`，脚本会核对旧容器后登记；已有记录时不传。状态不符、版本相同、旧包或镜像丢失时先排查，不删除记录绕过。升级不会更换 PostgreSQL 镜像；未知或被改写的历史迁移会被拒绝。
-
-3. 避免定时备份与升级冲突。已安装定时任务时记录原状态并暂停调度，未安装则保持变量为 `0`：
-
-   ```bash
-   timer_was_active=0
-   if systemctl is-active --quiet artzoo-backup.timer; then
-     timer_was_active=1
-     sudo systemctl stop artzoo-backup.timer
-   fi
-   systemctl is-active artzoo-backup.service
-   df -h "$root" "$backups" 2>/dev/null
-   ```
-
-   服务仍为 `active`/`activating` 时等备份完成，不杀进程；`inactive` 或未安装表示无需等待。备份目录尚不存在时检查其父目录空间。预留新旧镜像、完整数据库及媒体备份空间，并确保宿主机没有其他媒体写入者。若此时取消发版，恢复原本开启的 timer；网站尚未停服。即使未暂停 timer，维护锁也会让同时触发的备份安全失败，新入口会记录 `maintenance-locked`，不会与升级并发停站或写备份。
-
-### 1.4 【危险：停服升级】Server 单独执行
+**正式服务器：在 Dev 的仓库根目录执行。** 前提：Dev 能用 SSH 登录服务器（不要把密码写进命令）；服务器装有 `rsync`；运行用户能写 `/srv/artzoo/releases/`。`$new` 是 2.1 第 4 步的目录。
 
 ```bash
-bash "$bundle/deployment-maintenance.sh" upgrade --bundle "$bundle" --root "$root" --project "$project" --backup-dir "$backups" "${from_args[@]}"
+read -r -p 'SSH 目标（用户@主机，或 ssh 配置里的别名）：' remote
+rsync -a --partial -e ssh -- "$new" "${remote}:/srv/artzoo/releases/"
 ```
 
-脚本检查配置和迁移，列出待执行迁移；随后停 web、worker，强制备份，迁移，重建新镜像并检查健康，成功后更新 `deploy/current`、`deploy/previous` 和 `deploy/history.log`。无新增迁移也可以发布代码小改动；同版本重复升级会拒绝。停服期间 HTTPS 可能显示 502。此步骤不需要另行手动 `migrate`，也没有跳过备份选项。
+- `"$new"` 末尾不要加 `/`，这样传过去的是整个版本目录。
+- 不要加 `--delete`。中断了，就对**同一个还没用过的新包**重新执行这条命令续传。
 
-迁移开始前失败，会尝试启动旧版；先用原包 `status` 确认恢复。迁移开始后失败则保持停站，按输出的准确回退命令执行 1.6，不直接 `start`。任何失败都保留新旧包、备份及控制文件。
+### 2.3 Server：校验、导入、预检
 
-### 1.5 Server：验证并恢复日常维护
+在 Server 终端执行，先按 0.4 设置好变量。
 
-1. 看到 `PASS: upgrade` 后检查版本、服务和媒体身份。检查期间暂停上传、删除媒体：
-
-   ```bash
-   read -r current current_release current_schema < "$root/deploy/current"
-   bash "$bundle/deployment-maintenance.sh" status --root "$root" --project "$project"
-   bash "$bundle/deployment-maintenance.sh" media-identity --root "$root" --project "$project"
-   cat "$root/deploy/current" "$root/deploy/previous"
-   tail -n 5 "$root/deploy/history.log"
-   curl --fail --noproxy '*' http://127.0.0.1:13100/api/health
-   ```
-
-   后端端口若已有定制，使用原端口。应返回 `{"ok":true}`；`current` 指向新包，`previous` 保留旧包及升级前备份，最新历史为 `upgrade ... result=success`。媒体诊断退出码 `0` 才表示一致；`2` 表示不一致或无法检查，`1` 表示执行失败。不把 HTTP 健康等同于业务验收。
-
-2. 在浏览器和另一台家庭设备打开 `$origin`；家庭证书警告可以手动继续，正式域名须证书可信。验证登录、旧图显示、本次小改动，并上传、删除一张测试照片，确认配额退回。失败先停止验收，按 1.6 决定回退；不要把失败版本标为发布成功。
-3. 已按第 2 节迁移到固定启动器的定时备份会自动跟随 `deploy/current`，升级、回退无需修改 service。恢复原调度：
-
-   ```bash
-   if test "$timer_was_active" = 1; then sudo systemctl start artzoo-backup.timer; fi
-   systemctl list-timers artzoo-backup.timer
-   bash "$bundle/deployment-maintenance.sh" status --root "$root" --backup-dir "$backups"
-   ```
-
-   未安装 timer 跳过。仍使用旧 service 的站点先完成第 2 节的一次性迁移。检查最近备份结果；升级本身不会触发日常备份，上一条结果可能属于旧版本。固定 Windows 常驻入口也自动读取 `deploy/current`，无需修改参数、重新复制入口或重启当前隐藏常驻进程。
-
-### 1.6 【危险：回退会丢弃升级后数据】Server 单独执行
-
-迁移后失败时优先复制脚本打印的完整命令。升级成功后主动回退时，保持 `bundle` 为**本次新包（升级控制包）**，不要先改为旧包；`root`、`project`、`backups` 沿用本章值：
+**第 1 步：校验并导入新包。** 输入 Server 上的路径（例如 `/srv/artzoo/releases/<版本名>`），不要用 Dev 上的路径。
 
 ```bash
-bash "$bundle/deployment-maintenance.sh" rollback --bundle "$bundle" --root "$root" --project "$project" --backup-dir "$backups"
+read -r -p 'Server 上新发布包的完整目录：' new
+bash "$new/deployment-images.sh" verify "$new"
+bash "$new/deployment-images.sh" import "$new"
+bash "$new/deployment-images.sh" check "$new"
 ```
 
-回退在停站和覆盖前检查旧包是否支持媒体登记；不支持就拒绝，运行中的网站保持原状，已因迁移失败停站的网站继续停止。通过后另存当前状态、恢复 `previous` 记录的升级前数据库与媒体、重建并核对旧镜像容器，但不启动 web、worker。成功后 `current` 改回旧包，历史记录 `rollback ... result=success`，消耗 `previous` 并删除升级 `pending`，留下值为 `running` 的 `media-registration.pending`。只支持一级回退，不执行逆向迁移。
+依次应该看到：
 
-看到 `PASS: rollback` 后网站仍停止，必须执行输出的完整 `media-reregister` 命令；`start` 和 Windows 固定入口都会拒绝提前开站。恢复媒体会改变 inode，登记须全量核验内容。沿用本章变量时，先读取恢复后的旧包：
+- `PASS: 发布包文件校验完成。`——只核对文件和校验和。
+- `PASS: 镜像已导入并核对；运行中的服务未变更。`——导入镜像，不影响正在运行的网站。重复导入同一版本是安全的。
+- `PASS: 发布包镜像验证完成；……`——用临时容器检查镜像，结束后自动清理。这里不要加 `--database`。
 
-```bash
-read -r current current_release current_schema < "$root/deploy/current"
-```
-
-【危险：停写并重新登记】Server 单独执行；登记会先备份，逐项核对内容后原子更新身份，不清零用量：
-
-```bash
-bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$current" --root "$root" --project "$project" --backup-dir "$backups"
-```
-
-登记成功后按 `running` 标记自动启动旧版本并检查健康；再执行 `status`、`media-identity`，检查登录、旧图、删图退额及 `history.log`。失败保持停站，保留备份和维护标记，不强开网站。按 1.5 查看最近备份结果并仅恢复原本开启的调度；新备份入口与 Windows 固定入口自动跟随 `current`，无需手工改版本。回退到不支持新备份入口的旧包时，按第 2 节的旧包步骤处理。升级后新增的数据消失是回退的预期结果。
-
-以上停站保护只随新控制包生效，已交付旧包不改文件、不重算校验和。旧包的 `rollback` 仍可能直接开站，不用它代替本流程；先取得包含本修复的完整控制包并校验。目标旧包还必须自带登记脚本和兼容 tools；不支持时保留现场，另行评审恢复方案，不把新 tools 强塞给旧包。
-
-
-## 2. 备份与恢复（Server，任意目录）
-
-所有命令由站长执行；先设置 `bundle` 为当前完整发布目录、`root=/srv/artzoo`，并运行 `bash "$bundle/deployment-maintenance.sh" status --root "$root"`。使用含备份、恢复及媒体登记功能的已校验完整包；旧包不可自行补文件或重算校验和。定制项目需给每条维护命令补同一个 `--project`。
-
-备份为 PostgreSQL custom dump、三个媒体目录的 tar、已完成迁移列表和清单（版本、PostgreSQL 镜像 ID、项目、大小、SHA-256）。媒体数字属主和权限保留；拒绝链接、特殊文件、路径穿越及嵌套挂载。`compose.env` 不进入备份；站长须另外离线保存秘密配置。备份目录仍含站点数据，必须按私有数据保管。
-
-### 手动备份与校验
-
-1. 默认备份位置为 `$root/backups`，`backup-*` 保留最近 7 份；`upgrade-*`、`register-*`、`rescue-*` 每类各保留最近 3 份，可用 `--keep-maintenance 1–99` 调整。可用 `--backup-dir` 指定另一块 Linux 文件系统上的专用目录，用 `--keep` 指定 1–9999 份；目录及父级不可由组/其他用户写入，目录须为 UID/GID 1000、0700，不可使用链接、空格或 Windows 挂载目录。不要让多个站点共用一个备份目录。以下选定保留 7 份：
-
-   ```bash
-   backups="$root/backups"
-   ```
-
-2. 停站前先检查备份所在文件系统的可用空间：至少为“数据库 `pg_database_size` + 三个媒体目录的内容字节数”之和 × 1.5 + 1 GB（1,000,000,000 字节，向上取整）。媒体按逻辑大小计算，避免稀疏文件在 tar 中展开时低估。空间不足会打印需要/剩余字节并拒绝，不停应用、不写维护标记、不留下 `.partial.*`；`backup`、`upgrade`、`rollback`、`media-reregister` 和 `restore` 的救援备份都适用。估算不能预留空间或阻止其他进程继续占用磁盘。
-
-3. 【危险：短暂停站】暂停 web、worker，保持宿主机不直接写媒体；数据库继续运行。备份成功后启动应用并检查健康，最后发布正式备份目录、清理超过保留数的旧备份：
-
-   ```bash
-   bash "$bundle/deployment-maintenance.sh" backup --bundle "$bundle" --root "$root" --backup-dir "$backups" --keep 7
-   ```
-
-4. 成功应出现 `PASS: backup` 和备份完整路径。复制该路径后只读验证；这会用无网络临时容器执行 `pg_restore --list`，不修改数据库或媒体：
-
-   ```bash
-   read -r -p '完整备份目录：' snapshot
-   bash "$bundle/deployment-maintenance.sh" backup-verify --bundle "$bundle" --root "$root" --backup "$snapshot"
-   ```
-
-5. 备份失败会尝试重新启动应用并检查健康，不删除旧备份；失败仍返回非零。检查 `status`，未恢复时执行本节末尾的【危险】启动步骤。`.partial.*` 是失败现场，不计入保留份数，也不自动删除；排查后由站长清理。断电、强制杀进程或 Docker 不可用不能保证自动重启，须人工检查。
-
-### 保留规则与只读统计
-
-`backup`、`upgrade`、`rollback`、`media-reregister` 成功后，在本次 `--backup-dir` 内按类别清理；失败时不清理。只删除同项目、同 PostgreSQL 镜像、完整校验通过且名称符合脚本格式的旧备份。各类按名称中的 UTC 创建时间排序；`deploy/previous` 引用、各类最新的一份和本次新备份始终保留，即使时钟回拨或因此超过保留数。损坏、其他项目/镜像、未知名称和 `.partial.*` 保留现场，不能靠调整保留数清除它们。空间不足时也不会先删旧备份腾空间。
-
-只读查看默认目录，或明确传入日常使用的外置备份目录：
+**第 2 步：确认当前网站正常。**
 
 ```bash
 bash "$bundle/deployment-maintenance.sh" status --root "$root" --backup-dir "$backups"
 ```
 
-“备份”段显示总磁盘占用、文件系统剩余字节、四类目录的份数和最新 UTC 创建时间，以及 `.partial.*` 数量；损坏目录照常计数，未知和临时目录列出供人工处理。统计不会逐份校验，恢复前仍须 `backup-verify`。没有备份时输出 0 和“无”，不创建目录。最新 `backup-*` 超过 36 小时、无可识别的日常备份，或可用空间低于下次备份估算值的 2 倍时输出“警告”；统计失败也仅告警，不改变原有站点检查和退出码。`status` 只接受 `--backup-dir`，不接受保留数量或 `--backup`。
+最后一行应该是 `PASS: status；项目 artzoo。`。不正常就先排查（第 6 节），不要带着问题升级。
 
-这些规则仅随新发布包生效；旧包仍按旧规则运行，不补文件或重算校验和。升级取得新包后，后续成功维护会处理指定目录内兼容的既有备份；换用不同备份目录时，其他目录不会自动清理。回退到旧包后须按该旧包的实际能力检查空间与保留情况，不能假定它具有新预检功能。
-
-### 原地恢复演练
-
-1. 先执行并验证一次备份，记录路径。登录家庭站，发一条日常、上传一张图片；记录旧图是否正常。
-2. 【危险：覆盖当前站点】执行以下命令。脚本重新核对校验和、归档路径、发布版本、数据库镜像和项目；不一致时在停站前拒绝。本流程只恢复当前版本的备份；跨版本退回上一版用 1.6 的 `rollback`，不手动改 `current` 或修改备份清单绕过。停站后自动创建 `rescue-*` 当前状态备份，成功才开始覆盖：
-
-   ```bash
-   bash "$bundle/deployment-maintenance.sh" restore --bundle "$bundle" --root "$root" --backup-dir "$backups" --backup "$snapshot"
-   ```
-
-3. 恢复清空并重建应用的 `public` schema，拒绝额外用户 schema；SQL 在单个事务中恢复，错误回滚。媒体随后清空、解包；恢复一律保持停站并写 `media-registration.pending`：恢复前 web、worker 均在运行则为 `running`，均停止则为 `stopped`；状态不一致时在停站前拒绝。仍接受 `--keep-stopped true`，强制登记后继续停站。数据库和文件不是同一事务：覆盖阶段任一步失败，保持停站，输出恢复前备份路径及带 `--keep-stopped true` 的恢复命令；排查后由站长单独执行。准备阶段失败仅在应用原本运行时尝试恢复启动，不启动原本已停的应用。
-4. 【危险：停写并重新登记】恢复成功仍保持停站；执行脚本输出的完整命令，或以下等价命令，成功须出现 `PASS: media-reregister`。登记前全量校验内容并更新身份；任一文件缺失或内容不符会拒绝。登记完成前 `start` 和 Windows 入口拒绝开站，失败保留停站标记，不删除标记绕过。
-
-   ```bash
-   bash "$bundle/deployment-maintenance.sh" media-reregister --bundle "$bundle" --root "$root" --backup-dir "$backups"
-   ```
-
-5. 标记为 `running` 时，登记成功会自动开站并检查健康，再运行 `status` 和 `media-identity`（退出码须为 0）。标记为 `stopped` 时仍停止；需要开站时，由站长单独执行【危险：恢复开站】`bash "$bundle/deployment-maintenance.sh" start --root "$root"`，然后检查。确认新增日常和新图消失、登录及旧图显示正常；删除一张恢复前已有的相册照片，核对配额恰好退回一次。
-6. 需要撤销本次恢复时，将输出的 `rescue-*` 完整路径作为 `--backup` 再执行第 2 步。恢复本身不清理备份；随后登记成功会按维护保留规则清理。需要长期保存的恢复点应由站长另外归档。
-
-旧发布包不会获得默认停站行为：若已有包支持登记和 `--keep-stopped true`，恢复时必须显式加该选项，登记后再单独 `start`；不支持则停止演练，先通过正常发版取得完整支持包。不要改写旧发布包。
-
-### 每日定时备份
-
-固定入口只安装一次；每次读取 `deploy/current` 的单行记录，校验可信路径、版本和完整发布包，再执行当前包的 `backup`。不 source 记录、不按目录时间猜版本。模板面向系统 Docker 的 Server，不安装到 Dev；UID/GID 1000 须无需 sudo 交互即可访问 Docker。以下步骤均在 Server 任意目录执行，沿用已校验的新包 `$bundle`、站点 `$root` 和备份目录 `$backups`。
-
-1. 首次安装或从旧 service 迁移前，记录 timer 是否开启并暂停；正在运行的备份须等其结束，不杀进程。已有单元先另存，`saved` 使用全新目录，不覆盖历史副本：
-
-   ```bash
-   timer_was_active=0
-   if systemctl is-active --quiet artzoo-backup.timer; then
-     timer_was_active=1
-     sudo systemctl stop artzoo-backup.timer
-   fi
-   systemctl is-active artzoo-backup.service
-   saved=$(mktemp -d "$root/deploy/backup-units.XXXXXXXX")
-   for unit in artzoo-backup.service artzoo-backup.timer; do
-     if test -f "/etc/systemd/system/$unit"; then sudo cp -a "/etc/systemd/system/$unit" "$saved/"; fi
-   done
-   cp "$bundle/artzoo-backup.service.example" "$saved/artzoo-backup.service.new"
-   cp "$bundle/artzoo-backup.timer.example" "$saved/artzoo-backup.timer.new"
-   editor "$saved/artzoo-backup.service.new"
-   ```
-
-   服务仍为 `active`/`activating` 时先等完成，确认网站健康再继续。候选 service 的 `ExecStart` 固定为 `/usr/local/libexec/artzoo-backup`；仅沿用站点的 `--root`、`--backup-dir`、`--keep`、`--keep-maintenance`（默认 3）。非默认项目加 `--project` 原项目名。启动器为 root 所有、0755，运行进程仍是 UID/GID 1000；以后发版不重复覆盖它。旧 service 的两处发布目录不再使用。
-
-2. 安装一次性启动器并替换单元（若固定入口已经存在，先核对其来源，不覆盖）。这些命令不启动备份；任何一步失败即停，用第 5 步回退单元：
-
-   ```bash
-   sudo install -d -o root -g root -m 755 /usr/local/libexec
-   if test -e /usr/local/libexec/artzoo-backup; then
-     printf '固定入口已存在，请核对来源和权限；不覆盖。\n'
-   else
-     sudo install -o root -g root -m 755 "$bundle/artzoo-backup-launcher.sh" /usr/local/libexec/artzoo-backup
-   fi
-   stat -c '%U:%G %a %n' /usr/local/libexec/artzoo-backup
-   sudo install -m 644 "$saved/artzoo-backup.service.new" /etc/systemd/system/artzoo-backup.service
-   sudo install -m 644 "$saved/artzoo-backup.timer.new" /etc/systemd/system/artzoo-backup.timer
-   sudo systemd-analyze verify /etc/systemd/system/artzoo-backup.service /etc/systemd/system/artzoo-backup.timer
-   sudo systemctl daemon-reload
-   ```
-
-   `stat` 应为 `root:root 755`，verify 须通过。timer 时间不变：北京时间 03:00，关机错过不补跑。旧发布包不补文件、不重算校验和；当前包须包含本次新入口与结果记录功能。回退到不支持的新入口之前的旧包时，固定入口会拒绝并记录 `bundle-invalid`；暂停 timer，由站长恢复另存的旧 service 并按旧手册核对版本，或正常升级回支持包后恢复新单元。
-
-3. 【危险：立即停站备份一次】单独触发服务，成功后才能恢复定时调度：
-
-   ```bash
-   sudo systemctl start artzoo-backup.service
-   ```
-
-4. 检查结果，并恢复原调度；首次安装需要每日备份时，单独执行【危险：启用每日停站备份】`sudo systemctl enable --now artzoo-backup.timer`。家庭 Server 再按第 1 节升级一个小版本，不改 service，重复第 3 步确认仍成功：
-
-   ```bash
-   systemctl show artzoo-backup.service -p Result -p ExecMainStatus
-   bash "$bundle/deployment-maintenance.sh" status --root "$root" --backup-dir "$backups"
-   sudo journalctl -u artzoo-backup.service -n 40 --no-pager
-   if test "$timer_was_active" = 1; then sudo systemctl start artzoo-backup.timer; fi
-   systemctl list-timers artzoo-backup.timer
-   ```
-
-   服务结果应为 `success`、`0`，`status` 的最近备份结果应为 `result=success`、当前 `release` 和实际 `backup` 路径。Windows 固定入口 `-status` 同样显示结果。`backup` 可省略 `--bundle`；固定脚本路径的需求应使用启动器，而非长期调用旧包脚本。
-
-   每次正常退出或可捕获中断都原子写入 `deploy/backup-last`：UTC 时间、成功/失败、版本、备份路径或固定原因代码。`pending`、`media-registration.pending`、`maintenance-locked` 表示维护未完成或锁被占用；`current-invalid` / `bundle-invalid` 表示记录或发布包异常；`preflight`、`space-check`、`snapshot-failed`、`restart-failed`、`publish-failed`、`prune-failed` 结合本次 journal 排查。失败会告警，原有 `status` 退出码不变；锁或 pending 拒绝前也显示最近结果。记录不可信时仅警告，不执行内容。根目录不可信、权限/磁盘故障可能无法写入；断电或 SIGKILL 无法保证记录，仍须结合备份时间和 journal。不要删除维护标记绕过失败。
-
-5. 回退本次单元迁移：停止 timer，等待正在运行的备份结束；从 `$saved` 恢复原有单元，运行 `systemd-analyze verify`、`daemon-reload`，确认网站健康后恢复原 timer 状态。首次安装没有旧单元时保持 timer 禁用。固定入口可保留，不删除备份、发布包或站点数据。WSL 常驻仍按附录 4.3 手动开启。
-
-### 日常查看与启停（Server，任意目录）
-
-设置 `bundle` 为当前已校验发布包、`root=/srv/artzoo`。`status/start/stop` 可以省略 `--bundle`，由 `deploy/current` 决定目标；不是让脚本路径固定到任意旧包。没有 `current` 的历史站点显式指定原包，升级时按第 1 节登记。
-
-- 只读状态：`bash "$bundle/deployment-maintenance.sh" status --root "$root"`。
-- 【危险：停止网站】先执行 `sudo systemctl stop caddy`，再单独执行 `bash "$bundle/deployment-maintenance.sh" stop --root "$root"`；同时停止数据库，保留容器和数据。
-- 【危险：启动网站】单独执行 `bash "$bundle/deployment-maintenance.sh" start --root "$root"`，成功再执行 `sudo systemctl start caddy`；检查健康、HTTPS、登录与旧图。启动不执行迁移或升级；媒体登记或升级待处理标记存在时，先完成相应恢复流程。
-
-## 3. 首次部署新站点（Server，任意目录）
-
-仅用于全新的独立站点；已有站点用第 1 节升级。家庭先完成附录的网络隔离准备；正式 Linux 服务器跳过整个附录。首次发布包构建与传输复用 1.1–1.2；正式服务器首位超管需要本机真实控制台（如 VNC），SSH 不能完成 `owner`。
-
-1. 使用 Ubuntu、systemd、UID/GID 为 `1000:1000` 的运行用户；安装 Docker 和 Docker Compose。已有环境跳过安装。
-2. 指定完整发布目录、站点地址和后端端口；导入前先校验文件。
-
-   ```bash
-   read -r -p '完整发布目录：' bundle
-   read -r -p '站点 HTTPS 地址（无尾斜杠）：' origin
-   root=/srv/artzoo
-   port=13100
-   bash "$bundle/deployment-images.sh" verify "$bundle"
-   bash "$bundle/deployment-images.sh" import "$bundle"
-   bash "$bundle/deployment-images.sh" check "$bundle"
-   ```
-
-3. 仅新站创建目录；已有站点不得执行以下初始化。以下命令逐步执行，任一步失败立即停止。
-
-   ```bash
-   sudo install -d -o 1000 -g 1000 -m 700 "$root/secrets" "$root/media" "$root/media/"{original,derived,avatars}
-   bash "$bundle/deployment-maintenance.sh" prepare-env --bundle "$bundle" --root "$root" --origin "$origin"
-   ```
-
-   创建配置后，用 `editor "$root/secrets/compose.env"` 私下填写短信配置和需要的配额；保持初始化阶段 `ARTZOO_MEDIA_BUDGET_ENABLED=0`。执行 `bash "$bundle/deployment-maintenance.sh" config-check --bundle "$bundle" --root "$root"`，通过后再建库。秘密配置另外离线保存，不进日常备份。
-
-4. 【危险：新建数据库】仅空站执行 `bash "$bundle/deployment-maintenance.sh" database --bundle "$bundle" --root "$root"`。
-5. 【危险：迁移空库】执行 `bash "$bundle/deployment-maintenance.sh" migrate --bundle "$bundle" --root "$root"`。
-6. 【危险：写入媒体基线】执行 `bash "$bundle/deployment-maintenance.sh" baseline --bundle "$bundle" --root "$root"`。
-7. 【危险：创建首位超管】在 Server 本机真实终端执行 `bash "$bundle/deployment-maintenance.sh" owner --bundle "$bundle" --root "$root"`；按提示输入，不能通过 SSH 执行。
-8. 【危险：启用应用】执行 `bash "$bundle/deployment-maintenance.sh" enable-budget --bundle "$bundle" --root "$root"`。
-9. 成功后 `deploy/current` 登记初始版本。确认 `curl --fail --noproxy '*' "http://127.0.0.1:$port/api/health"` 返回 `{"ok":true}`。失败即停止，不删除卷、不重复初始化。
-
-### 3.1 Server：配置 Caddy（任意目录）
-
-1. 已安装 Caddy 则跳过本步；新机器按 [Caddy 官方 Ubuntu 安装步骤](https://caddyserver.com/docs/install#debian-ubuntu-raspbian)执行：
-
-   ```bash
-   sudo apt install --yes debian-keyring debian-archive-keyring apt-transport-https curl gnupg
-   curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-   curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
-   sudo chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg /etc/apt/sources.list.d/caddy-stable.list
-   sudo apt update
-   sudo apt install caddy
-   ```
-
-2. 选择一种模板，复制到候选文件：
-   - 家庭局域网：`sudo install -m 644 "$bundle/Caddyfile.lan.example" /etc/caddy/Caddyfile.pending`；替换两处 `LAN_IP` 为固定局域网 IPv4。
-   - 正式域名：取得上线授权、完成域名解析后，执行 `sudo install -m 644 "$bundle/Caddyfile.public.example" /etc/caddy/Caddyfile.pending`；替换 `SITE_DOMAIN`。此模式需放行服务器 TCP 80、443，不用于当前家庭公网映射。
-3. 执行 `sudoedit /etc/caddy/Caddyfile.pending`；核对站点地址与 `$origin` 完全一致，后端端口与 `$port` 一致；保留 `127.0.0.1`，不添加 `trusted_proxies`、`header_up` 或访问日志。
-4. 校验候选文件，看到 `Valid configuration` 后备份原文件：
-
-   ```bash
-   sudo caddy fmt --overwrite /etc/caddy/Caddyfile.pending
-   sudo -u caddy -H caddy validate --config /etc/caddy/Caddyfile.pending --adapter caddyfile
-   caddy_backup=$(sudo mktemp /etc/caddy/Caddyfile.before-artzoo.XXXXXX)
-   sudo cp -p /etc/caddy/Caddyfile "$caddy_backup"
-   printf 'Caddy 备份：%s\n' "$caddy_backup"
-   ```
-
-5. 【危险：切换 HTTPS 入口】执行以下命令；失败按第 5 节恢复备份。
-
-   ```bash
-   sudo install -m 644 /etc/caddy/Caddyfile.pending /etc/caddy/Caddyfile
-   sudo systemctl reload caddy
-   systemctl show caddy -p ActiveState -p SubState
-   ```
-
-### 3.2 Server：验证代理并启用信任（任意目录）
-
-1. 重新设置第 3 节的 `bundle`、`root`、`origin`、`port`；确认对应当前运行版本。验证发布包后取得 tools 镜像：
-
-   ```bash
-   bash "$bundle/deployment-images.sh" verify "$bundle"
-   tools_image=$(awk '$1 == "tools" {print $2}' "$bundle/images.tsv")
-   test -n "$tools_image"
-   ca_mount=()
-   ```
-
-2. 仅局域网证书模式增加根证书挂载；正式域名跳过：
-
-   ```bash
-   ca_mount=(--mount type=bind,src=/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt,dst=/ca.crt,readonly)
-   ```
-
-3. 【危险：短暂加载测试路由】执行检查；60 秒内用另一台局域网设备打开打印的地址，核对 `source` 是该设备 IP、`protocol=https`、`host` 是站点地址。结束须出现两条 `PASS`；失败停止，先恢复 Caddy 配置。
-
-   ```bash
-   sudo docker --host unix:///var/run/docker.sock run --rm --network host \
-     --user 0:0 --cap-drop ALL --security-opt no-new-privileges --read-only \
-     --mount "type=bind,src=$bundle/deployment-https-check.mjs,dst=/check.mjs,readonly" \
-     "${ca_mount[@]}" --entrypoint node "$tools_image" /check.mjs "$origin" "$port" 60
-   ```
-
-4. 备份原覆盖文件（如有），再安装代理模板；秘密配置中的 `ARTZOO_TRUSTED_PROXY` 保持空值，仅 web 通过覆盖文件启用。
-
-   ```bash
-   sudo install -d -o 1000 -g 1000 -m 750 "$root/deploy"
-   proxy="$root/deploy/proxy.compose.yaml"
-   proxy_backup=''
-   if test -e "$proxy"; then
-     proxy_backup=$(mktemp "$root/deploy/proxy.before-artzoo.XXXXXX")
-     cp -p "$proxy" "$proxy_backup"
-   fi
-   sudo install -o 1000 -g 1000 -m 640 "$bundle/proxy.compose.yaml.example" "$proxy"
-   printf '代理备份（空值表示此前无覆盖）：%s\n' "$proxy_backup"
-   dc() { sudo env -i "PATH=$PATH" "HOME=$HOME" docker --host unix:///var/run/docker.sock compose --project-name artzoo --env-file "$bundle/images.env" --env-file "$root/secrets/compose.env" -f "$bundle/compose.yaml" -f "$proxy" "$@"; }
-   dc config --quiet
-   ```
-
-5. 【危险：重建 web】仅当前运行镜像与发布包一致时执行；短暂中断，不重建数据库或 worker。
-
-   ```bash
-   dc up -d --no-deps --no-build --pull never --force-recreate --wait web
-   bash "$bundle/deployment-maintenance.sh" status --bundle "$bundle" --root "$root"
-   ```
-
-6. 重新执行第 3 步（等待时间可改为 `0`），确认 HTTPS、健康检查、伪造代理头拒绝及原 Caddy 配置恢复全部通过。
-7. 从另一台设备检查：HTTPS 的 443 应可达；后端 13100、开发端口 3100、数据库 5432、Caddy 管理端口 2019 均不应向外开放。家庭防火墙和 Dev/Server 同时运行的验收见附录 4.2；正式服务器使用其主机防火墙和安全组，只开放所需的 SSH、HTTP/HTTPS 入口。
-
-## 4. 附录：家庭 WSL 专用
-
-独立正式 Linux 服务器跳过整个附录。以下保留家庭 rootless、mirrored、Windows 防火墙和手动常驻配置；当前实现不创建 Windows 开机或登录计划任务。
-
-### 4.1 家庭 WSL：网络与 Dev 隔离（独立 Linux 服务器跳过）
-
-1. Windows 管理员 PowerShell：备份现有配置；用 `wslconfig.example` 合并同名设置，保留其他设置。
-
-   ```powershell
-   $cfg = Join-Path $env:USERPROFILE '.wslconfig'
-   if (Test-Path -LiteralPath $cfg) {
-       Copy-Item -LiteralPath $cfg -Destination "$cfg.before-artzoo-$(Get-Date -Format yyyyMMddHHmmss)"
-   }
-   notepad.exe $cfg
-   ```
-
-2. Dev：确认 Docker 已是 rootless；已完成隔离的机器跳到第 7 步。
-
-   ```bash
-   docker info --format '{{json .SecurityOptions}}'
-   systemctl --user is-active docker
-   ```
-
-3. Dev：按 [Docker rootless 安装步骤](https://docs.docker.com/engine/security/rootless/)检查 `uidmap`、`rootlesskit`、`slirp4netns` 和 `/etc/subuid`、`/etc/subgid`；保留原 Docker 版本。切换前导出需要的镜像、备份容器数据，保留旧数据目录。
-4. 【危险：停止 Dev 容器】仅 Dev 执行 `sudo systemctl disable --now docker.service docker.socket`；安装并运行 `dockerd-rootless-setuptool.sh install`。Ubuntu `docker.io` 的脚本若位于 `/usr/share/docker.io/contrib/`，先将其中两个 `dockerd-rootless*.sh` 链接到 `/usr/local/bin/`。
-5. Dev 仓库根目录：确认 rootless 启动成功，再安装两份系统模板；已有同名配置先备份。以下模板对应 UID 1000。
-
-   ```bash
-   templates="$PWD/deployment"
-   test "$(id -u)" = 1000 && test "$(id -g)" = 1000
-   sudo systemctl mask docker.service docker.socket
-   sudo loginctl enable-linger "$(id -un)"
-   sudo install -m 644 "$templates/dev-docker.tmpfiles.conf.example" /etc/tmpfiles.d/artzoo-dev-docker.conf
-   sudo install -d /etc/systemd/system/user@1000.service.d
-   sudo install -m 644 "$templates/dev-user-retry.conf.example" /etc/systemd/system/user@1000.service.d/wsl-retry.conf
-   sudo systemctl daemon-reload
-   sudo systemd-tmpfiles --create /etc/tmpfiles.d/artzoo-dev-docker.conf
-   docker --host unix:///var/run/docker.sock info --format '{{json .SecurityOptions}}'
-   ```
-
-6. Dev：将导出的镜像导入 rootless Docker；核对镜像 ID 和需要的容器数据。出现差异立即停止；不要删除原 `/var/lib/docker`、`/var/lib/containerd`。需要 FLClash 代理时按下方步骤配置。
-7. 【危险：关闭两套 WSL】保存 Dev 工作；Server 仅在已安装 Caddy 时执行 `sudo systemctl stop caddy`；随后停止应用和数据库：`bash "$bundle/deployment-maintenance.sh" stop --bundle "$bundle" --root "$root"`；Dev 执行 `systemctl --user stop docker`；Windows 执行 `wsl --shutdown`。
-8. Windows：分别打开 `ArtZoo-FC-Dev` 和 `ArtZoo-FC-Server`；两边执行 `wslinfo --networking-mode`，确认 `mirrored`。
-9. Dev、Server：保持日常系统代理和 TUN 状态，各执行以下三项，均须退出码为 0、`HTTP=200 TLS_VERIFY=0`。
-
-   ```bash
-   curl --disable --fail --silent --show-error --output /dev/null --connect-timeout 8 --max-time 30 --write-out 'HTTP=%{http_code} TLS_VERIFY=%{ssl_verify_result}\n' https://github.com
-   curl --disable --ipv4 --noproxy '*' --fail --silent --show-error --output /dev/null --connect-timeout 8 --max-time 30 --write-out 'HTTP=%{http_code} TLS_VERIFY=%{ssl_verify_result}\n' https://github.com
-   curl --disable --ipv4 --noproxy '*' --fail --silent --show-error --output /dev/null --connect-timeout 8 --max-time 30 --write-out 'HTTP=%{http_code} TLS_VERIFY=%{ssl_verify_result}\n' https://archive.ubuntu.com/ubuntu/
-   ```
-
-10. 绕过代理超时时，关闭再开启 FLClash TUN 后重测；仍失败则按第 5 节回退，不继续开站。
-11. 【危险：恢复服务】Server 执行 `bash "$bundle/deployment-maintenance.sh" start --bundle "$bundle" --root "$root"`；已安装 Caddy 的机器再执行 `sudo systemctl start caddy`。
-
-#### Dev Docker 代理（Dev 仓库根目录）
-
-1. 确认 FLClash 本机 HTTP 代理端口；复制模板前备份已有同名文件。按实际端口替换模板中的 `7890`；保留内部网关 `10.0.2.2`。此配置允许 Dev 容器访问宿主回环服务，独立网络仍保留。
-2. 按 [Docker 用户服务代理配置](https://docs.docker.com/engine/daemon/proxy/)安装模板；若 `~/.config/docker/daemon.json` 已配置代理，先核对其优先级，不直接覆盖。
-
-   ```bash
-   mkdir -p "$HOME/.config/systemd/user/docker.service.d"
-   install -m 600 deployment/dev-docker-proxy.conf.example "$HOME/.config/systemd/user/docker.service.d/proxy.conf"
-   ```
-
-3. 【危险：重启 Dev Docker】保存开发容器工作后执行；同时确认 Server HTTPS 不间断。
-
-   ```bash
-   systemctl --user daemon-reload
-   systemctl --user restart docker
-   docker --host unix:///var/run/docker.sock pull docker/dockerfile:1
-   export ARTZOO_BUILD_PROXY=http://10.0.2.2:7890
-   ```
-
-4. 拉取成功后执行第 1 节构建。失败则恢复原 `proxy.conf`（此前无文件则移走新文件），重新加载用户服务并重启 Dev Docker；不调整 Server 配置。
-
-### 4.2 Windows：家庭局域网入口（管理员 PowerShell，任意目录）
-
-1. 路由器保留固定 IP；不配置公网端口映射。不关闭 Windows 或 Hyper-V 防火墙。
-2. 填入实际 IP、局域网 CIDR，仅放行 TCP 443；同名规则已存在时先核对，不覆盖。
-
-   ```powershell
-   $lanIp = Read-Host '固定局域网 IPv4'
-   $lanSubnet = Read-Host '允许访问的局域网 CIDR'
-   $wslCreator = '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}'
-   $rule = 'ArtZoo-HTTPS-LAN'
-   if (-not (Get-NetFirewallHyperVRule -Name $rule -ErrorAction SilentlyContinue)) {
-       New-NetFirewallHyperVRule -Name $rule -DisplayName $rule -Direction Inbound -Action Allow -VMCreatorId $wslCreator -Protocol TCP -LocalAddresses $lanIp -LocalPorts 443 -RemoteAddresses $lanSubnet
-   }
-   Get-NetFirewallHyperVRule -PolicyStore ActiveStore -Name $rule |
-       Select-Object Name, Enabled, Action, LocalAddresses, LocalPorts, RemoteAddresses
-   ```
-
-3. 本机浏览器、同一局域网手机分别访问站点；家庭证书警告可手动继续。需要消除警告时，仅从 Server 导出 Caddy 的 `root.crt` 并在设备安装、信任；不分发私钥。
-4. 从另一台局域网 Windows 电脑执行 `Test-NetConnection <站点IP> -Port <端口>`：443 应通过；13100、3100、5432、2019 均不应通过。Dev 构建镜像、运行临时开发容器期间，另一设备连续访问 Server，确认不中断。
-5. 【危险：重启 Dev 容器引擎】保存开发工作后，Dev 执行 `systemctl --user restart docker`；同时检查 Server 不中断。失败停止验收。
-
-### 4.3 家庭 WSL：手动常驻与媒体身份检查
-
-本节按站长本次要求采用**手动开启、手动关闭**，不创建 Windows 开机或登录计划任务。Windows 重启后要重新执行 `-start`。Microsoft 说明 [systemd 服务本身不会让 WSL 持续运行](https://learn.microsoft.com/en-us/windows/wsl/systemd)，因此由隐藏的前台 WSL 进程保持发行版存活。Linux 内已有 Docker、Caddy 的服务配置保留；本脚本不阻止其他软件或终端另行启动发行版。
-
-#### 固定 Windows 入口：开启、查看和关闭
-
-Windows 只保存一个小型控制脚本，默认操作 `ArtZoo-FC-Server`、站点 `/srv/artzoo`、项目 `artzoo`。不用输入发布包名或 Linux 绝对路径；每次从 `deploy/current` 读取当前部署记录，核对路径权限、包完整性及现有容器。不能把文件名最新的目录当成正在使用的版本。
-
-前提：Server 已完成部署并有有效 `deploy/current`；对应包须包含 `deployment-resident.sh` 和维护脚本。入口可以控制具备这些能力的已有完整包，不要求为了安装 Windows 入口重建网站，也不修改已交付包。旧站没有 `current` 时，先通过已授权的首次部署或 `upgrade --from` 建立记录；入口不猜版本、不自行初始化。升级或媒体恢复未完成时拒绝启动，保留现场。
-
-1. **首次安装，仅一次。** 使用仓库 `deployment/artzoo-resident.ps1` 或包含新入口的完整发布包内同名文件。在 Windows PowerShell 输入该文件的完整路径，复制为固定文件名；不是复制整个发布包。默认目录为当前用户的 `Documents\ArtZoo-FC`：
-
-   ```powershell
-   $source = Read-Host '新版 artzoo-resident.ps1 的完整路径'
-   $directory = Join-Path $env:USERPROFILE 'Documents\ArtZoo-FC'
-   New-Item -ItemType Directory -Path $directory -Force | Out-Null
-   $control = Join-Path $directory 'ArtZoo-FC-Server.ps1'
-   if (Test-Path -LiteralPath $control) { throw '固定入口已存在，请先核对，不覆盖' }
-   Copy-Item -LiteralPath $source -Destination $control
-   ```
-
-   已经安装固定入口则跳过；网站升级、回退后不用再次复制。只有 Windows 入口代码本身变化时才更新这一文件，更新前另存原入口。不要直接从 WSL UNC 路径运行入口，避免在查看关闭状态时唤醒发行版。不创建快捷方式、计划任务或开机自启。
-
-2. Windows PowerShell 进入固定目录，查看帮助或状态（任意工作目录可先执行下面的 `Set-Location`）：
-
-   ```powershell
-   Set-Location (Join-Path $env:USERPROFILE 'Documents\ArtZoo-FC')
-   .\ArtZoo-FC-Server.ps1
-   .\ArtZoo-FC-Server.ps1 -status
-   ```
-
-   无参数只显示用法；每次只选一个小写模式。PowerShell 从当前目录调用脚本要带 `.\`，不需要把目录加入 PATH。`-status` 显示已记录版本、发布目录、常驻、网站及 Caddy 检查结果。WSL 已关闭时只报告关闭，不读取包、不将其启动，也不把缓存当实时版本。常驻关闭但 WSL 仍运行时继续检查网站；有终端维持网站运行时，不误报网站已经停止。
-
-3. 【危险：启动网站】在这个 Windows 目录单独执行：
-
-   ```powershell
-   .\ArtZoo-FC-Server.ps1 -start
-   ```
-
-   自动选择当前部署包，启动隐藏常驻进程，再启动已有数据库、web、worker 和 Caddy；不建库、不迁移、不升级。Caddy 的 sudo 提示仍由站长在前台输入，不保存密码。看到 `Resident: running`、Caddy `active` 后，用手机访问 HTTPS。关闭所有 WSL 和 PowerShell 终端，等至少一分钟后再访问，确认常驻有效。重复启动不累积常驻进程；Windows 重启后需重新执行 `-start`。
-
-4. 【危险：停止网站】在同一目录单独执行：
-
-   ```powershell
-   .\ArtZoo-FC-Server.ps1 -stop
-   ```
-
-   正常停止 web、worker、数据库、Caddy 后释放常驻，成功显示 `Resident: stopped`。保留全部容器和数据，不执行 `wsl --shutdown` 或 `--terminate`，不影响 Dev。发行版已经关闭时直接报告关闭；停止服务失败时保留常驻，先排错再重试。
-
-5. 验证：依次查看 `-status`、执行一次【危险】`-start`、检查 HTTPS 与关闭终端后的访问，再单独执行【危险】`-stop`。下次正常升级或回退后，再用同一入口查看状态，确认记录及容器版本匹配。任何失败返回错误；不要通过删除 `current` 或维护标记绕过。回退入口更新时恢复原先另存的 Windows 文件，不恢复或修改站点数据。脚本被执行策略拦截时先核对来源，按本机策略处理这一文件，不永久降低全局执行策略。
-
-#### 只读媒体身份诊断
-
-Server 终端，设置当前 `bundle`、`root=/srv/artzoo`。检查期间不要上传或删除媒体，也不要直接修改宿主媒体；命令不自动停站，在线写入可能导致瞬时无法检查，需要在无写入时重测。数据库快照使用只读 SQL，诊断容器无网络、无秘密环境、根文件系统和三个媒体挂载只读；只会创建并清理维护锁、临时快照等控制文件。
+**第 3 步：暂停定时备份，确认没有备份在运行。** 升级和备份共用一把维护锁，同时触发时备份会安全失败；暂停定时器是为了不留下一条"备份失败"的记录。
 
 ```bash
-bash "$bundle/deployment-maintenance.sh" media-identity --bundle "$bundle" --root "$root"
-echo "退出码=$?"
+timer_was_active=0
+if systemctl is-active --quiet artzoo-backup.timer; then
+  timer_was_active=1
+  sudo systemctl stop artzoo-backup.timer
+fi
+echo "timer_was_active=$timer_was_active"
+systemctl is-active artzoo-backup.service
 ```
 
-JSON 中 `consistent` 为一致，`inconsistent` 为不一致，`unchecked` 为无法检查；`components` 是文件组件合计，`directories` 按实际子目录统计，`baseline` 单独比较整体媒体基线。整体基线只保存一个哈希，无法倒推出具体哪个根目录变化。`skippedCredited` 是已返还配额的历史组件；`skippedAggregate` 是不对应单文件的基线汇总记录，不计为一致文件。`skippedDatabase` 是存放在数据库 bytea 中的快捷图标，不参加磁盘身份比较。
+最后一条显示 `inactive`（或 `failed`，表示上次失败过）都说明现在没有在备份，可以继续；显示 `active` 或 `activating` 说明正在备份，等它结束，不要杀进程。没装定时备份的站点会显示 `inactive`。
 
-退出码 `0` 表示所有可检查项一致且没有无法检查项，`2` 表示发现不一致或无法检查，`1` 表示执行失败或快照不完整。缺失身份、未知类型、丢失文件、内容被改、链接或不可信权限均不会误报为一致。文件组件数为零只能证明基线检查结果，不能作为上传媒体验证通过的证据。诊断复用当前 tools 镜像的只读身份核对方法，不重新登记身份，不删除图片，不退还或清零配额。
+记住打印出来的 `timer_was_active`：中途换了终端这个变量会丢失，到时按它手动恢复（2.5 第 3 步）。如果这时决定不升级了，也按 2.5 第 3 步恢复定时器。
 
-#### 实测记录与重启顺序
+**第 4 步：看一眼磁盘空间。**
 
-各轮先记录版本、文件组件数、诊断 JSON 和退出码。确保有恢复前上传的图片及身份记录；没有非零一致样本就不能确认重启安全。检查完成后另做 HTTPS、登录、旧图显示验收。
+```bash
+df -h / "$root" "$backups" 2>/dev/null
+```
 
-- 恢复：按第 2 节完成备份及【危险】原地恢复，在停站状态分别记录登记前、登记后的诊断。文件重新写入可能使文件身份变化；根目录保留时整体基线仍可能一致。
-- 容器重启：【危险】Server 按第 2 节正常停止、启动已有容器，再检查诊断；无需重启 Windows 或 WSL。
-- Windows 重启，Dev 先启动：【危险】保存全部工作，先运行 `-stop`，再由站长重启 Windows。登录后先打开 Dev，再执行 `-start` 启动 Server，检查诊断与网站。
-- Windows 重启，Server 先启动：【危险】重复上述停站、保存、重启步骤；登录后先执行 `-start`，再打开 Dev，检查诊断与网站。先确认其他软件没有提前启动另一个发行版；否则本轮不能证明启动顺序。
+升级脚本会自己检查备份盘的空间，不够时在停站前就拒绝；但它不检查 Docker 自己的磁盘（新镜像和迁移都要用），也发现不了宿主机上直接写媒体目录的程序。确认 Docker 所在的盘（通常是 `/`）有余量，并且除了网站容器，没有别的程序在写 `/srv/artzoo/media`。
 
-记录中区分 Dev 临时项目结果与家庭 Server 实测结果。Windows 重启只能由站长安排，未实际完成就保留未验收状态，不用 `wsl --shutdown` 或容器重启冒充。恢复或启动顺序出现不一致时，按第 2 节执行已交付的媒体身份登记流程；登记失败保持停站，核对文件完整性和权限，不改身份算法或清零配额。
-## 5. 失败回退（只执行对应项）
+**第 5 步：检查新版本对配置的要求。**
 
-1. Caddy 候选校验失败：不安装候选文件，修改后重新校验。
-2. 【危险：恢复 Caddy】Server 执行 `sudo cp -p "$caddy_backup" /etc/caddy/Caddyfile && sudo systemctl reload caddy`；重新检查 HTTPS。
-3. 【危险：清除中断的测试路由】Server 执行 `sudo systemctl reload caddy`；确认 Caddy `active/running`，再检查 HTTPS。
-4. 【危险：恢复代理】还原 `$proxy_backup`；此前无覆盖则只移走本次新增的 `$proxy`。用原发布包、原覆盖文件重建 web；无覆盖时从 `dc` 定义移除 `-f "$proxy"`，再执行3.2 第 5 步。
-5. 【危险：恢复 WSL 网络】先按附录 4.1 第 7 步停服务；Windows 还原 `.wslconfig` 备份（原本不存在则移走本次创建的文件），执行 `wsl --shutdown`，重新启动并验证两套 WSL 联网。
-6. Dev rootless 失败：保留 rootless 与旧 Docker 数据，停止 Dev Docker 排查；不要在 Server 在线时重新启用 Dev rootful Docker。
-7. 防火墙规则不符合预期：Windows 管理员执行 `Remove-NetFirewallHyperVRule -Name ArtZoo-HTTPS-LAN`，只撤销本条规则。
+```bash
+bash "$new/deployment-maintenance.sh" config-check --bundle "$new" --root "$root"
+```
 
+看到 `PASS: config-check；配置符合发布包清单。` 就继续 2.4。不通过时只会列出变量名（`缺失：`、`多余：`、`格式不符：`），不显示值：
 
-8. 升级配置、包校验或迁移比较失败：在停站前修正；不删版本指针、不重置数据库。迁移前停站阶段失败，确认旧版已恢复；迁移开始后失败，按 1.6 单独执行输出的【危险】`rollback`。
-9. 备份失败：保留已有备份及 `.partial.*` 现场，检查服务是否自动恢复；断电或 Docker 不可用时人工核对。不要因失败删除最后一份有效备份。
-10. 恢复覆盖阶段、媒体登记或回退失败：保持停站，保留输出的 `rescue-*`、`register-*` 备份和维护标记；按报错核对内容、权限与空间。不要直接开站，或用旧脚本绕过标记。修复后再执行对应的【危险】恢复/登记命令。
-11. 定时备份失败：查看 `status` 中的最近备份结果（Windows 入口 `-status` 同样可见），按原因代码结合 `journalctl -u artzoo-backup.service` 排查；确认维护完成、站点健康后手动触发验证。已迁移的 service 自动跟随当前版本；旧 service 按第 2 节迁移。
+- 新版本**新增了变量**（`缺失：`）：用 `editor "$root/secrets/compose.env"` 补上，再执行一次 `config-check`。补上之后，正在运行的旧版本会把它当作"多余"的变量，`status`、备份和 Windows 入口都会拒绝，所以补完就直接做 2.4；决定不升级了，就把刚补的变量删掉。
+- 要求**修改已有变量的值**或删掉变量：先停下，交给 AI 给出步骤（原因见 7.5）。
+- 不要拿新模板覆盖已有的 `compose.env`。写法见 7.5。
+
+### 2.4 【危险：停站升级】
+
+单独执行这一条：
+
+```bash
+bash "$new/deployment-maintenance.sh" upgrade --bundle "$new" --root "$root" --backup-dir "$backups"
+```
+
+脚本会依次：核对新包和配置 → 列出要执行的数据库迁移（没有新迁移也可以升级）→ 检查备份空间 → 停止 web、worker → 做一份 `upgrade-*` 备份并校验，写入 `deploy/previous` → 执行迁移 → 用新镜像重建并启动 web、worker → 健康检查 → 更新 `deploy/current` 和 `deploy/history.log`。
+
+**成功**：最后看到 `PASS: upgrade。`，接着做 2.5。
+
+**失败**分两种，看输出：
+
+- **迁移开始之前失败**：大部分检查（配置、镜像、迁移列表、空间）都在停站之前，失败时网站根本没停；停站之后、迁移之前失败的，脚本会尝试重新启动旧版本。两种情况都执行 `bash "$bundle/deployment-maintenance.sh" status --root "$root"` 确认旧版本正常，查明原因后再升级。
+- **迁移开始之后失败**：网站保持停止，输出里有一条【危险】回退命令。不要执行 `start`，按 2.6 回退。
+
+不管哪种失败，新旧发布包、备份和 `deploy/` 里的文件都保留，不要删。同一个版本不能重复升级（会提示"相同版本"）。
+
+### 2.5 Server：验证新版本
+
+**第 1 步：检查服务和记录。** 检查期间先不要上传或删除图片。
+
+```bash
+read -r bundle _ < "$root/deploy/current"      # 现在应该是新包
+printf '当前发布包：%s\n' "$bundle"
+bash "$bundle/deployment-maintenance.sh" status --root "$root" --backup-dir "$backups"
+bash "$bundle/deployment-maintenance.sh" media-identity --root "$root"; echo "退出码=$?"
+cat "$root/deploy/current" "$root/deploy/previous"
+tail -n 3 "$root/deploy/history.log"
+curl --fail --noproxy '*' http://127.0.0.1:13100/api/health
+```
+
+应该看到：
+
+- 当前发布包是新包；`status` 最后一行是 `PASS: status；项目 artzoo。`
+- `media-identity` 的退出码是 `0`（`2` 和 `1` 的含义见 6.3）
+- `previous` 记着旧包和这次升级前的备份；`history.log` 最后一行是 `upgrade ... result=success`
+- `curl` 返回 `{"ok":true}`（改过 `ARTZOO_HTTP_PORT` 的话，把 13100 换成你的端口）
+
+**第 2 步：在浏览器里验收。** 用电脑和另一台设备打开网站（家庭 Server 的证书警告可以手动继续；正式服务器的证书必须受信任）。检查：能登录；旧图片正常显示；这次改动的功能正常；上传一张测试照片再删掉，确认配额退回。
+
+有问题就停止验收，决定是否回退（2.6）。健康检查通过不等于功能验收通过。
+
+**第 3 步：恢复定时备份。**
+
+```bash
+if test "$timer_was_active" = 1; then sudo systemctl start artzoo-backup.timer; fi
+systemctl list-timers artzoo-backup.timer
+```
+
+换过终端、`timer_was_active` 已经丢了的话：2.3 第 3 步打印的是 `timer_was_active=1`，就执行 `sudo systemctl start artzoo-backup.timer`。
+
+定时备份和 Windows 固定入口都会自动跟着 `deploy/current` 走，升级后不用改任何配置。升级本身不会触发日常备份，所以 `status` 里的"最近备份结果"可能还是旧版本那次。
+
+### 2.6 回退到上一版 【危险】
+
+回退就是用"旧版本镜像 + 这次升级前的备份"恢复。**升级之后写入的数据（新帖子、新图片、新账号等）都会丢失**，这是预期的。只能回退一级，不做反向迁移。
+
+**第 1 步：【危险：回退】** 必须用**这次升级用的新包**里的脚本执行。升级失败时脚本打印过回退命令的，直接复制那条执行；否则执行：
+
+```bash
+read -r _ _ _ new < "$root/deploy/previous"      # previous 的第 4 列就是这次升级用的新包
+bash "$new/deployment-maintenance.sh" rollback --bundle "$new" --root "$root" --backup-dir "$backups"
+```
+
+没有 `deploy/previous` 文件，说明没有可回退的版本（只能回退一级，已经回退过一次就没有了）。
+
+脚本会：检查旧包支持媒体登记、升级前的备份完好、空间足够（不通过就拒绝，网站保持原状）→ 停站 → 把当前状态另存为 `rescue-*` 备份 → 恢复升级前的数据库和媒体 → 用旧镜像重建容器，但不启动 → 写入登记标记，`current` 改回旧包。
+
+成功时看到 `PASS: rollback。` 和 `保持停站；登记成功后自动启动旧版本并检查健康。`，下面还打印一条【危险】`media-reregister` 命令。**这时网站仍然是停止的**，`start` 和 Windows 入口都会拒绝开站，必须先做第 2 步。
+
+**第 2 步：【危险：停写并重新登记媒体】** 恢复媒体后文件的磁盘身份变了，必须重新登记（原因见 `docs/adr/0004-media-file-identity.md`）。复制上一步打印的命令执行；输出找不到了，就执行下面这两行，它和打印的命令是同一条（用新包的脚本，登记旧包）：
+
+```bash
+read -r bundle _ new < "$root/deploy/current"     # 回退后：第 1 列是旧包，第 3 列是刚回退掉的新包
+bash "$new/deployment-maintenance.sh" media-reregister --bundle "$bundle" --root "$root" --backup-dir "$backups"
+```
+
+它会先做一份 `register-*` 备份，逐个核对文件内容，再一次性更新身份，不改配额用量。成功时看到 `PASS: media-reregister；原运行状态=running，……`，并自动启动旧版本、检查健康。
+
+**第 3 步：验证。** 同样用新包的脚本、指定旧包：
+
+```bash
+bash "$new/deployment-maintenance.sh" status --bundle "$bundle" --root "$root" --backup-dir "$backups"
+bash "$new/deployment-maintenance.sh" media-identity --bundle "$bundle" --root "$root"; echo "退出码=$?"
+tail -n 3 "$root/deploy/history.log"
+```
+
+`status` 通过、`media-identity` 退出码 0、`history.log` 最后一行是 `rollback ... result=success`。再在浏览器里检查登录、旧图片、删图后配额退回。然后按 2.5 第 3 步恢复定时备份。
+
+停站之前的检查不通过时网站保持原状；停站之后失败则网站保持停止，备份和标记都保留。不要强行开站，按第 6 节处理。
+
+**回退之后、下一次升级之前要注意**：`deploy/current` 的第 3 列仍然指向回退掉的新包，旧包的脚本每次都会校验它。如果新包比旧包多了交付文件（只有部署工具本身改过的版本才会这样），旧包的脚本认不出新包，会报 `发布包校验失败`。这时按 0.4 方式执行的日常命令、定时备份和 Windows 入口都会失败，只能像第 3 步那样用新包的脚本加 `--bundle 旧包`。遇到这种情况，尽快修好问题重新升级，并告诉 AI。
+
+---
+
+## 3. 日常维护
+
+先按 0.4 设置变量。
+
+### 3.1 查看状态（只读）
+
+```bash
+bash "$bundle/deployment-maintenance.sh" status --root "$root" --backup-dir "$backups"
+```
+
+正常时最后一行是 `PASS: status；项目 artzoo。`。它检查数据库、配额基线，web 和 worker 的镜像、挂载、端口、配置、日志设置是否和当前发布包一致，以及 web 的健康状态。开头还会显示备份情况：
+
+- 最近一次备份结果：`result=success`，或 `result=failed` 加原因代码（见 7.4）；
+- 备份目录占用、剩余空间、各类备份的份数和最新时间；
+- 出现 `警告：` 时要处理：最新的日常备份超过 36 小时、找不到日常备份、剩余空间不到下次备份估算值的 2 倍，或最近一次备份失败。
+
+备份统计不会逐份校验备份，恢复前仍要用 `backup-verify`（3.3）。
+
+其他只读检查：
+
+```bash
+bash "$bundle/deployment-maintenance.sh" media-identity --root "$root"; echo "退出码=$?"   # 媒体文件身份，见 6.3
+curl --fail --noproxy '*' http://127.0.0.1:13100/api/health                              # 应返回 {"ok":true}
+tail -n 5 "$root/deploy/history.log"                                                      # 最近的升级、回退记录
+```
+
+### 3.2 启动和停止
+
+**家庭 Server：用 Windows 固定入口。** 在 Windows PowerShell 里执行（入口的安装见 5.8）。先进入入口所在目录，查看状态（只读）：
+
+```powershell
+Set-Location (Join-Path $env:USERPROFILE 'Documents\ArtZoo-FC')
+.\ArtZoo-FC-Server.ps1 -status
+```
+
+【危险：启动网站】
+
+```powershell
+.\ArtZoo-FC-Server.ps1 -start
+```
+
+【危险：停止网站】
+
+```powershell
+.\ArtZoo-FC-Server.ps1 -stop
+```
+
+- `-status`：显示当前版本、发布目录、常驻进程、网站和 Caddy 的检查结果。WSL 没在运行时只报告已停止，不会把它启动。
+- `-start`：先启动一个隐藏的常驻进程，让 WSL 保持运行；再启动已有的数据库、web、worker 和 Caddy（Caddy 需要输入 sudo 密码）。不建库、不迁移、不升级。看到 `Resident: running` 和 Caddy `active` 后，可以关掉所有终端，网站继续运行。**Windows 重启后要重新执行一次 `-start`。**
+- `-stop`：停止 web、worker、数据库和 Caddy，再释放常驻进程，看到 `Resident: stopped`。数据和容器都保留，不关闭 WSL，不影响 Dev。停止中途失败时常驻进程会保留，先用 `-status` 看清状态再重试。
+
+入口每次都从 `deploy/current` 找当前版本，升级或回退后不用改它。有未完成的升级或媒体登记时，`-start` 会拒绝开站。
+
+**正式服务器（或不用 Windows 入口时）：** 停止和启动各分两步，每步单独执行。
+
+停止：
+
+```bash
+sudo systemctl stop caddy                                       # 【危险】第 1 步：先停 Caddy
+```
+
+```bash
+bash "$bundle/deployment-maintenance.sh" stop --root "$root"     # 【危险】第 2 步：停应用和数据库，容器和数据都保留
+```
+
+启动：
+
+```bash
+bash "$bundle/deployment-maintenance.sh" start --root "$root"    # 【危险】第 1 步：先启动数据库和应用
+```
+
+```bash
+sudo systemctl start caddy                                      # 【危险】第 2 步：成功后再启动 Caddy
+```
+
+`start` 成功会看到 `PASS: start；项目 artzoo。`，然后检查 HTTPS、登录和旧图片。`start` 只启动已有的容器，不建库、不迁移、不升级；有未完成的升级或媒体登记时会拒绝（第 6 节）。正式服务器重启后，用 3.1 的 `status` 确认网站已经恢复，没有恢复就按上面的步骤启动。
+
+### 3.3 手动备份 【危险：短暂停站】
+
+备份时网站会停一小会儿：脚本停止 web、worker（数据库继续运行），导出数据库、打包三个媒体目录并校验，然后重新启动应用、检查健康，最后才把备份放进备份目录，并清理超出份数的旧备份。
+
+```bash
+bash "$bundle/deployment-maintenance.sh" backup --root "$root" --backup-dir "$backups"
+```
+
+成功时看到 `备份已保存：<完整路径>` 和 `PASS: backup。`。停站前会先检查空间，不够就直接拒绝，网站不受影响。
+
+**校验某一份备份（只读）**：用一个不联网的临时容器检查数据库导出能否读取，不改数据库和媒体。
+
+```bash
+read -r -p '备份完整目录：' snapshot
+bash "$bundle/deployment-maintenance.sh" backup-verify --bundle "$bundle" --root "$root" --backup "$snapshot"
+```
+
+看到 `PASS: backup-verify。`。它只能校验**当前版本**做的备份；升级之后，旧版本做的备份（包括 `upgrade-*`）会被它拒绝，这不代表备份坏了。
+
+**备份失败时**：脚本会尝试重新启动应用，旧备份不会被删除。先用 `status` 看网站是否恢复，没恢复就按 3.2 启动。失败留下的 `.partial.*` 目录是现场，不计入份数，也不会被自动删除，排查后自己删掉。断电、强杀进程或 Docker 不可用时，脚本没法自动恢复网站，要人工检查。
+
+备份里有什么、保留几份、空间怎么算，见 7.3。
+
+### 3.4 定时备份
+
+装好以后（安装见 5.7），每天北京时间 03:00 自动执行一次 3.3 的备份；那时 Server 没开机就跳过，不会补。它通过固定启动器 `/usr/local/libexec/artzoo-backup` 读取 `deploy/current`，所以升级、回退后不用改配置。
+
+```bash
+systemctl list-timers artzoo-backup.timer                          # 下次运行时间
+systemctl show artzoo-backup.service -p Result -p ExecMainStatus   # 上次结果，正常是 Result=success、ExecMainStatus=0
+sudo journalctl -u artzoo-backup.service -n 40 --no-pager          # 上次的输出
+cat "$root/deploy/backup-last"                                     # 最近一次备份结果，status 里也会显示
+```
+
+暂停：`sudo systemctl stop artzoo-backup.timer`；恢复：`sudo systemctl start artzoo-backup.timer`。
+
+定时备份失败时，`status` 和 Windows 入口的 `-status` 都会显示警告和原因代码（见 7.4）。查明原因、确认没有维护操作在进行、网站健康后，可以手动触发一次验证：【危险：立即停站备份】`sudo systemctl start artzoo-backup.service`。
+
+---
+
+## 4. 从备份恢复（原地恢复）【危险】
+
+用一份备份覆盖当前站点的数据库和全部媒体，用于家庭 Server 演练或误操作后找回数据。注意：
+
+- 只能恢复**当前版本**做的备份（备份记录的版本必须和 `deploy/current` 一致）。要退回上一个版本请用 2.6 回退，不要手动改 `current` 或备份清单。
+- 恢复前脚本会自动把当前状态另存为 `rescue-*` 备份，恢复错了还能撤销（第 5 步）。
+- 恢复后必须做媒体登记（第 3 步），登记完成前网站保持停止。
+
+**第 1 步：选好备份并校验。** 也可以先按 3.3 做一份新备份再恢复它。
+
+```bash
+read -r -p '要恢复的备份完整目录：' snapshot
+bash "$bundle/deployment-maintenance.sh" backup-verify --bundle "$bundle" --root "$root" --backup "$snapshot"
+```
+
+演练时，可以在这之后登录网站发一条日常、传一张图，恢复后它们应该消失。
+
+**第 2 步：【危险：覆盖当前站点】**
+
+```bash
+bash "$bundle/deployment-maintenance.sh" restore --bundle "$bundle" --root "$root" --backup-dir "$backups" --backup "$snapshot"
+```
+
+脚本会：重新核对备份（校验和、版本、数据库镜像、项目，不符就在停站前拒绝）→ 停止 web、worker → 另存 `rescue-*` 备份 → 写入登记标记 → 在一个事务里重建数据库 → 清空并解包三个媒体目录 → 保持停站。
+
+成功时看到 `PASS: restore；保持停站，登记成功后应恢复状态=running`（恢复前网站是停着的则为 `=stopped`），下面打印一条【危险】`media-reregister` 命令。记下输出里 `备份已保存：` 后面的 `rescue-*` 路径。
+
+覆盖阶段失败时网站保持停止，脚本会打印当前状态的备份路径，以及一条带 `--keep-stopped true` 的恢复命令；查明原因后单独执行它。准备阶段失败时，如果网站原本在运行，脚本会尝试重新启动它。
+
+**第 3 步：【危险：停写并重新登记媒体】** 复制上一步打印的命令执行，或者执行：
+
+```bash
+bash "$bundle/deployment-maintenance.sh" media-reregister --root "$root" --backup-dir "$backups"
+```
+
+成功时看到 `PASS: media-reregister；原运行状态=……`。任何文件缺失或内容不符都会拒绝，网站保持停止。
+
+**第 4 步：开站并验证。**
+
+- 状态是 `running`：登记成功后已经自动开站并检查过健康。
+- 状态是 `stopped`（恢复前网站本来就停着，或者第 2 步加了 `--keep-stopped true`）：网站仍然停止，需要时按 3.2 启动。
+
+然后执行 3.1 的 `status` 和 `media-identity`（退出码 0），登录看旧图片；删除一张恢复前就有的相册照片，确认配额恰好退回一次。演练时确认第 1 步之后发的日常和图片已经消失。
+
+**第 5 步（需要时）：撤销这次恢复。** 把第 2 步输出的 `rescue-*` 路径当作 `--backup`，重新做第 2–4 步。
+
+恢复本身不清理备份，之后登记成功时会按保留规则清理（7.3）。需要长期保存的恢复点，另外复制归档。
+
+---
+
+## 5. 第一次搭建新站点
+
+只用于**全新的空站点**（例如正式服务器上线）。已经在运行的站点用第 2 节升级，绝对不要再执行这里的初始化命令。
+
+开始前：
+
+- 家庭 WSL 先完成 `docs/HOME_WSL_SETUP.md` 里的一次性配置；独立的 Linux 服务器不需要。
+- 正式服务器的首位超管必须在服务器的**真实控制台**（例如云厂商的 VNC）上创建，SSH 不行（5.4 第 4 步）。
+- 发布包按 2.1 构建。
+
+### 5.1 准备主机
+
+使用 Ubuntu + systemd，有一个 UID 和 GID 都是 1000 的运行用户，装好 Docker 和 Docker Compose（已经有就跳过）。然后创建发布包目录，再按 2.2 把发布包复制进去：
+
+```bash
+sudo install -d -o 1000 -g 1000 -m 755 /srv/artzoo/releases
+```
+
+### 5.2 导入发布包
+
+```bash
+read -r -p '发布包完整目录：' bundle
+read -r -p '站点 HTTPS 地址（例如 https://192.168.1.10，不要结尾斜杠）：' origin
+root=/srv/artzoo
+backups=/srv/artzoo/backups
+port=13100
+bash "$bundle/deployment-images.sh" verify "$bundle"
+bash "$bundle/deployment-images.sh" import "$bundle"
+bash "$bundle/deployment-images.sh" check "$bundle"
+```
+
+三条都看到 `PASS`。后面 5.3–5.6 都在这个终端里做；中途换了终端，重新执行前五行设置变量。
+
+### 5.3 创建目录和配置
+
+**第 1 步：创建目录并生成配置**（只在新站执行）。
+
+```bash
+sudo install -d -o 1000 -g 1000 -m 700 "$root/secrets" "$root/media" "$root/media/"{original,derived,avatars}
+bash "$bundle/deployment-maintenance.sh" prepare-env --bundle "$bundle" --root "$root" --origin "$origin"
+```
+
+看到 `PASS: prepare-env；配置已创建，权限 0600，配额关闭。`。数据库密码和邀请密钥已经自动随机生成。
+
+**第 2 步：填写短信等配置。**
+
+```bash
+editor "$root/secrets/compose.env"
+```
+
+- 需要短信（邀请注册、找回密码都要用）：`ARTZOO_SMS_PROVIDER=aliyun-pnvs`，并填齐另外五项，模板编号必须是 `100001` 和 `100003`。不需要就保持 `unconfigured`，五项留空。
+- 需要时调整配额上限。**保持 `ARTZOO_MEDIA_BUDGET_ENABLED=0`**，后面由 `enable-budget` 打开。
+- 写法见 7.5，各变量的含义见 ARCHITECTURE.md 第十一节。
+
+**第 3 步：检查配置。**
+
+```bash
+bash "$bundle/deployment-maintenance.sh" config-check --bundle "$bundle" --root "$root"
+```
+
+看到 `PASS: config-check；配置符合发布包清单。`。然后把 `compose.env` 另外离线保存一份，它不在日常备份里。
+
+### 5.4 初始化数据库和首位超管
+
+每一步单独执行，看到成功标志再做下一步。任何一步失败都停下：不要删除数据卷，不要重复初始化。
+
+**第 1 步：【危险：新建数据库】** 创建数据库卷并启动 PostgreSQL（只能在空站执行）。
+
+```bash
+bash "$bundle/deployment-maintenance.sh" database --bundle "$bundle" --root "$root"
+```
+
+成功：`PASS: database；项目 artzoo。`
+
+**第 2 步：【危险：迁移空库】**
+
+```bash
+bash "$bundle/deployment-maintenance.sh" migrate --bundle "$bundle" --root "$root"
+```
+
+成功：`PASS: migrate；项目 artzoo。`
+
+**第 3 步：【危险：写入媒体基线】** 上传配额必须先有基线。
+
+```bash
+bash "$bundle/deployment-maintenance.sh" baseline --bundle "$bundle" --root "$root"
+```
+
+成功：`PASS: baseline；项目 artzoo。`
+
+**第 4 步：【危险：创建首位超管】** 必须在 Server 本机的真实终端执行，不能通过 SSH。按提示输入本人手机号、参与身份、确认语和两遍密码；密码不会出现在命令行或日志里。
+
+```bash
+bash "$bundle/deployment-maintenance.sh" owner --bundle "$bundle" --root "$root"
+```
+
+成功：`PASS: owner；项目 artzoo。`
+
+**第 5 步：【危险：启用配额并启动网站】**
+
+```bash
+bash "$bundle/deployment-maintenance.sh" enable-budget --bundle "$bundle" --root "$root"
+```
+
+成功：看到 `PASS: web health` 和 `PASS: enable-budget；项目 artzoo。`。这时 `deploy/current` 已记录初始版本。再确认一次：
+
+```bash
+curl --fail --noproxy '*' "http://127.0.0.1:$port/api/health"     # 应返回 {"ok":true}
+```
+
+### 5.5 配置 Caddy（HTTPS 入口）
+
+**第 1 步：安装 Caddy**（已经装了就跳过），按 [Caddy 官方 Ubuntu 安装步骤](https://caddyserver.com/docs/install#debian-ubuntu-raspbian)：
+
+```bash
+sudo apt install --yes debian-keyring debian-archive-keyring apt-transport-https curl gnupg
+curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+sudo chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update
+sudo apt install caddy
+```
+
+**第 2 步：选一个模板，复制成候选文件。**
+
+- 家庭局域网：
+
+  ```bash
+  sudo install -m 644 "$bundle/Caddyfile.lan.example" /etc/caddy/Caddyfile.pending
+  ```
+
+  把文件里两处 `LAN_IP` 换成固定的局域网 IPv4。
+
+- 正式域名（取得上线授权、域名已经解析到服务器之后）：
+
+  ```bash
+  sudo install -m 644 "$bundle/Caddyfile.public.example" /etc/caddy/Caddyfile.pending
+  ```
+
+  把 `SITE_DOMAIN` 换成域名。服务器要放行 TCP 80 和 443。
+
+**第 3 步：编辑并核对候选文件。** 执行 `sudoedit /etc/caddy/Caddyfile.pending`：站点地址必须和 `$origin` 完全一致；后端是 `127.0.0.1:` 加 `$port`；不要添加 `trusted_proxies`、`header_up` 或访问日志。
+
+**第 4 步：校验候选文件，并备份原配置。**
+
+```bash
+sudo caddy fmt --overwrite /etc/caddy/Caddyfile.pending
+sudo -u caddy -H caddy validate --config /etc/caddy/Caddyfile.pending --adapter caddyfile
+caddy_backup=$(sudo mktemp /etc/caddy/Caddyfile.before-artzoo.XXXXXX)
+sudo cp -p /etc/caddy/Caddyfile "$caddy_backup"
+printf 'Caddy 备份：%s\n' "$caddy_backup"
+```
+
+校验要看到 `Valid configuration`；不通过就修改候选文件后重新校验，不要安装它。
+
+**第 5 步：【危险：切换 HTTPS 入口】**
+
+```bash
+sudo install -m 644 /etc/caddy/Caddyfile.pending /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+systemctl show caddy -p ActiveState -p SubState
+```
+
+应该显示 `ActiveState=active`、`SubState=running`。出问题时恢复原配置：【危险】`sudo cp -p "$caddy_backup" /etc/caddy/Caddyfile && sudo systemctl reload caddy`，再检查 HTTPS。
+
+### 5.6 验证代理，让网站信任 Caddy 传来的 IP
+
+网站默认把所有访问者算作同一个来源（限流共用一个桶）。先确认 Caddy 会覆盖伪造的转发头，再让 web 读取 Caddy 传来的真实 IP。
+
+**第 1 步：准备检查工具。**
+
+```bash
+bash "$bundle/deployment-images.sh" verify "$bundle"
+tools_image=$(awk '$1 == "tools" {print $2}' "$bundle/images.tsv")
+test -n "$tools_image"
+ca_mount=()
+```
+
+只有家庭局域网证书模式再执行下面这一行（正式域名跳过）：
+
+```bash
+ca_mount=(--mount type=bind,src=/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt,dst=/ca.crt,readonly)
+```
+
+**第 2 步：【危险：短暂加载测试路由】** 检查工具会临时给 Caddy 加一条测试路由，核对证书、健康检查，以及伪造的 `X-Forwarded-*` 头会被 Caddy 覆盖；然后等 60 秒，让你用另一台局域网设备打开它打印的地址；最后删掉测试路由、恢复原配置。
+
+```bash
+sudo docker --host unix:///var/run/docker.sock run --rm --network host \
+  --user 0:0 --cap-drop ALL --security-opt no-new-privileges --read-only \
+  --mount "type=bind,src=$bundle/deployment-https-check.mjs,dst=/check.mjs,readonly" \
+  "${ca_mount[@]}" --entrypoint node "$tools_image" /check.mjs "$origin" "$port" 60
+```
+
+- 先出现 `PASS: HTTPS certificate, health and forged forwarding headers`；
+- 60 秒内用另一台设备打开 `CLIENT CHECK` 后面的地址：`source` 应该是那台设备的 IP，`protocol` 是 `https`，`host` 是站点地址；
+- 最后出现 `PASS: original Caddy configuration restored`。
+
+失败就停下：先执行【危险】`sudo systemctl reload caddy` 清掉可能残留的测试路由，确认 Caddy 是 `active/running`；必要时按 5.5 第 5 步恢复原配置。
+
+**第 3 步：安装代理覆盖文件。** `compose.env` 里的 `ARTZOO_TRUSTED_PROXY` 保持空值，这个文件只给 web 打开信任。
+
+```bash
+sudo install -d -o 1000 -g 1000 -m 750 "$root/deploy"
+proxy="$root/deploy/proxy.compose.yaml"
+proxy_backup=''
+if test -e "$proxy"; then
+  proxy_backup=$(mktemp "$root/deploy/proxy.before-artzoo.XXXXXX")
+  cp -p "$proxy" "$proxy_backup"
+fi
+sudo install -o 1000 -g 1000 -m 640 "$bundle/proxy.compose.yaml.example" "$proxy"
+printf '代理备份（空值表示此前没有覆盖文件）：%s\n' "$proxy_backup"
+dc() { sudo env -i "PATH=$PATH" "HOME=$HOME" docker --host unix:///var/run/docker.sock compose --project-name artzoo --env-file "$bundle/images.env" --env-file "$root/secrets/compose.env" -f "$bundle/compose.yaml" -f "$proxy" "$@"; }
+dc config --quiet
+```
+
+`dc config --quiet` 没有输出就是正常。
+
+**第 4 步：【危险：重建 web】** 只在当前运行的就是这个发布包时执行。网站会中断几十秒，数据库和 worker 不动。
+
+```bash
+dc up -d --no-deps --no-build --pull never --force-recreate --wait web
+bash "$bundle/deployment-maintenance.sh" status --bundle "$bundle" --root "$root"
+```
+
+`status` 最后一行是 `PASS: status；项目 artzoo。`。
+
+**第 5 步：再检查一次。** 重新执行第 2 步（最后的 `60` 可以改成 `0`，不再等其他设备），两条 `PASS` 都要出现。
+
+**第 6 步：确认端口没有暴露。** 从另一台设备检查：443 能连上；13100（后端）、3100（开发端口）、5432（数据库）、2019（Caddy 管理）都连不上。家庭的 Windows 防火墙见 `docs/HOME_WSL_SETUP.md`；正式服务器用安全组或主机防火墙，只开放 SSH、80 和 443。
+
+**需要撤销代理信任时**：把 `$proxy_backup` 复制回 `$proxy`；此前没有覆盖文件的，就只移走这次新装的 `$proxy`，并把上面 `dc()` 定义里的 `-f "$proxy"` 去掉。然后重新执行第 4 步。
+
+### 5.7 安装定时备份（一次性）
+
+模板面向 Server 的系统 Docker，不要装到 Dev。运行用户要能不输入 sudo 密码访问 Docker（服务单元里用 `SupplementaryGroups=docker`）。
+
+**第 1 步：另存现有单元，准备候选文件。**
+
+```bash
+timer_was_active=0
+if systemctl is-active --quiet artzoo-backup.timer; then
+  timer_was_active=1
+  sudo systemctl stop artzoo-backup.timer
+fi
+systemctl is-active artzoo-backup.service
+saved=$(mktemp -d "$root/deploy/backup-units.XXXXXXXX")
+for unit in artzoo-backup.service artzoo-backup.timer; do
+  if test -f "/etc/systemd/system/$unit"; then sudo cp -a "/etc/systemd/system/$unit" "$saved/"; fi
+done
+cp "$bundle/artzoo-backup.service.example" "$saved/artzoo-backup.service.new"
+cp "$bundle/artzoo-backup.timer.example" "$saved/artzoo-backup.timer.new"
+editor "$saved/artzoo-backup.service.new"
+```
+
+服务显示 `active` 或 `activating` 时，先等这次备份结束、确认网站健康再继续。
+
+在候选的 service 里，`ExecStart` 固定是 `/usr/local/libexec/artzoo-backup`，只需要核对参数：`--root`、`--backup-dir`、`--keep`（日常备份保留份数，默认 7）、`--keep-maintenance`（升级、登记、救援备份每类保留份数，默认 3）；项目名不是 `artzoo` 时加 `--project`。
+
+**第 2 步：安装固定启动器和单元。** 这些命令不会启动备份。
+
+```bash
+sudo install -d -o root -g root -m 755 /usr/local/libexec
+if test -e /usr/local/libexec/artzoo-backup; then
+  printf '固定入口已存在，请核对来源和权限；不覆盖。\n'
+else
+  sudo install -o root -g root -m 755 "$bundle/artzoo-backup-launcher.sh" /usr/local/libexec/artzoo-backup
+fi
+stat -c '%U:%G %a %n' /usr/local/libexec/artzoo-backup
+sudo install -m 644 "$saved/artzoo-backup.service.new" /etc/systemd/system/artzoo-backup.service
+sudo install -m 644 "$saved/artzoo-backup.timer.new" /etc/systemd/system/artzoo-backup.timer
+sudo systemd-analyze verify /etc/systemd/system/artzoo-backup.service /etc/systemd/system/artzoo-backup.timer
+sudo systemctl daemon-reload
+```
+
+`stat` 应该显示 `root:root 755 /usr/local/libexec/artzoo-backup`，`systemd-analyze verify` 没有报错。启动器只装一次，以后发版不用重装；只有启动器本身的代码改了才需要更新（先另存旧文件）。
+
+**第 3 步：【危险：立即停站备份一次】**
+
+```bash
+sudo systemctl start artzoo-backup.service
+```
+
+**第 4 步：检查结果，启用每日定时。**
+
+```bash
+systemctl show artzoo-backup.service -p Result -p ExecMainStatus
+bash "$bundle/deployment-maintenance.sh" status --root "$root" --backup-dir "$backups"
+sudo journalctl -u artzoo-backup.service -n 40 --no-pager
+```
+
+应该是 `Result=success`、`ExecMainStatus=0`，`status` 里的最近备份结果是 `result=success`。然后启用每日定时：
+
+- 第一次安装：【危险：启用每日停站备份】`sudo systemctl enable --now artzoo-backup.timer`
+- 原来就开着的：`sudo systemctl start artzoo-backup.timer`
+
+最后用 `systemctl list-timers artzoo-backup.timer` 看下次运行时间。
+
+**撤销**：停止 timer，等正在运行的备份结束；把 `$saved` 里的原单元复制回 `/etc/systemd/system/`，执行 `systemd-analyze verify` 和 `daemon-reload`，确认网站健康后恢复原来的 timer 状态。第一次安装（没有原单元）就保持 timer 禁用。固定启动器可以留着，不用删备份、发布包或站点数据。
+
+### 5.8 家庭：安装 Windows 固定入口（一次性）
+
+前提：Server 已经部署好，有有效的 `deploy/current`。
+
+在 Windows PowerShell 里执行，把仓库 `deployment/` 里或发布包里的 `artzoo-resident.ps1` 复制成固定文件（只复制这一个文件，不是整个发布包）：
+
+```powershell
+$source = Read-Host '新版 artzoo-resident.ps1 的完整路径'
+$directory = Join-Path $env:USERPROFILE 'Documents\ArtZoo-FC'
+New-Item -ItemType Directory -Path $directory -Force | Out-Null
+$control = Join-Path $directory 'ArtZoo-FC-Server.ps1'
+if (Test-Path -LiteralPath $control) { throw '固定入口已存在，请先核对，不覆盖' }
+Copy-Item -LiteralPath $source -Destination $control
+```
+
+- 已经装过就跳过；升级、回退后都不用重新复制。只有入口脚本本身改了才更新，更新前先另存原文件。
+- 不要直接从 `\\wsl.localhost\...` 路径运行入口（查看状态时会把已经关闭的 WSL 唤醒）。
+- 不创建快捷方式、计划任务或开机自启。
+- PowerShell 拦截脚本运行时，只针对这一个文件处理，不要永久降低全局执行策略。
+
+装好后验证一遍（用法见 3.2）：`-status` → 【危险】`-start` → 关掉所有 WSL 和 PowerShell 终端，等至少一分钟后用手机访问网站 → 【危险】`-stop`。
+
+### 5.9 收尾
+
+- 按 3.3 手动备份一次，并用 `backup-verify` 校验。
+- 把 `compose.env` 离线保存好（5.3 第 3 步）。
+- 按 DECISIONS 第 16 条，正式服务器上线前还要做一次独立目标恢复演练，具体步骤届时另定。
+
+---
+
+## 6. 出错时怎么办
+
+### 6.1 维护脚本的拒绝提示
+
+脚本拒绝时以 `停止：` 开头。下表这些拒绝都发生在改动任何东西之前，网站保持原状。
+
+| 提示里有 | 意思 | 怎么做 |
+|---|---|---|
+| `同一站点有另一维护操作正在执行` | 另一条维护命令正在运行（常见是定时备份） | 等它结束（`systemctl is-active artzoo-backup.service` 不再是 `active`）再重试；不要杀进程 |
+| `媒体登记未完成` | 恢复或回退后还没登记媒体，网站保持停止 | 执行 `media-reregister`（2.6 第 2 步，或第 4 节第 3 步） |
+| `登记未完成；restore 须保持停站` | 媒体登记没完成时又要恢复 | 恢复命令加上 `--keep-stopped true` |
+| `升级/恢复尚未完成` | 升级在迁移开始后失败了 | 按 2.6 回退 |
+| `维护尚未完成：…；不执行备份` | 有没完成的升级、恢复或登记，备份被跳过 | 先把那个操作做完 |
+| `备份空间不足：需要 … 字节，剩余 … 字节` | 备份盘空间不够，网站没受影响 | 腾出空间，或换备份目录（之后所有命令都用新目录），再重试 |
+| `镜像缺失或 ID 不符` / `镜像缺失或 ID 不一致` | 命令要用的发布包镜像不在本机 | 导入那个发布包：`bash "<发布包>/deployment-images.sh" import "<发布包>"`。日常命令用的是当前包，升级是新包，回退还要用到旧包 |
+| `发布包校验失败` | 发布包文件不完整或被改过；回退之后也可能出现（见 2.6 最后一段） | 不要改发布包；回退后的情况按 2.6 处理，其他情况交给 AI 排查 |
+| `所选发布包与 deploy/current 不一致` | 用错了发布包 | 按 0.4 重新读取 `bundle` |
+| `请使用镜像对应的 UID/GID 1000 用户执行` | 用了 root 或 `sudo` 执行脚本 | 换回运行用户，不要 `sudo` 整个脚本 |
+| `相同发布版本，无需升级` / `相同版本，无需升级` | 这个版本已经在运行 | 不用升级 |
+| `配置检查未通过` | `compose.env` 有缺失、多余或格式不对的变量，上面会列出变量名 | `editor "$root/secrets/compose.env"` 改好后再 `config-check`。刚为新版本补了变量、还没升级时，旧版本会报 `多余：`，直接升级即可（2.3 第 5 步） |
+| `容器非秘密配置不一致` | `compose.env` 里某个值和正在运行的容器不一样，通常是改过配置 | 见 7.5 最后一条 |
+| `应用运行状态不一致，请先明确停站` | web 和 worker 一个在运行、一个停了 | 先按 3.2 让两者一致（都停或都启动） |
+| `数据库包含新包不认识的迁移，拒绝降级` | 新包比数据库还旧，多半选错了包 | 核对版本 |
+| `已执行迁移内容发生变化，拒绝升级` | 已经执行过的迁移文件被改过 | 停下，交给 AI 排查（迁移只能新增，不能修改） |
+| `旧包不支持登记，回退后无法安全开站` | 上一版太旧，没有媒体登记功能 | 不要回退，保持现状，交给 AI 另行评估 |
+| `升级不能更换 PostgreSQL 镜像` | 新包的数据库镜像版本变了 | 停下，这需要单独的数据库升级方案 |
+
+### 6.2 各环节失败后，网站处于什么状态
+
+| 失败在哪 | 网站状态 | 下一步 |
+|---|---|---|
+| 升级：迁移开始前 | 多数检查在停站前，网站没停；停站后才失败的，脚本尝试重新启动旧版本 | 用 `status` 确认旧版本正常 |
+| 升级：迁移开始后 | 停止，留下 `deploy/pending` | 执行输出里的回退命令，或按 2.6 回退 |
+| 回退或媒体登记 | 停站前的检查失败：保持原状；停站后失败：停止，备份和标记都保留 | 按报错核对文件内容、权限和空间，修好后重新执行同一条命令。如果 `deploy/` 里 `pending` 和 `media-registration.pending` 同时存在，两条命令都会被拒绝，这时停下交给 AI |
+| 手动或定时备份 | 脚本尝试重新启动应用 | `status`；没恢复就按 3.2 启动；`.partial.*` 保留 |
+| 恢复：准备阶段 | 原本在运行的会尝试重新启动 | `status` |
+| 恢复：覆盖阶段 | 停止 | 执行输出里那条带 `--keep-stopped true` 的恢复命令（用 `rescue-*` 备份） |
+
+不管哪种失败：不要删除最后一份有效备份，不要删 `deploy/` 里的标记，不要用旧发布包的脚本绕过检查。
+
+### 6.3 媒体文件身份检查（media-identity）
+
+```bash
+bash "$bundle/deployment-maintenance.sh" media-identity --root "$root"; echo "退出码=$?"
+```
+
+这个检查是只读的：数据库只用只读查询，检查容器不联网、媒体只读挂载；不改身份、不删图、不动配额。检查期间不要上传或删除图片，也不要直接改动宿主机上的媒体文件，否则可能出现暂时的"无法检查"。
+
+输出是一行 JSON：`consistent` 一致，`inconsistent` 不一致，`unchecked` 无法检查。`baseline` 是三个媒体根目录的整体基线，`components` 是全部文件，`directories` 按子目录分别统计。`skippedCredited`（已删除并退还配额的历史记录）、`skippedAggregate`（基线汇总记录）、`skippedDatabase`（存在数据库里的快捷入口图标）不参与磁盘比较。`components` 全是 0 只说明还没有上传过图片，不能当作图片验证通过。
+
+| 退出码 | 意思 | 怎么做 |
+|---|---|---|
+| 0 | 全部一致 | 不用处理 |
+| 2 | 有不一致或无法检查的项 | 确认没人在上传或删除后重新检查；仍是 2，就执行下面的【危险】登记 |
+| 1 | 检查本身失败（例如快照不完整） | 看报错后重试 |
+
+【危险：停写、备份并重新登记媒体】网站正在运行时也可以执行，登记完会自动恢复运行：
+
+```bash
+bash "$bundle/deployment-maintenance.sh" media-reregister --root "$root" --backup-dir "$backups"
+```
+
+恢复和回退之后脚本会强制要求登记。其他时候一般不需要：站长实测过，家庭 Server 在 Windows 重启后身份保持一致。
+
+---
+
+## 7. 参考
+
+### 7.1 维护命令一览
+
+用法：`bash "$bundle/deployment-maintenance.sh" <命令> --root /srv/artzoo [选项]`。
+
+| 命令 | 作用 | 影响 | `--bundle` |
+|---|---|---|---|
+| `status` | 检查站点，显示备份统计 | 只读 | 可省略，读 `current` |
+| `media-identity` | 检查媒体文件身份 | 只读 | 可省略 |
+| `config-check` | 检查 `compose.env` | 只读，不连 Docker | 必须 |
+| `backup-verify` | 校验一份备份 | 只读 | 必须 |
+| `start` / `stop` | 启动 / 停止现有容器（`stop` 也停数据库） | 启停网站 | 可省略 |
+| `backup` | 备份 | 短暂停站 | 可省略 |
+| `restore` | 用备份覆盖当前站点 | 停站，覆盖数据 | 必须 |
+| `media-reregister` | 备份并重新登记媒体身份 | 停站 | 可省略 |
+| `upgrade` | 升级到新包 | 停站，迁移数据库 | 必须（新包） |
+| `rollback` | 回退到上一版 | 停站，丢弃升级后的数据 | 用新包里的脚本执行 |
+| `prepare-env`、`database`、`migrate`、`baseline`、`owner`、`enable-budget` | 新站初始化（第 5 节） | 创建数据 | 必须 |
+
+常用选项：
+
+- `--backup-dir`：备份目录，默认 `/srv/artzoo/backups`。
+- `--keep`：日常备份保留份数，默认 7；`--keep-maintenance`：其他备份每类保留份数，默认 3（见 7.3）。
+- `--backup`：恢复或校验时指定备份目录。
+- `--keep-stopped true`：只用于 `restore`，登记成功后仍保持停站。
+- `--project`：项目名，默认 `artzoo`。
+- `--from`：只用于没有 `deploy/current` 记录的老站点第一次升级。按本手册初始化的站点都有这条记录，不需要它。
+
+发布包工具：`bash deployment-images.sh verify|import|check <发布包目录>`；构建只在 Dev 的仓库里用 `bash scripts/deployment-images.sh build`。
+
+### 7.2 `deploy/` 里的文件
+
+| 文件 | 内容 | 什么时候有 |
+|---|---|---|
+| `current` | 一行：`<当前发布包目录> <版本名> <配置清单来源包>` | 初始化完成后；升级成功后三列都指向新包；回退后第 1 列指回旧包，第 3 列仍是回退掉的新包 |
+| `previous` | 一行：`<旧包目录> <旧版本名> <升级前备份目录> <新包目录>` | 升级时（迁移之前）写入；回退成功后删除 |
+| `pending` | 升级或回退正在进行，或者中途失败 | 存在时只允许 `rollback` 和 `stop` |
+| `media-registration.pending` | 媒体登记还没完成；内容是登记后要恢复的状态（`running` 或 `stopped`） | 恢复、回退时写入，单独执行 `media-reregister` 时也会先写入；登记成功后删除。存在时只允许 `media-reregister`、`media-identity`、`stop`，以及带 `--keep-stopped true` 的 `restore` |
+| `history.log` | 每次升级、回退一行：时间、操作、from、to、备份、结果 | 一直追加 |
+| `backup-last` | 最近一次备份的结果（见 7.4） | 每次 `backup`（含定时）结束时更新 |
+| `proxy.compose.yaml` | 让 web 信任 Caddy 的四行配置 | 5.6 安装 |
+
+这些都是纯文本记录：`current` 不是符号链接，也不要 `source` 它。脚本只按记录选择版本，不会按目录时间去猜。
+
+### 7.3 备份
+
+**内容**：PostgreSQL 导出（custom 格式）、三个媒体目录的 tar 包、已完成的迁移列表，以及清单（版本、PostgreSQL 镜像 ID、项目、各文件大小和 SHA-256）。媒体保留数字属主和权限；遇到链接、特殊文件、路径穿越或嵌套挂载会拒绝。`compose.env` 不在备份里。备份目录含全部站点数据，按私有数据保管。
+
+**分类和默认保留份数**（名字里的时间是 UTC）：
+
+| 前缀 | 谁产生 | 默认保留 |
+|---|---|---|
+| `backup-` | 手动和定时备份 | 7 份（`--keep`） |
+| `upgrade-` | 升级前 | 3 份（`--keep-maintenance`） |
+| `register-` | 媒体登记前 | 3 份 |
+| `rescue-` | 恢复、回退覆盖前的现场 | 3 份 |
+
+**清理规则**：只在 `backup`、`upgrade`、`rollback`、`media-reregister` 成功后清理，失败时不清理；`restore` 本身不清理。只删除同项目、同 PostgreSQL 镜像、校验通过、名字符合格式的旧备份；`previous` 引用的那份、每类最新的一份和本次新做的一份始终保留。损坏的、其他项目的、名字不认识的和 `.partial.*` 都不动，留给人工处理。空间不足时也不会先删旧备份腾地方。
+
+> 建议一直用默认份数（日常 7、其他每类 3）。会清理备份的命令都按 `--keep` 和 `--keep-maintenance` 执行，没写就用默认值；脚本打印的回退、登记命令也不带这两个参数。如果把定时备份改成了别的份数，手动执行 `backup`、`upgrade`、`rollback`、`media-reregister` 时都要自己加上同样的参数，否则会按默认值清理。
+
+**空间**：停站前要求备份所在文件系统的剩余空间 ≥（数据库大小 + 三个媒体目录的内容字节数）× 1.5 + 1 GB，不够就在停站前拒绝。`backup`、`upgrade`、`rollback`、`media-reregister`，以及 `restore` 另存现场时都会检查。按默认份数，同时会有 16 份左右的全量备份（日常 7 份，另外三类各 3 份）。媒体按上限 10 GB 估算，16 份约 160 GB，再加上每次备份前的空间检查（`status` 在剩余空间不到下次备份估算值的 2 倍时就会警告），备份盘建议准备 200 GB 左右。
+
+**备份目录的要求**：绝对路径，不含空格和链接；属于 UID/GID 1000、权限 0700，上级目录不能被组或其他用户写入；不能放在 Windows 挂载的盘上；不要几个站点共用一个目录。换目录以后，旧目录里的备份不会被自动清理。
+
+### 7.4 `backup-last` 和原因代码
+
+格式：`<UTC 时间> result=success release=<版本> backup=<路径>`，或 `<UTC 时间> result=failed release=<版本> reason=<代码>`。
+
+| 代码 | 意思 |
+|---|---|
+| `maintenance-locked` | 有别的维护操作在执行 |
+| `pending`、`media-registration.pending` | 升级、恢复或媒体登记没完成，不做备份 |
+| `current-invalid`、`bundle-invalid` | `deploy/current` 记录或它指向的发布包有问题 |
+| `preflight` | 备份前的检查没通过（配置、容器、健康等） |
+| `space-check` | 空间不足 |
+| `snapshot-failed` | 导出数据库或打包媒体失败 |
+| `restart-failed` | 备份后重新启动应用或健康检查失败 |
+| `publish-failed` | 把备份放进备份目录时失败 |
+| `prune-failed` | 清理旧备份失败（新备份已经保存） |
+| `exec-failed` | 固定启动器没能启动当前包的备份脚本 |
+
+详细输出看 `sudo journalctl -u artzoo-backup.service`。断电或进程被强杀时可能来不及写这条记录，要结合备份目录里的时间和 journal 判断。
+
+### 7.5 `compose.env` 的写法
+
+- 只能写**当前运行版本**的 `runtime-config.manifest` 里声明的变量。多写、缺必填项或格式不对，`config-check` 都会指出（只列变量名）；`status`、备份等日常命令也会因此拒绝。升级时例外：升级会同时接受新旧两个版本声明的变量（见 2.3 第 5 步）。
+- 普通值写成 `NAME=value`。值里有 `$`、`#`、引号或反斜杠时，用单引号包起来，值里的单引号写成 `\'`。
+- 不支持：双引号、变量插值、行尾注释、多行值、首尾空格、以反斜杠结尾的值、反斜杠紧挨着单引号。
+- 可选项留空就用默认值。短信的五项在 `ARTZOO_SMS_PROVIDER=aliyun-pnvs` 时必须全部填写，`unconfigured` 时必须全部留空。
+- 各变量的含义和默认值见 ARCHITECTURE.md 第十一节。
+- 站点建好后不要再改 `POSTGRES_PASSWORD`：改它不会改变数据库里的实际密码，容器重建后反而连不上数据库。
+- **改了已有变量的值，正在运行的容器不会自动更新。** 非秘密的值（例如配额上限、短信签名、`AUTH_SMS_DAILY_LIMIT`）改了以后，维护脚本会发现容器里的值对不上，`status`、`start`、备份（含定时备份）、`restore`、`media-identity`、`media-reregister` 和 `upgrade` 都会以"容器非秘密配置不一致"拒绝；秘密的值（例如短信凭证）不会报错，但在容器重建前不会生效。目前没有专门重建容器的维护命令，所以**改配置前先让 AI 给出具体步骤**，不要先改了再说。
