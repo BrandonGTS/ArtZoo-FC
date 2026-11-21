@@ -1587,7 +1587,6 @@
     "apps/web/server/auth/owner-initialization-console.ts",
     "apps/web/server/auth/page-guards.ts",
     "apps/web/server/auth/ports.ts",
-    "apps/web/server/auth/production-owner-cli-policy.ts",
     "apps/web/server/auth/retire-legacy-invitations.ts",
     "apps/web/server/auth/runtime.ts",
     "apps/web/server/auth/security.ts",
