@@ -42,6 +42,6 @@ const config: NextConfig = {
     ];
   },
   poweredByHeader: false,
-  experimental: { authInterrupts: true }
+  experimental: { authInterrupts: true, agentUpgrade: 'security' }
 };
 export default config;
