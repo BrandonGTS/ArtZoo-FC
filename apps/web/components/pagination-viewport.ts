@@ -2,7 +2,7 @@ import type { MouseEvent } from 'react';
 
 // This observer belongs to the click, so it survives controls temporarily
 // unmounting while their parent fetches a new page. It never changes layout.
-export function preservePaginationViewport(navigation: HTMLElement) {
+export function preservePaginationViewport(navigation: HTMLElement, scrollContainer?: HTMLElement | null) {
   const key = navigation.dataset.paginationViewport;
   const page = navigation.dataset.paginationPage;
   const pathname = window.location.pathname;
@@ -39,9 +39,14 @@ export function preservePaginationViewport(navigation: HTMLElement) {
     }
     if (!waiting && current.dataset.paginationPage === page) return;
     const delta = current.getBoundingClientRect().top - top;
+    cancel();
+    if (scrollContainer) {
+      scrollContainer.scrollTo({ top: scrollContainer.scrollTop + delta, behavior: 'instant' });
+      return;
+    }
+
     const maximum = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     const destination = Math.max(0, Math.min(maximum, window.scrollY + delta));
-    cancel();
     window.scrollTo({ top: destination, left: window.scrollX, behavior: 'instant' });
   };
   const observer = new MutationObserver(() => {
@@ -60,14 +65,27 @@ export function preservePaginationViewport(navigation: HTMLElement) {
   window.addEventListener('keydown', cancelOnKey);
 }
 
-export function paginationViewportProps(page: number, loading: boolean, key: string) {
+export function paginationViewportProps(
+  page: number,
+  loading: boolean,
+  key: string,
+  getScrollContainer?: (navigation: HTMLElement) => HTMLElement | null
+) {
   return {
     'data-pagination-viewport': key,
     'data-pagination-page': page,
     'data-pagination-loading': loading,
     onClickCapture(event: MouseEvent<HTMLElement>) {
       const button = event.target instanceof Element ? event.target.closest('button') : null;
-      if (!loading && button && !button.disabled) preservePaginationViewport(event.currentTarget);
+      if (
+        !loading &&
+        button &&
+        !button.disabled &&
+        !button.matches('[aria-disabled="true"], [aria-current="page"]')
+      ) {
+        const navigation = event.currentTarget;
+        preservePaginationViewport(navigation, getScrollContainer?.(navigation));
+      }
     }
   };
 }
