@@ -16,7 +16,7 @@ import { MessageStateProvider } from './messages/message-state';
 import { ActivityEditFeedbackProvider } from './activities/activity-edit-feedback';
 
 // Shared visual foundation and server-backed account session.
-const artzooTheme: ThemeConfig = {
+export const artzooTheme: ThemeConfig = {
   token: {
     colorPrimary: '#436B4E',
     colorPrimaryHover: '#34583F',

@@ -1,0 +1,290 @@
+.trigger {
+  inline-size: max-content;
+  min-block-size: 2.5rem;
+  padding: 0.375rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  background: var(--highlight);
+  color: var(--ink);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -4px;
+}
+
+.dialog {
+  --detail-inset: clamp(1rem, 3.25vw, 2rem);
+  --detail-clip-top: 1px;
+  --detail-close-inset: clamp(0.5rem, 1vw, 0.75rem);
+  --detail-muted: color-mix(in oklab, var(--ink) 75%, var(--activities-paper));
+
+  box-sizing: border-box;
+  inline-size: min(56rem, calc(100% - 2rem));
+  max-inline-size: none;
+  max-block-size: calc(100% - 2rem);
+  padding: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--photo) transparent;
+  border: 0;
+  /* Clip the top-edge seam without moving the cover or the scroll area. */
+  clip-path: inset(var(--detail-clip-top) 0 0 round var(--card-radius));
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  container-type: inline-size;
+}
+
+.dialog:modal {
+  overscroll-behavior: contain;
+}
+
+.dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background: rgb(13 36 29 / 60%);
+}
+
+.dialog :is(h2, h3, p, dl, dd, ol) {
+  margin: 0;
+}
+
+.header {
+  --detail-fade: clamp(8.75rem, 20vw, 12rem);
+
+  background-color: var(--cover);
+  background-image:
+    linear-gradient(to bottom, transparent, var(--activities-paper)), var(--detail-artwork, none);
+  background-image:
+    linear-gradient(
+      to bottom,
+      transparent,
+      color-mix(in oklab, var(--activities-paper) 9%, transparent) calc(var(--detail-fade) * 0.27),
+      color-mix(in oklab, var(--activities-paper) 36%, transparent) calc(var(--detail-fade) * 0.52),
+      color-mix(in oklab, var(--activities-paper) 72%, transparent) calc(var(--detail-fade) * 0.77),
+      color-mix(in oklab, var(--activities-paper) 95%, transparent) var(--detail-fade),
+      var(--activities-paper)
+    ),
+    var(--detail-artwork, none);
+  background-position: center;
+  background-size: cover;
+}
+
+.toolbar {
+  position: sticky;
+  z-index: 1;
+  inset-block-start: 0;
+  display: flex;
+  align-items: start;
+  justify-content: end;
+  block-size: 0;
+  padding-inline-end: var(--detail-close-inset);
+  pointer-events: none;
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  margin-block-start: calc(var(--detail-clip-top) + var(--detail-close-inset));
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  background: color-mix(in oklab, var(--ink) 85%, transparent);
+  color: var(--cream);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.close:hover {
+  background: var(--ink);
+}
+
+.close:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -4px;
+}
+
+.close::before,
+.filledSeat::before {
+  inline-size: 1rem;
+  block-size: 1rem;
+  background: currentColor;
+  content: '';
+}
+
+.close::before {
+  mask: url('/artzoo/albums/close.svg') center / contain no-repeat;
+}
+
+.heading {
+  display: grid;
+  justify-items: start;
+  gap: 0.625rem;
+  padding: var(--detail-fade) var(--detail-inset) var(--detail-inset);
+}
+
+.heading h2 {
+  color: inherit;
+  font-size: clamp(1.25rem, 3.35vw, 2rem);
+  line-height: 1.32;
+  overflow-wrap: anywhere;
+}
+
+.type {
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: var(--highlight);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(13rem, 2fr);
+  align-items: start;
+  gap: var(--detail-inset);
+  padding: 0 var(--detail-inset) var(--detail-inset);
+  background: var(--activities-paper);
+}
+
+.info {
+  display: grid;
+  gap: 1rem;
+}
+
+.section {
+  display: grid;
+  gap: 0.625rem;
+  padding-block-start: 0.625rem;
+  border-block-start: 1px solid var(--line);
+}
+
+.body h3 {
+  color: inherit;
+  font-size: 1.0625rem;
+  line-height: 1.5;
+}
+
+.body h3 span {
+  margin-inline-start: 0.45rem;
+  color: var(--detail-muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.25rem), 1fr));
+  gap: 0.625rem 1rem;
+}
+
+.facts dt,
+.count span {
+  color: var(--detail-muted);
+  font-size: 0.8125rem;
+}
+
+.facts dd {
+  font-weight: 600;
+}
+
+.facts time span {
+  white-space: nowrap;
+}
+
+.agenda {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0;
+  list-style: none;
+}
+
+.agenda li {
+  display: grid;
+  grid-template-columns: 3.1rem minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.agenda time {
+  color: var(--detail-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.participation {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: calc(var(--card-radius) * 0.65);
+  background: var(--paper);
+  background: color-mix(in oklab, var(--line) 24%, var(--activities-paper));
+}
+
+.count {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.count strong {
+  font-size: 1.625rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.seats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.375rem;
+}
+
+.seats span {
+  display: grid;
+  place-items: center;
+  min-block-size: 2rem;
+  border-radius: 0.4rem;
+}
+
+.filledSeat {
+  background: var(--line);
+}
+
+.filledSeat::before {
+  mask: url('/artzoo/icons/user-round.svg') center / contain no-repeat;
+}
+
+.emptySeat {
+  background: var(--activities-paper);
+  color: var(--detail-muted);
+}
+
+.emptySeat::before {
+  content: '+';
+}
+
+.register {
+  min-block-size: 2.75rem;
+  padding: 0.55rem 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--cream);
+  font: inherit;
+  font-weight: 650;
+}
+
+@container (width < 36rem) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

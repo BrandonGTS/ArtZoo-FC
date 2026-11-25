@@ -42,6 +42,8 @@ const config: NextConfig = {
     ];
   },
   poweredByHeader: false,
-  experimental: { authInterrupts: true }
+  // Keep the repository's own AGENTS.md hierarchy during local development.
+  agentRules: false,
+  experimental: { authInterrupts: true, agentUpgrade: 'security' }
 };
 export default config;

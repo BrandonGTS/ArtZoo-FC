@@ -1,0 +1,77 @@
+.numberedPagination {
+  --pagination-line: var(--line, var(--artzoo-line));
+  --pagination-ink: var(--ink, var(--artzoo-primary));
+  --pagination-tile: color-mix(in srgb, var(--artzoo-page), var(--pagination-line) 24%);
+
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-block-start: 1.5rem;
+}
+
+.numberedPagination > button,
+.numberedPagination > button:global(.ant-btn) {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  inline-size: auto;
+  min-inline-size: 2.5rem;
+  min-block-size: 2.5rem;
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  border-radius: 0.625rem;
+  box-shadow: none;
+  background: var(--pagination-tile);
+  color: var(--artzoo-text);
+  font: 500 0.9375rem/1.2 var(--artzoo-body-font);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.numberedPagination > button:not([aria-disabled='true'], [aria-current='page']):is(:hover, :active) {
+  background: color-mix(in srgb, var(--artzoo-page), var(--pagination-line) 48%);
+  color: var(--artzoo-text);
+}
+
+.numberedPagination > button[aria-disabled='true'],
+.numberedPagination > button:global(.ant-btn)[aria-disabled='true']:is(:hover, :active) {
+  background: var(--pagination-tile);
+  color: var(--artzoo-secondary);
+  opacity: 0.55;
+  cursor: default;
+}
+
+.numberedPagination > button[aria-current='page'] {
+  background: var(--pagination-ink);
+  color: var(--artzoo-page);
+}
+
+.numberedPagination > button:focus-visible,
+.numberedPagination > button:global(.ant-btn):focus-visible {
+  outline: 2px solid var(--pagination-ink);
+  outline-offset: 2px;
+}
+
+.numberedPagination svg {
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+}
+
+.pageStatus {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .numberedPagination > button,
+  .numberedPagination > button:global(.ant-btn) {
+    min-inline-size: 2.75rem;
+    min-block-size: 2.75rem;
+  }
+}

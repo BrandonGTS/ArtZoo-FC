@@ -1,6 +1,7 @@
 'use client';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type CSSProperties } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import type { EditorState, Selection } from '@tiptap/pm/state';
 import { theme } from 'antd';
 import {
@@ -16,6 +17,7 @@ import './inline-sticker-input.css';
 
 export interface InlineStickerInputRef {
   focus(): void;
+  insertText(text: string): boolean;
   insertSticker(id: string): boolean;
   read(): string | null;
 }
@@ -186,6 +188,23 @@ const InlineStickerInput = forwardRef<InlineStickerInputRef, Props>(function Inl
     },
     []
   );
+
+  function insertAtSelection(node: ProseMirrorNode) {
+    if (!editor || live.current.disabled || composing.current) return false;
+    const range =
+      selection.current && selection.current.$from.doc === editor.state.doc
+        ? selection.current
+        : editor.state.selection;
+    const transaction = editor.state.tr.setSelection(range).replaceSelectionWith(node);
+    if (inlineText(transaction.doc.toJSON()).length > live.current.maxLength) {
+      setLimitHit(true);
+      return false;
+    }
+    editor.view.dispatch(transaction);
+    selection.current = editor.state.selection;
+    return true;
+  }
+
   useImperativeHandle(ref, () => ({
     focus() {
       if (!editor || live.current.disabled) return;
@@ -202,22 +221,12 @@ const InlineStickerInput = forwardRef<InlineStickerInputRef, Props>(function Inl
       }
       return inlineText(editor.getJSON());
     },
+    insertText(text) {
+      return editor && text ? insertAtSelection(editor.schema.text(text)) : false;
+    },
     insertSticker(stickerId) {
-      if (!editor || live.current.disabled || composing.current || !stickerToken(stickerId)) return false;
-      const range =
-        selection.current && selection.current.$from.doc === editor.state.doc
-          ? selection.current
-          : editor.state.selection;
-      const transaction = editor.state.tr
-        .setSelection(range)
-        .replaceSelectionWith(editor.schema.nodes.sticker!.create({ id: stickerId }));
-      if (inlineText(transaction.doc.toJSON()).length > live.current.maxLength) {
-        setLimitHit(true);
-        return false;
-      }
-      editor.view.dispatch(transaction);
-      selection.current = editor.state.selection;
-      return true;
+      if (!editor || !stickerToken(stickerId)) return false;
+      return insertAtSelection(editor.schema.nodes.sticker!.create({ id: stickerId }));
     }
   }));
   const style = {

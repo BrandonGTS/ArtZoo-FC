@@ -1,5 +1,5 @@
 // Local reuse of accepted home fact icons; home source stays unchanged.
-export function PublisherFactIcon({ kind }: { kind: 'period' | 'duty' | 'location' }) {
+export function PublisherFactIcon({ kind }: { kind: 'period' | 'duty' | 'location' | 'duration' }) {
   return (
     <svg
       className="home-activity-fact-icon"
@@ -21,6 +21,12 @@ export function PublisherFactIcon({ kind }: { kind: 'period' | 'duty' | 'locatio
       {kind === 'duty' ? (
         <>
           <path d="M3 17h14M5 17V6l5-3 5 3v11M8 17v-5h4v5M8 7h.01M12 7h.01" />
+        </>
+      ) : null}
+      {kind === 'duration' ? (
+        <>
+          <circle cx="10" cy="10" r="7" />
+          <path d="M10 6v4l2.5 1.5" />
         </>
       ) : null}
       {kind === 'location' ? (

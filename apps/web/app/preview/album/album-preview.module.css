@@ -1,0 +1,306 @@
+.albumHero .categoryLine {
+  grid-area: 2 / 1;
+  display: flex;
+  align-items: center;
+  gap: clamp(0.5rem, 1.4vw, 1.25rem);
+  min-inline-size: 0;
+  min-block-size: var(--preview-subtitle-row-size, auto);
+}
+.categoryLine::after {
+  content: '';
+  flex: 1;
+  border-block-start: 1px solid var(--line);
+}
+.categories {
+  max-inline-size: 100%;
+}
+.categories :global(.ant-tabs-nav) {
+  margin: 0;
+}
+.categories :global(.ant-tabs-nav)::before {
+  display: none;
+}
+.categories :global(.ant-tabs-nav-list) {
+  min-height: 2.75rem;
+}
+.categories :global(.ant-tabs-tab) {
+  color: var(--ink);
+  padding-block: 0.45rem;
+  font: 500 clamp(1rem, 1.65vw, 1.5rem)/1.25 var(--artzoo-body-font);
+}
+.categories :global(.ant-tabs-tab) + :global(.ant-tabs-tab) {
+  margin-inline-start: clamp(0.65rem, 1.55vw, 1.5rem);
+}
+.categories :global(.ant-tabs-tab-active) :global(.ant-tabs-tab-btn) {
+  color: var(--ink);
+  font-weight: 750;
+  text-shadow: none;
+}
+.categories :global(.ant-tabs-tab-active) {
+  box-shadow: inset 0 -2px var(--ink);
+}
+.categories :global(.ant-tabs-ink-bar) {
+  display: none;
+}
+.catalog,
+.photos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.875rem, 2.1vw, 2rem);
+}
+.feature {
+  grid-column: 1 / -1;
+}
+.feature:has(+ li) {
+  border-block-end: 1px solid var(--line);
+  padding-block-end: clamp(1.25rem, 2.1vw, 2rem);
+}
+.albumCard,
+.photos button {
+  inline-size: 100%;
+  display: grid;
+  gap: 0.7rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: start;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.cover,
+.photos button {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 2.05;
+  border-radius: clamp(0.65rem, 1vw, 1rem);
+}
+.feature .albumCard {
+  grid-template-columns: minmax(0, 1.78fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(1rem, 3vw, 3rem);
+}
+.feature .cover {
+  aspect-ratio: 2.8;
+}
+.caption {
+  display: grid;
+  justify-items: start;
+  gap: 0.25rem;
+}
+.caption strong,
+.galleryTitle {
+  font-family: Georgia, 'Songti SC', SimSun, serif;
+  font-size: clamp(1.125rem, 1.85vw, 1.75rem);
+  line-height: 1.22;
+}
+.feature strong,
+.galleryTitle {
+  font-size: clamp(1.75rem, 3.5vw, 3.5rem);
+}
+.meta {
+  color: var(--artzoo-secondary);
+  font-size: clamp(0.875rem, 1.2vw, 1.125rem);
+}
+.feature .meta {
+  margin-block-start: 0.25rem;
+  font-size: clamp(1rem, 1.5vw, 1.375rem);
+}
+.cover {
+  position: relative;
+}
+.cover::after {
+  content: '↗';
+  position: absolute;
+  inset: auto clamp(0.5rem, 1.1vw, 1rem) clamp(0.5rem, 1.1vw, 1rem) auto;
+  display: grid;
+  place-items: center;
+  inline-size: clamp(1.75rem, 2.5vw, 2.25rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--cream);
+  color: var(--ink);
+  font:
+    500 1.25rem/1 system-ui,
+    sans-serif;
+  opacity: var(--cover-arrow-opacity, 0);
+  pointer-events: none;
+}
+.albumCard:focus-visible {
+  --cover-arrow-opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .albumCard:hover {
+    --cover-arrow-opacity: 1;
+    --cover-scale: 1.012;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .cover {
+      scale: var(--cover-scale, 1);
+      transition: scale 180ms ease-out;
+    }
+    .cover::after {
+      transition: opacity 140ms ease-out;
+    }
+  }
+}
+.back:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+.albumCard:focus-visible,
+.back:focus-visible,
+.photos button:focus-visible,
+.controls button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.empty {
+  padding-block: 2rem;
+  text-align: center;
+  color: var(--artzoo-secondary);
+}
+.back {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 0.5rem 0;
+  font: inherit;
+  cursor: pointer;
+}
+.galleryTitle {
+  margin-block: 1rem 0.35rem;
+}
+ul.photos {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-block-start: 1.5rem;
+}
+.photos button {
+  display: grid;
+  place-items: end start;
+  padding: 0.5rem;
+  aspect-ratio: 1.5;
+}
+.photos button span {
+  padding: 0.15rem 0.5rem;
+  background: var(--cream);
+  border-radius: 0.35rem;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+.viewer {
+  overscroll-behavior: contain;
+}
+.stage {
+  display: grid;
+  place-items: center;
+  container-type: size;
+  block-size: min(65dvh, 40rem);
+}
+.stage span {
+  inline-size: min(100cqw, 100cqh * var(--photo-ratio));
+  aspect-ratio: var(--photo-ratio);
+  border-radius: 0.5rem;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.5rem, 2vw, 1.5rem);
+  padding-block-start: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+.controls button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-block-size: 2.75rem;
+  padding: 0.5rem clamp(0.75rem, 2vw, 1.5rem);
+  border: 0;
+  border-radius: 99rem;
+  background: var(--ink);
+  color: var(--cream);
+  font-weight: 700;
+  cursor: pointer;
+}
+.controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@media (width >= 48rem) {
+  .feature .albumCard {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  }
+  .feature:has(+ li) {
+    padding-block-end: 1.25rem;
+  }
+  .feature .cover {
+    aspect-ratio: 3.3;
+  }
+  .feature ~ li .cover {
+    aspect-ratio: 2.25;
+  }
+
+  .viewer :global(.ant-modal-body) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+  }
+  .stage {
+    grid-area: 1 / 2;
+  }
+  .controls {
+    display: contents;
+  }
+  .controls button:first-child {
+    grid-area: 1 / 1;
+  }
+  .controls button:last-child {
+    grid-area: 1 / 3;
+  }
+  .controls [role='status'] {
+    grid-area: 2 / 2;
+    text-align: center;
+  }
+}
+
+@media (width >= 96rem) and (height >= 56.25rem) {
+  .catalog {
+    --album-cover-extra-height: min(13.25rem, 100dvh - 56.25rem);
+  }
+  .feature .cover {
+    min-block-size: calc(15.625rem + var(--album-cover-extra-height) * 0.6);
+  }
+  .feature ~ li .cover {
+    min-inline-size: 0;
+    min-block-size: calc(12.25rem + var(--album-cover-extra-height) * 0.4);
+  }
+}
+
+@media (width < 62.5rem) {
+  .albumHero .categoryLine {
+    grid-column: 1 / -1;
+  }
+}
+@media (width < 48rem) {
+  .catalog,
+  .feature .albumCard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .feature .cover {
+    aspect-ratio: 1.5;
+  }
+  .catalog li:not(.feature) .albumCard {
+    grid-template-columns: minmax(4.5rem, 0.7fr) minmax(0, 1fr);
+    align-items: center;
+  }
+  .catalog li:not(.feature) .cover {
+    aspect-ratio: 1.55;
+  }
+  ul.photos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+}

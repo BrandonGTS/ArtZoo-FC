@@ -1,0 +1,322 @@
+.activityLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
+  gap: var(--card-gap);
+  min-block-size: var(--preview-content-row-min-size, auto);
+}
+
+.calendar,
+.activityCard {
+  min-inline-size: 0;
+  border-radius: var(--card-radius);
+}
+
+.calendar {
+  --date-size: clamp(1.75rem, 3.5vw, 2.875rem);
+  --date-row-size: clamp(3rem, calc(4vw + 0.75rem), 4.375rem);
+  --event-dot-size: 0.3125rem;
+  --event-dot-gap: 0.4375rem;
+  --event-dot-next-gap: calc(var(--event-dot-gap) + 0.25rem);
+
+  padding: var(--card-padding);
+  background: var(--activities-paper);
+}
+
+.calendarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  margin-block-end: clamp(0.5rem, 1.7vw, 1.5rem);
+}
+
+.calendarHeader h2 {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(0.375rem, 1.25vw, 1.125rem);
+  margin: 0;
+  font-size: clamp(1.25rem, 2.9vw, 2.75rem);
+}
+
+.calendarHeader h2 span {
+  color: var(--artzoo-secondary);
+  font-size: clamp(0.875rem, 1.4vw, 1.25rem);
+  font-weight: 500;
+}
+
+.monthControls {
+  display: flex;
+  gap: clamp(0.125rem, 0.75vw, 0.625rem);
+}
+
+.monthControls button,
+.eventDay {
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.monthControls button {
+  inline-size: clamp(2rem, 3.1vw, 2.75rem);
+  aspect-ratio: 1;
+  padding: 0;
+}
+
+.monthControls button span {
+  inline-size: 0.42rem;
+  aspect-ratio: 1;
+  border-block-start: 2px solid currentColor;
+  border-inline-end: 2px solid currentColor;
+}
+
+.previous {
+  transform: rotate(-135deg);
+}
+
+.next {
+  transform: rotate(45deg);
+}
+
+.monthTable {
+  --weekday-label: #5c5c5c;
+  --weekend-label: #ff4141;
+  --weekday-date: #2d3531;
+  --weekend-date: #e22929;
+  --adjacent-weekday-date: #c2c2c2;
+  --adjacent-weekend-date: #fdc2c2;
+
+  inline-size: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.monthTable th {
+  padding-block: 0.5rem;
+  border-block-end: 1px solid var(--line);
+  color: var(--weekday-label);
+  font-size: clamp(0.8125rem, 1.1vw, 1rem);
+  font-weight: 500;
+}
+
+.monthTable th:nth-last-child(-n + 2) {
+  color: var(--weekend-label);
+}
+
+.monthTable td {
+  block-size: var(--date-row-size);
+  padding: 0;
+  color: var(--weekday-date);
+  font-size: clamp(1rem, 1.65vw, 1.4375rem);
+  font-weight: 500;
+}
+
+.monthTable td:nth-last-child(-n + 2) {
+  color: var(--weekend-date);
+}
+
+.adjacentDay {
+  color: var(--adjacent-weekday-date);
+}
+
+.monthTable td:nth-last-child(-n + 2) .adjacentDay {
+  color: var(--adjacent-weekend-date);
+}
+
+.eventDay {
+  position: relative;
+  inline-size: min(
+    100%,
+    var(--date-size),
+    calc(var(--date-row-size) - var(--event-dot-size) - var(--event-dot-gap) - var(--event-dot-next-gap))
+  );
+  aspect-ratio: 1;
+  padding: 0;
+}
+
+.eventDay::after,
+.legend::before {
+  inline-size: var(--event-dot-size);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--cover);
+  content: '';
+}
+
+.eventDay::after {
+  position: absolute;
+  inset-block-start: calc(100% + var(--event-dot-gap));
+  justify-self: center;
+}
+
+.eventDay[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--cream);
+}
+
+@media (hover: hover) {
+  .monthControls button:hover,
+  .eventDay[aria-pressed='false']:hover {
+    background: var(--wish);
+  }
+}
+
+.monthControls button:focus-visible,
+.eventDay:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.eventDay:focus-visible {
+  outline-offset: 1px;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: clamp(0.625rem, 1.55vw, 1.375rem) 0 0;
+  color: var(--artzoo-secondary);
+  font-size: 0.8125rem;
+}
+
+.activityCard {
+  --activity-card-inset: clamp(0.625rem, 1vw, 1rem);
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: var(--activity-card-inset);
+  padding-block-start: calc(var(--activity-card-inset) - 0.25rem);
+  background: var(--ink);
+  color: var(--cream);
+}
+
+.activitySlide {
+  display: grid;
+  grid-template-rows: minmax(7rem, clamp(9.75rem, calc(16vw + 1.125rem), 16rem)) minmax(min-content, 1fr);
+  padding-block-end: clamp(0.25rem, 1.4vw, 1.25rem);
+}
+
+.activityCover {
+  display: flex;
+  align-items: end;
+  justify-content: end;
+  padding: 0.625rem;
+  border-radius: calc(var(--card-radius) * 0.65);
+  background: var(--cover) center / cover no-repeat;
+}
+
+.activitySlide:nth-child(even) .activityCover {
+  background-color: var(--photo);
+}
+
+.activityDetails {
+  display: grid;
+  align-content: start;
+  gap: clamp(0.625rem, 1.4vw, 1.25rem);
+  padding: clamp(0.75rem, 1.6vw, 1.625rem);
+}
+
+.activityDetails p,
+.activityDetails h2 {
+  margin: 0;
+}
+
+.activityDetails h2 {
+  color: inherit;
+  font-size: clamp(1.375rem, 2.55vw, 2.25rem);
+}
+
+.activityTitle {
+  display: -webkit-box;
+  overflow: clip;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.schedule {
+  color: var(--highlight);
+  font-size: clamp(0.875rem, 1.3vw, 1.125rem);
+  font-weight: 700;
+}
+
+.activityFacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--activity-fact-min-width, 100%)), 1fr));
+  gap: clamp(0.5rem, 0.75vw, 0.6875rem);
+  font-size: clamp(0.8125rem, 1.15vw, 1rem);
+}
+
+.activityFacts li {
+  display: grid;
+  grid-template-columns: 1.125rem minmax(0, 1fr);
+  align-items: start;
+  column-gap: 0.5rem;
+}
+
+.activityFacts svg,
+.participantsIcon {
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  margin-block-start: 0.125rem;
+  color: var(--highlight);
+}
+
+.participantsIcon {
+  mask: url('/artzoo/icons/users.svg') center / contain no-repeat;
+  background: currentColor;
+}
+
+@media (width >= 54rem) {
+  .calendar {
+    --date-row-size: clamp(3rem, calc(3.5vw + 0.625rem), 4.0625rem);
+    --event-dot-gap: 0.3125rem;
+
+    padding-block: clamp(0.875rem, 1.5vw, 1.5625rem);
+  }
+
+  .calendarHeader {
+    margin-block-end: clamp(0.5rem, 1.1vw, 1rem);
+  }
+
+  .legend {
+    margin-block-start: clamp(0.625rem, 1.1vw, 1rem);
+  }
+
+  .activityCard {
+    /* Let the calendar set the shared row height. */
+    contain: size;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .activitySlide {
+    grid-template-rows: minmax(7rem, clamp(8.5rem, calc(13vw + 0.75rem), 14.25rem)) minmax(min-content, 1fr);
+    padding-block-end: clamp(0.25rem, 0.85vw, 0.875rem);
+  }
+
+  .activityDetails {
+    gap: clamp(0.5rem, 1vw, 1rem);
+    padding-block: clamp(0.625rem, 1.25vw, 1.375rem) 0;
+  }
+}
+
+@media (width < 54rem) {
+  .activityLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .activitySlide {
+    grid-template-rows: clamp(8.75rem, 38vw, 9.5rem) auto;
+  }
+
+  .activityTitle {
+    min-block-size: 2lh;
+  }
+}

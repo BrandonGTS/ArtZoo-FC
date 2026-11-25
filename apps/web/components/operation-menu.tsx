@@ -3,32 +3,53 @@ import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import { Button, Dropdown, theme } from 'antd';
 import './operation-menu.css';
 
-export type OperationMenuItem = { key: string; label: string; danger?: boolean; disabled?: boolean };
+export type OperationMenuItem = {
+  key: string;
+  label: string;
+  danger?: boolean;
+  disabled?: boolean;
+  className?: string;
+};
+type MenuEdge = 'first' | 'last';
+
+function getMenuButtons(menu: HTMLElement) {
+  return Array.from(menu.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+}
+
+function focusMenuEdge(menu: HTMLElement, edge: MenuEdge) {
+  const buttons = getMenuButtons(menu);
+  (edge === 'first' ? buttons[0] : buttons.at(-1))?.focus();
+}
+
 /** Formal activity organizer-menu appearance, with explicit portal and keyboard handling. */
 export default function OperationMenu({
   label,
   items,
   onAction,
-  disabled = false
+  disabled = false,
+  compositeKeyboard = false
 }: {
   label: string;
   items: OperationMenuItem[];
   onAction(key: string): void;
   disabled?: boolean;
+  compositeKeyboard?: boolean;
 }) {
   const { token } = theme.useToken(),
     id = useId();
   const [open, setOpen] = useState(false),
     [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const [touchTrigger, setTouchTrigger] = useState(false);
   const trigger = useRef<HTMLButtonElement | null>(null),
-    focusMenu = useRef(false);
+    pendingFocus = useRef<MenuEdge | null>(null);
   const expanded = open && !disabled;
   if (disabled && open) setOpen(false);
   useEffect(() => {
-    if (!expanded || !container || !focusMenu.current) return;
+    if (!expanded || !container || !pendingFocus.current) return;
     const frame = requestAnimationFrame(() => {
-      container.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
-      focusMenu.current = false;
+      const edge = pendingFocus.current;
+      pendingFocus.current = null;
+      if (edge) focusMenuEdge(container, edge);
     });
     return () => cancelAnimationFrame(frame);
   }, [expanded, container]);
@@ -44,7 +65,7 @@ export default function OperationMenu({
       if (targetDialog && targetDialog !== triggerDialog && !container?.contains(target)) return;
       event.preventDefault();
       event.stopPropagation();
-      focusMenu.current = false;
+      pendingFocus.current = null;
       setOpen(false);
       trigger.current?.focus();
     };
@@ -52,6 +73,7 @@ export default function OperationMenu({
     return () => document.removeEventListener('keydown', escape, true);
   }, [expanded, container]);
   function close(focus = false) {
+    pendingFocus.current = null;
     setOpen(false);
     if (focus) trigger.current?.focus();
   }
@@ -65,13 +87,14 @@ export default function OperationMenu({
       <Dropdown
         open={expanded}
         disabled={disabled}
-        trigger={['hover', 'click']}
+        trigger={touchTrigger ? ['click'] : ['hover', 'click']}
         placement="bottomRight"
         arrow
         destroyOnHidden={false}
         onOpenChange={(next) => {
           if (!next && container?.matches(':hover')) return;
-          setOpen(next);
+          if (next) setOpen(true);
+          else close();
         }}
         popupRender={() => (
           <div
@@ -89,10 +112,13 @@ export default function OperationMenu({
                 '--operation-menu-hover-bg': token.controlItemBgHover
               } as CSSProperties
             }
-            onPointerEnter={() => {
-              if (!disabled) setOpen(true);
+            onPointerEnter={(event) => {
+              if (event.pointerType !== 'touch' && !disabled) setOpen(true);
             }}
-            onPointerLeave={() => close()}
+            onPointerLeave={(event) => {
+              // A touch emits pointerleave before the item's click.
+              if (event.pointerType !== 'touch') close();
+            }}
             onClick={(event) => event.stopPropagation()}
             onAuxClick={(event) => event.stopPropagation()}
             onBlur={(event) => {
@@ -100,15 +126,18 @@ export default function OperationMenu({
             }}
             onKeyDown={(event) => {
               event.stopPropagation();
+              if (compositeKeyboard && event.key === 'Tab') {
+                // The popup is portaled. Resume native tab order from its trigger.
+                close(true);
+                return;
+              }
               if (event.key === 'Escape') {
                 event.preventDefault();
                 close(true);
               }
               if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
                 event.preventDefault();
-                const buttons = Array.from(
-                  event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')
-                );
+                const buttons = getMenuButtons(event.currentTarget);
                 const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
                 const next =
                   event.key === 'Home'
@@ -125,6 +154,8 @@ export default function OperationMenu({
                 key={item.key}
                 htmlType="button"
                 role="menuitem"
+                tabIndex={compositeKeyboard ? -1 : undefined}
+                className={item.className}
                 danger={item.danger}
                 disabled={disabled || item.disabled}
                 onClick={() => {
@@ -149,14 +180,25 @@ export default function OperationMenu({
           aria-expanded={expanded}
           aria-controls={expanded ? id : undefined}
           disabled={disabled}
+          onPointerEnter={(event) => {
+            if (event.pointerType === 'mouse') setTouchTrigger(false);
+          }}
+          onPointerDown={(event) => setTouchTrigger(event.pointerType === 'touch')}
           onKeyDown={(event) => {
+            if (event.key === 'Escape' && !expanded) return;
             event.stopPropagation();
             if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
               event.preventDefault();
-              focusMenu.current = true;
-              setOpen(true);
+              const edge = compositeKeyboard && event.key === 'ArrowUp' ? 'last' : 'first';
+              if (compositeKeyboard && expanded && container) {
+                pendingFocus.current = null;
+                focusMenuEdge(container, edge);
+              } else {
+                pendingFocus.current = edge;
+                setOpen(true);
+              }
             }
-            if (event.key === 'Escape') close();
+            if (event.key === 'Escape' || (compositeKeyboard && expanded && event.key === 'Tab')) close();
           }}
           icon={<span className="operation-menu-chevron" aria-hidden="true" />}
         />

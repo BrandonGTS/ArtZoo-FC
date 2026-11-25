@@ -1,9 +1,10 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Button, Input, Tabs } from 'antd';
 import type { ButtonProps } from 'antd';
 import './collection-controls.css';
+import styles from './collection-controls.module.css';
 import { paginationViewportProps } from './pagination-viewport';
 
 export interface CollectionTabsProps {
@@ -120,7 +121,10 @@ export function PageArrowButton({
   direction,
   label = direction === 'previous' ? '上一页' : '下一页',
   ...props
-}: Pick<ButtonProps, 'disabled' | 'onClick'> & { direction: 'previous' | 'next'; label?: string }) {
+}: Pick<ButtonProps, 'aria-disabled' | 'disabled' | 'onClick'> & {
+  direction: 'previous' | 'next';
+  label?: string;
+}) {
   return (
     <Button
       type="text"
@@ -177,10 +181,88 @@ function PageNavigation({
     </nav>
   );
 }
-export function ListPagination({ page, totalPages, ...props }: PageNavigationProps & { totalPages: number }) {
-  const pages = Math.max(1, totalPages);
-  return pages <= 1 ? null : (
-    <PageNavigation {...props} page={page} totalPages={pages} hasMore={page < pages} />
+type ListPaginationProps = PageNavigationProps & {
+  totalPages: number;
+  numbered?: boolean;
+  getScrollContainer?: (navigation: HTMLElement) => HTMLElement | null;
+};
+
+const MAX_VISIBLE_PAGES = 10;
+
+function NumberedListPagination({
+  page,
+  totalPages,
+  loading = false,
+  onPageChange,
+  label = '列表分页',
+  getScrollContainer
+}: ListPaginationProps) {
+  const [windowStart, setWindowStart] = useState(1);
+  const visibleCount = Math.min(totalPages, MAX_VISIBLE_PAGES);
+  const lastStart = totalPages - visibleCount + 1;
+  const firstPage = Math.max(page - visibleCount + 1, Math.min(windowStart, page, lastStart));
+  const pageNumbers = Array.from({ length: visibleCount }, (_, index) => firstPage + index);
+
+  function selectPage(next: number) {
+    if (loading || next === page || next < 1 || next > totalPages) return;
+
+    setWindowStart(Math.max(next - visibleCount + 1, Math.min(firstPage, next)));
+    onPageChange(next);
+  }
+
+  return (
+    <nav
+      className={styles.numberedPagination}
+      aria-label={label}
+      {...paginationViewportProps(page, loading, label, getScrollContainer)}
+    >
+      <PageArrowButton
+        direction="previous"
+        aria-disabled={loading || page <= 1}
+        onClick={() => selectPage(page - 1)}
+      />
+      {pageNumbers.map((number) => (
+        <button
+          key={number}
+          type="button"
+          aria-current={page === number ? 'page' : undefined}
+          aria-disabled={loading || undefined}
+          aria-label={`第 ${number} 页`}
+          onClick={() => selectPage(number)}
+        >
+          {number}
+        </button>
+      ))}
+      <PageArrowButton
+        direction="next"
+        aria-disabled={loading || page >= totalPages}
+        onClick={() => selectPage(page + 1)}
+      />
+      <span className={styles.pageStatus} role="status">
+        {`第 ${page} 页，共 ${totalPages} 页`}
+      </span>
+    </nav>
+  );
+}
+
+export function ListPagination({
+  page,
+  totalPages,
+  numbered,
+  getScrollContainer,
+  ...props
+}: ListPaginationProps) {
+  if (totalPages <= 1) return null;
+
+  return numbered ? (
+    <NumberedListPagination
+      {...props}
+      page={page}
+      totalPages={totalPages}
+      getScrollContainer={getScrollContainer}
+    />
+  ) : (
+    <PageNavigation {...props} page={page} totalPages={totalPages} hasMore={page < totalPages} />
   );
 }
 /** Unknown-total resources retain their existing hasMore contract; do not invent a total. */
