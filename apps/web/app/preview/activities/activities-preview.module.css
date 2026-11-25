@@ -2,6 +2,7 @@
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
   gap: var(--card-gap);
+  min-block-size: var(--preview-content-row-min-size, auto);
 }
 
 .calendar,
@@ -273,36 +274,36 @@
   background: currentColor;
 }
 
-.reserve {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--card-gap);
-  margin-block-start: clamp(1rem, 2.6vw, 2.25rem);
-}
-
-.reserve div {
-  block-size: clamp(2.25rem, 5.6vw, 5rem);
-  border-radius: calc(var(--card-radius) * 0.65);
-  background: var(--wish);
-}
-
-.reserve div:nth-child(2) {
-  background: var(--line);
-}
-
-.reserve div:nth-child(3) {
-  background: var(--photo);
-}
-
 @media (width >= 54rem) {
+  .calendar {
+    --date-row-size: clamp(3rem, calc(3.5vw + 0.625rem), 4.0625rem);
+    --event-dot-gap: 0.3125rem;
+
+    padding-block: clamp(0.875rem, 1.5vw, 1.5625rem);
+  }
+
+  .calendarHeader {
+    margin-block-end: clamp(0.5rem, 1.1vw, 1rem);
+  }
+
+  .legend {
+    margin-block-start: clamp(0.625rem, 1.1vw, 1rem);
+  }
+
   .activityCard {
     /* Let the calendar set the shared row height. */
     contain: size;
     grid-template-rows: minmax(0, 1fr);
   }
 
+  .activitySlide {
+    grid-template-rows: minmax(7rem, clamp(8.5rem, calc(13vw + 0.75rem), 14.25rem)) minmax(min-content, 1fr);
+    padding-block-end: clamp(0.25rem, 0.85vw, 0.875rem);
+  }
+
   .activityDetails {
-    padding-block-end: 0;
+    gap: clamp(0.5rem, 1vw, 1rem);
+    padding-block: clamp(0.625rem, 1.25vw, 1.375rem) 0;
   }
 }
 

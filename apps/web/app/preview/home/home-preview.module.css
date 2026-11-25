@@ -22,9 +22,11 @@
 .preview {
   --rail-width: clamp(3.25rem, 6.8vw, 6.125rem);
   --page-inset: clamp(0.75rem, 3vw, 2.625rem);
+  --page-top-inset: clamp(0.875rem, 1.6vw, 1.5rem);
   --card-padding: clamp(1rem, 2.3vw, 2rem);
   --card-gap: clamp(0.625rem, 1.1vw, 1rem);
-  --preview-heading-gap: clamp(1.25rem, 2.4vw, 2.5rem);
+  --preview-heading-gap: clamp(0.75rem, 1.4vw, 1.5rem);
+  --preview-subtitle-gap: clamp(0.625rem, 1.2vw, 1rem);
 
   display: grid;
   grid-template-columns: var(--rail-width) minmax(0, 1fr);
@@ -34,6 +36,15 @@
   font-family: var(--artzoo-body-font);
   line-height: 1.5;
   overflow-wrap: anywhere;
+
+  @media (width >= 48rem) {
+    --preview-subtitle-row-size: 2.8125rem;
+  }
+
+  @media (width >= 96rem) {
+    --preview-content-row-min-size: 36.5625rem;
+    --preview-content-bottom-gap: 0.625rem;
+  }
 }
 
 .preview ul {
@@ -486,7 +497,7 @@
   }
 
   .scrollHintProgress::before {
-    transition: transform 240ms ease-out;
+    transition: transform var(--wheel-progress-duration) ease-out;
   }
 }
 
@@ -496,27 +507,20 @@
   }
 }
 
-.content {
-  display: grid;
-  grid-template-rows: minmax(min-content, 1fr) auto;
-  min-block-size: 100%;
-}
-
 .content,
 .pageContent {
   inline-size: min(100%, 94rem);
   margin-inline: auto;
-  padding: clamp(1rem, 2.1vw, 1.875rem) var(--page-inset) clamp(2.25rem, 4.2vw, 3.75rem);
+  padding: var(--page-top-inset) var(--page-inset)
+    var(--preview-content-bottom-gap, clamp(2.25rem, 4.2vw, 3.75rem));
 }
 
-.previewScreen:is([data-preview-page='home'], [data-incoming='home']) .content {
+.content {
+  display: grid;
   grid-template-rows: auto auto;
   align-content: start;
-  padding-block-end: 1rem;
-}
-
-.previewScreen:is([data-preview-page='home'], [data-incoming='home']) .hero {
-  margin-block-start: var(--preview-heading-gap);
+  min-block-size: 100%;
+  padding-block-end: var(--preview-content-bottom-gap, 1rem);
 }
 
 .pageHeader {
@@ -525,7 +529,7 @@
   grid-template-rows: [toolbar] auto [notice-body] auto [heading] minmax(min-content, 1fr);
   align-items: start;
   column-gap: 1rem;
-  margin-block-end: clamp(1.5rem, 2.9vw, 2.625rem);
+  margin-block-end: clamp(1rem, 2vw, 1.75rem);
 }
 
 .topActions {
@@ -599,12 +603,8 @@
   grid-column: 1;
   grid-row: heading;
   align-self: end;
-  margin-block-start: 0.25rem;
-  container: preview-hero / inline-size;
-}
-
-.pageHeading {
   margin-block-start: var(--preview-heading-gap);
+  container: preview-hero / inline-size;
 }
 
 .titleGroup {
@@ -621,7 +621,7 @@
 
 .title {
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(3rem, 8.1vw, 7.375rem);
+  font-size: clamp(3rem, 7vw, 6.5rem);
   font-weight: 400;
   line-height: 1;
   letter-spacing: -0.045em;
@@ -633,25 +633,13 @@
   font-weight: 400;
 }
 
-.heroDescription {
-  contain: inline-size;
-  text-align: end;
-  margin-block-start: clamp(0.5rem, 1.1vw, 1rem);
-  color: var(--artzoo-secondary);
-  font-size: clamp(0.875rem, 1.15vw, 1.0625rem);
-  text-wrap: balance;
-}
-
-.heroDescription span {
-  white-space: nowrap;
-}
-
 .subtitle {
   display: flex;
   align-items: center;
   gap: clamp(0.625rem, 1.2vw, 1.125rem);
   max-inline-size: 34rem;
-  margin-block-start: clamp(0.875rem, 1.65vw, 1.5rem);
+  min-block-size: var(--preview-subtitle-row-size, auto);
+  margin-block-start: var(--preview-subtitle-gap);
   font-size: clamp(1.125rem, 1.8vw, 1.625rem);
   font-weight: 800;
   line-height: 1.2;
@@ -668,6 +656,7 @@
   display: grid;
   grid-template-columns: minmax(0, 3.15fr) minmax(0, 2fr);
   gap: var(--card-gap);
+  min-block-size: var(--preview-content-row-min-size, auto);
 }
 
 .album,

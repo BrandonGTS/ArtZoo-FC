@@ -1,7 +1,7 @@
 .daily {
   inline-size: min(100%, 94rem);
   margin-inline: auto;
-  padding: clamp(1rem, 2.1vw, 1.875rem) var(--page-inset) clamp(2.25rem, 4.2vw, 3.75rem);
+  padding: var(--page-top-inset) var(--page-inset) clamp(2.25rem, 4.2vw, 3.75rem);
 }
 
 .daily .hero {
@@ -12,12 +12,11 @@
   grid-template-columns: minmax(0, 1fr) var(--share-search-width);
   align-items: center;
   column-gap: 1.5rem;
-  margin-block-start: var(--preview-heading-gap);
 }
 
 .hero .title {
   grid-area: 1 / 1;
-  margin-block-end: clamp(0.875rem, 1.65vw, 1.5rem);
+  margin-block-end: var(--preview-subtitle-gap);
 }
 
 .hero .subtitle {

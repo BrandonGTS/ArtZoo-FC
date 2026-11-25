@@ -24,6 +24,14 @@ pnpm build                       # 构建生产版本
 pnpm dev:web                     # 本地开发，访问 http://localhost:3100
 ```
 
+## Astra 本地预览
+
+在 Mac 或 Windows 的开发 WSL（`ArtZoo-FC-Dev`）中，从仓库根目录依次运行 `pnpm install --frozen-lockfile`、`pnpm prepare:code` 和 `pnpm dev:web`。打开 [Astra 首页](http://localhost:3100/preview/home)，从侧栏进入日常、活动、相册和其他。
+
+Astra 预览在开发模式下使用仓库中的示例数据，无需启动数据库。更新代码后按锁文件重新安装依赖。Next.js 的版本见 `apps/web/package.json` 和 `pnpm-lock.yaml`。
+
+正式站的发布包构建和升级步骤见 [部署手册](docs/DEPLOYMENT.md)。
+
 ## 目录
 
 ```text

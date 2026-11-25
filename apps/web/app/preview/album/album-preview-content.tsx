@@ -44,6 +44,7 @@ export default function AlbumPreviewContent() {
   const back = useRef<HTMLButtonElement>(null);
   const opener = useRef<HTMLButtonElement | null>(null);
   const catalogScroll = useRef(0);
+  const showFeaturedAlbum = category === '全部' && appliedQuery === '';
   const matches = albums.filter(
     (item) => (category === '全部' || item.category === category) && item.name.includes(appliedQuery)
   );
@@ -99,7 +100,7 @@ export default function AlbumPreviewContent() {
         {matches.length ? (
           <ul className={styles.catalog} aria-label="相册目录">
             {matches.map((item, index) => (
-              <li key={item.name} className={index === 0 ? styles.feature : undefined}>
+              <li key={item.name} className={showFeaturedAlbum && index === 0 ? styles.feature : undefined}>
                 <button
                   type="button"
                   className={styles.albumCard}
@@ -116,11 +117,6 @@ export default function AlbumPreviewContent() {
                     <span className={styles.meta}>
                       {item.date} · {item.count}张
                     </span>
-                    {index === 0 && (
-                      <span className={styles.cta}>
-                        打开相册 <span aria-hidden="true">→</span>
-                      </span>
-                    )}
                   </span>
                 </button>
               </li>

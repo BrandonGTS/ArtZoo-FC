@@ -14,10 +14,6 @@ export default function PreviewContent({ pane }: { pane: PreviewPage['id'] | 'tr
             <h1 className={styles.title} lang="en">
               Sample <em>Journal</em>
             </h1>
-            <p className={styles.heroDescription}>
-              <span>与 ArtZoo 一起，</span>
-              <span>在艾欧泽亚</span>留下珍贵的记忆
-            </p>
           </div>
           <p className={styles.subtitle}>公会手记</p>
         </div>

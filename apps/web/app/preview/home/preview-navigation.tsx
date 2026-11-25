@@ -14,10 +14,11 @@ import { type PreviewPage, previewPages } from '../preview-pages';
 import styles from './home-preview.module.css';
 import PreviewSidebar, { getPreviewNavControl } from './preview-sidebar';
 
-const wheelThreshold = 480;
-const wheelGestureGap = 180;
+const wheelThreshold = 576;
+const wheelCooldown = 180;
 const hintMinimumTime = 200;
 const hintIdleDelay = 1500;
+const hintProgressDuration = 240;
 const scrollableScreenClassName = styles.previewScreen + ' ' + styles.previewScrollbar;
 
 function screenClassName(page: PreviewPage) {
@@ -52,13 +53,17 @@ export default function PreviewNavigation({ children, placeholder, pagePreviews 
   const viewportRef = useRef<HTMLElement>(null);
   const screenRef = useRef<HTMLDivElement>(null);
   const incomingRef = useRef<HTMLDivElement>(null);
-  const navigation = useRef<{ destination: PreviewPage; rollback: number } | null>(null);
+  const navigation = useRef<{
+    destination: PreviewPage;
+    rollback: number;
+    fromWheel: boolean;
+  } | null>(null);
   const wheel = useRef({
     target: null as PreviewPage | null,
     revealedAt: 0,
     distance: 0,
-    lastAt: 0,
-    consumed: false
+    rewinding: false,
+    cooldownUntil: 0
   });
   const hintTimer = useRef<number | undefined>(undefined);
   const [presentation, setPresentation] = useState<Presentation>({
@@ -76,15 +81,17 @@ export default function PreviewNavigation({ children, placeholder, pagePreviews 
   const closeHint = useCallback(() => {
     window.clearTimeout(hintTimer.current);
     if (navigation.current) return;
-    if (!wheel.current.target) return;
-    wheel.current.target = null;
-    wheel.current.distance = 0;
+    const progress = wheel.current;
+    if (!progress.target && !progress.rewinding) return;
+    progress.target = null;
+    progress.distance = 0;
+    progress.rewinding = false;
     rootRef.current?.style.removeProperty('--wheel-progress');
     setPresentation((current) => ({ ...current, revealed: false }));
   }, []);
 
   const moveTo = useCallback(
-    (destination: PreviewPage) => {
+    (destination: PreviewPage, fromWheel = false) => {
       if (navigation.current) return;
       const screen = screenRef.current;
       if (destination === page) {
@@ -103,7 +110,7 @@ export default function PreviewNavigation({ children, placeholder, pagePreviews 
         closeHint();
         setPresentation((current) => ({ ...current, destination: null }));
       }, 8000);
-      navigation.current = { destination, rollback };
+      navigation.current = { destination, rollback, fromWheel };
       setPresentation((current) => ({ ...current, destination }));
     },
     [closeHint, page]
@@ -114,6 +121,11 @@ export default function PreviewNavigation({ children, placeholder, pagePreviews 
   const hintVisible = presentation.revealed && !next;
 
   useLayoutEffect(() => {
+    const pendingNavigation = navigation.current;
+    if (pendingNavigation?.destination === page && pendingNavigation.fromWheel) {
+      wheel.current.cooldownUntil = performance.now() + wheelCooldown;
+    }
+
     const viewport = viewportRef.current;
     const screen = screenRef.current;
     const incoming = incomingRef.current;
@@ -166,6 +178,19 @@ export default function PreviewNavigation({ children, placeholder, pagePreviews 
     if (!root) return;
     const progress = wheel.current;
 
+    const rewindHint = () => {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        closeHint();
+        return;
+      }
+
+      progress.target = null;
+      progress.distance = 0;
+      progress.rewinding = true;
+      root.style.removeProperty('--wheel-progress');
+      hintTimer.current = window.setTimeout(closeHint, hintProgressDuration);
+    };
+
     const handleWheel = (event: WheelEvent) => {
       const screen = screenRef.current;
       if (!screen || event.ctrlKey || event.shiftKey || !event.cancelable) return;
@@ -179,9 +204,7 @@ export default function PreviewNavigation({ children, placeholder, pagePreviews 
       if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
 
       const now = performance.now();
-      if (now - progress.lastAt > wheelGestureGap) progress.consumed = false;
-      progress.lastAt = now;
-      if (progress.consumed || navigation.current) {
+      if (now < progress.cooldownUntil || navigation.current) {
         event.preventDefault();
         return;
       }
@@ -212,16 +235,16 @@ export default function PreviewNavigation({ children, placeholder, pagePreviews 
       progress.distance = Math.min(wheelThreshold, progress.distance + distance - toEdge);
       root.style.setProperty('--wheel-progress', String(progress.distance / wheelThreshold));
       window.clearTimeout(hintTimer.current);
-      hintTimer.current = window.setTimeout(closeHint, hintIdleDelay);
+      hintTimer.current = window.setTimeout(rewindHint, hintIdleDelay);
       if (!progress.target) {
         progress.target = destination;
         progress.revealedAt = now;
+        progress.rewinding = false;
         setPresentation((current) => ({ ...current, hint: destination, revealed: true }));
         return;
       }
       if (progress.distance >= wheelThreshold && now - progress.revealedAt >= hintMinimumTime) {
-        progress.consumed = true;
-        moveTo(destination);
+        moveTo(destination, true);
       }
     };
 
@@ -232,6 +255,7 @@ export default function PreviewNavigation({ children, placeholder, pagePreviews 
       navigation.current = null;
       progress.target = null;
       progress.distance = 0;
+      progress.rewinding = false;
       window.clearTimeout(hintTimer.current);
       root.style.removeProperty('--wheel-progress');
     };
@@ -242,7 +266,12 @@ export default function PreviewNavigation({ children, placeholder, pagePreviews 
       className={styles.preview}
       ref={rootRef}
       data-active-page={page.id}
-      style={{ '--active-nav-index': pageIndex } as CSSProperties}
+      style={
+        {
+          '--active-nav-index': pageIndex,
+          '--wheel-progress-duration': hintProgressDuration + 'ms'
+        } as CSSProperties
+      }
       data-peeking={presentation.revealed ? edge : undefined}
     >
       <PreviewSidebar page={page} navRef={navRef} highlightRef={highlightRef} onNavigate={moveTo} />
