@@ -2,7 +2,15 @@
 
 import { toBeijingParts } from '@artzoo/domain';
 import { ConfigProvider } from 'antd';
-import { useId, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode
+} from 'react';
 import { CollectionSearch, ListPagination } from '../../../components/collection-controls';
 import DailyActionIcon from '../../../components/daily/daily-action-icon';
 import DailyToolbarIcon from '../../../components/daily/daily-toolbar-icon';
@@ -177,6 +185,8 @@ function PostContent({
   searchPattern?: RegExp;
   actions?: ReactNode;
 }) {
+  const previewRef = useRef<HTMLParagraphElement>(null);
+  const [truncated, setTruncated] = useState(false);
   const { author, createdAt } = post;
   const text = postText(post);
   const readableText = searchPattern ? stickerLabelText(text) : '';
@@ -189,15 +199,42 @@ function PostContent({
   const firstMatch = highlights?.[0];
   const excerptStart = !detail && firstMatch ? excerptStartNearMatch(readableText, firstMatch) : 0;
 
+  useLayoutEffect(() => {
+    const preview = previewRef.current;
+    if (!preview) return;
+
+    const measure = () => setTruncated(preview.scrollHeight > preview.clientHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(preview);
+    document.fonts.addEventListener('loadingdone', measure);
+    return () => {
+      observer.disconnect();
+      document.fonts.removeEventListener('loadingdone', measure);
+    };
+  }, [text, excerptStart]);
+
+  const content = <StickerText text={text} highlights={highlights} excerptStart={excerptStart} />;
+
   return (
     <div className={styles.copy}>
       <span className={styles.avatar} aria-hidden="true" />
       <PostByline author={author} createdAt={createdAt} />
-      {text && (
-        <p className={detail ? styles.detailText : styles.postBody}>
-          <StickerText text={text} highlights={highlights} excerptStart={excerptStart} />
-        </p>
-      )}
+      {text &&
+        (detail ? (
+          <p className={styles.detailText}>{content}</p>
+        ) : (
+          <div className={styles.postExcerpt}>
+            <p ref={previewRef} className={styles.postBody}>
+              {content}
+            </p>
+            {(truncated || excerptStart > 0) && (
+              <span className={styles.fullPostHint} aria-hidden="true">
+                查看全文
+              </span>
+            )}
+          </div>
+        ))}
       {actions}
     </div>
   );
@@ -573,7 +610,7 @@ function DailyPreviewDetail({
   return (
     <PaperModal
       title="分享详情"
-      width={760}
+      width={840}
       open={open}
       onCancel={onClose}
       footer={null}
@@ -585,7 +622,11 @@ function DailyPreviewDetail({
       }}
       destroyOnHidden
       className={homeStyles.previewDialog + ' ' + styles.detailDialog}
-      classNames={{ header: styles.visuallyHidden }}
+      classNames={{
+        container: styles.detailFrame,
+        header: styles.visuallyHidden,
+        body: styles.detailBody
+      }}
       styles={{
         container: {
           background: 'var(--cream)',

@@ -1,24 +1,8 @@
 'use client';
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import homeStyles from '../home/home-preview.module.css';
 import DailyPreviewEditor, { type DailyPreviewSubmission } from './daily-preview-editor';
 import styles from './daily-preview.module.css';
-
-const surfaceSelector = '[data-preview-page="daily"], [role="dialog"]';
-const blankSelector = [
-  surfaceSelector,
-  '.ant-modal-container',
-  '.ant-modal-body',
-  '.' + homeStyles.pageHeader,
-  '.' + styles.hero,
-  '.' + styles.daily,
-  '.' + styles.posts,
-  '.' + styles.postDetail,
-  '.' + styles.replySection,
-  '.' + styles.replyList,
-  '.' + styles.replyItem
-].join(', ');
 
 export default function DailyPreviewComposer({
   active = true,
@@ -37,9 +21,12 @@ export default function DailyPreviewComposer({
   const containerRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLButtonElement>(null);
   const editorPanelRef = useRef<HTMLDivElement>(null);
+  const editorPress = useRef<PointerEvent | null>(null);
   const editorId = useId();
+  const isReply = variant === 'reply';
 
   function open() {
+    if (expanded) return;
     if (!keepDraft.current) setDraft(++nextDraft.current);
     setExpanded(true);
   }
@@ -50,44 +37,46 @@ export default function DailyPreviewComposer({
     setExpanded(false);
   }
 
+  function publish(submission: DailyPreviewSubmission) {
+    onPublish(submission);
+    discardAndClose();
+  }
+
   useEffect(() => {
     if (!active || !expanded) return;
 
     const container = containerRef.current;
-    const surface = container?.closest(surfaceSelector);
-    if (!container || !(surface instanceof HTMLElement)) return;
+    if (!container) return;
 
-    let pressedBlank: Element | null = null;
-    let editorHadFocus = false;
+    const ownerDocument = container.ownerDocument;
+    let outsidePress: PointerEvent | null = null;
 
-    const trackPress = (event: PointerEvent) => {
-      const target = event.target;
-      pressedBlank =
-        event.button === 0 &&
-        target instanceof Element &&
-        target.matches(blankSelector) &&
-        !container.contains(target) &&
-        target.closest(surfaceSelector) === surface
-          ? target
-          : null;
-      editorHadFocus = container.contains(container.ownerDocument.activeElement);
+    const trackOutsidePress = (event: PointerEvent) => {
+      outsidePress = event.button === 0 && !event.composedPath().includes(container) ? event : null;
     };
 
-    const closeOnBlank = (event: MouseEvent) => {
-      const clickedBlank = event.detail > 0 && pressedBlank !== null && event.target === pressedBlank;
-      pressedBlank = null;
-      if (!clickedBlank) return;
+    const closeOnOutside = (event: MouseEvent) => {
+      const press = outsidePress;
+      outsidePress = null;
+      if (
+        event.detail === 0 ||
+        !press ||
+        press === editorPress.current ||
+        event.composedPath().includes(container)
+      ) {
+        return;
+      }
 
       keepDraft.current = true;
-      returnFocus.current = editorHadFocus;
+      returnFocus.current = container.contains(ownerDocument.activeElement);
       setExpanded(false);
     };
 
-    surface.addEventListener('pointerdown', trackPress, true);
-    surface.addEventListener('click', closeOnBlank, true);
+    ownerDocument.addEventListener('pointerdown', trackOutsidePress, true);
+    ownerDocument.addEventListener('click', closeOnOutside, true);
     return () => {
-      surface.removeEventListener('pointerdown', trackPress, true);
-      surface.removeEventListener('click', closeOnBlank, true);
+      ownerDocument.removeEventListener('pointerdown', trackOutsidePress, true);
+      ownerDocument.removeEventListener('click', closeOnOutside, true);
     };
   }, [active, expanded]);
 
@@ -110,8 +99,12 @@ export default function DailyPreviewComposer({
   return (
     <div
       ref={containerRef}
-      className={variant === 'reply' ? styles.replyComposer : styles.publisher}
+      className={isReply ? styles.replyComposer : styles.publisher}
       data-expanded={expanded ? '' : undefined}
+      onPointerDownCapture={(event) => {
+        // React also captures presses in the editor's portaled pickers here.
+        editorPress.current = event.nativeEvent;
+      }}
     >
       <div className={styles.publisherPanel} data-visible={!expanded ? '' : undefined} inert={expanded}>
         <div className={styles.publisherPanelContent}>
@@ -123,7 +116,7 @@ export default function DailyPreviewComposer({
             onClick={open}
             ref={promptRef}
           >
-            说点什么吧
+            {isReply ? '整点回复...?' : '说点什么吧...?'}
           </button>
         </div>
       </div>
@@ -139,13 +132,10 @@ export default function DailyPreviewComposer({
           {draft !== null && (
             <DailyPreviewEditor
               key={draft}
-              variant={variant}
               active={active && expanded}
+              variant={variant}
               onCancel={discardAndClose}
-              onPublish={(submission) => {
-                onPublish(submission);
-                discardAndClose();
-              }}
+              onPublish={publish}
             />
           )}
         </div>

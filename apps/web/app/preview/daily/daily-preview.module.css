@@ -114,10 +114,6 @@
 
 .publisher {
   margin-block-end: clamp(1rem, 2vw, 1.75rem);
-}
-
-.publisher,
-.replyComposer {
   border-radius: var(--card-radius);
   background: color-mix(in srgb, var(--paper), var(--line) 30%);
 }
@@ -163,6 +159,13 @@
   font: inherit;
   font-size: clamp(1rem, 1.35vw, 1.1875rem);
   cursor: pointer;
+}
+
+.replyComposer .publisherPrompt {
+  min-block-size: 2.75rem;
+  padding: 0.5rem 1rem;
+  background: color-mix(in srgb, var(--paper), var(--line) 30%);
+  font-size: 0.9375rem;
 }
 
 .publisherPrompt:hover {
@@ -400,14 +403,16 @@
 
 .card {
   --preview-card-padding: clamp(0.625rem, 1.35vw, 1.25rem);
+  --preview-card-block-padding: clamp(0.625rem, 1vw, 1rem);
+  --post-avatar-size: clamp(2rem, 3.35vw, 2.5rem);
 
   position: relative;
   display: flex;
-  container: daily-card / inline-size;
+  container: daily-card daily-thread / inline-size;
   flex-wrap: wrap;
   align-items: center;
   gap: clamp(0.75rem, 2vw, 1.75rem);
-  padding: var(--preview-card-padding);
+  padding: var(--preview-card-block-padding) var(--preview-card-padding);
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   border-radius: var(--card-radius);
   background: var(--cream);
@@ -418,7 +423,7 @@
 .cardMenu {
   position: absolute;
   z-index: 2;
-  inset-block-start: calc(var(--preview-card-padding) - 0.25rem);
+  inset-block-start: calc(var(--preview-card-block-padding) - 0.25rem);
   inset-inline-end: var(--preview-card-padding);
   display: flex;
 }
@@ -427,9 +432,19 @@
   padding-inline-end: 2.25rem;
 }
 
+@container (inline-size >= 25rem) {
+  .card .copy > .byline,
+  .replyCopy > .byline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.125rem 0.75rem;
+  }
+}
+
 @container daily-card (inline-size < 14.75rem) {
   .cardMenu {
-    inset-block-start: calc(var(--preview-card-padding) + 1.5rem);
+    inset-block-start: calc(var(--preview-card-block-padding) + 1.5rem);
   }
 
   .card .copy > .byline {
@@ -485,8 +500,8 @@
   row-gap: clamp(0.35rem, 0.8vw, 0.75rem);
 }
 
-.copy:has(> .postBody) {
-  row-gap: clamp(0.625rem, 1.35vw, 1.25rem);
+.card > .copy {
+  row-gap: 0.5rem;
 }
 
 .copy .avatar {
@@ -495,8 +510,12 @@
   align-self: start;
 }
 
+.card > .copy > .avatar {
+  grid-row: 1 / span 2;
+}
+
 .copy > .byline,
-.postBody,
+.postExcerpt,
 .counts {
   grid-column: 2;
 }
@@ -552,6 +571,15 @@
   white-space: pre-wrap;
 }
 
+.fullPostHint {
+  display: block;
+  margin-block-start: 0.25rem;
+  color: var(--cover);
+  font-size: 0.875rem;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
 :is(.postBody, .detailText) mark {
   background-color: var(--highlight);
   color: inherit;
@@ -567,6 +595,10 @@
 .counts {
   margin-block-start: clamp(0.5rem, 0.95vw, 0.875rem);
   gap: 0.875rem;
+}
+
+.card > .copy > .counts {
+  margin-block-start: 0;
 }
 
 .cardAction {
@@ -632,11 +664,28 @@
 @container daily-card (inline-size >= 44rem) {
   .card:has(> .photos) > .copy {
     flex-basis: 0;
+    align-self: stretch;
+    grid-template-rows: auto auto 1fr;
+  }
+
+  .card:has(> .photos) > .copy > .counts {
+    grid-row: 3;
+    align-self: end;
   }
 
   .card > .photos {
-    flex-basis: min(45%, 34rem);
+    flex-basis: clamp(20rem, 28%, 23.75rem);
     margin-inline-end: 2.5rem;
+  }
+
+  .card > .photos > span {
+    block-size: clamp(6rem, 7.5vw, 7rem);
+    aspect-ratio: auto;
+  }
+
+  .card > .photos > span:only-child {
+    justify-self: end;
+    inline-size: min(100%, 16rem);
   }
 }
 
@@ -645,7 +694,7 @@
   z-index: 1;
   flex: 0 0 100%;
   min-inline-size: 0;
-  padding-block-start: clamp(0.75rem, 1.3vw, 1.125rem);
+  padding-block-start: 0.75rem;
   border-block-start: 1px solid var(--line);
 }
 
@@ -659,10 +708,6 @@
 .replySection:not([hidden]) {
   display: grid;
   gap: 0.75rem;
-}
-
-.replyComposer[data-expanded] {
-  background: transparent;
 }
 
 .replyComposer .publisherPanel[data-visible] .publisherPanelContent {
@@ -683,7 +728,7 @@
 
 .replyList {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.5rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -698,7 +743,7 @@
 }
 
 .replyItem + .replyItem {
-  padding-block-start: 0.75rem;
+  padding-block-start: 0.5rem;
   border-block-start: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
 }
 
@@ -772,6 +817,39 @@
   block-size: auto;
 }
 
+@container daily-thread (inline-size >= 44rem) {
+  .replyCopy:has(> .photos) {
+    grid-template-columns: minmax(0, 1fr) clamp(12rem, var(--reply-photo-width, 29%), 22rem);
+    grid-template-rows: auto auto 1fr;
+    column-gap: 1rem;
+  }
+
+  .replyCopy:has(> .photos) > :is(.byline, p, .replyActions) {
+    grid-column: 1;
+  }
+
+  .replyCopy:has(> .photos) > .replyActions {
+    grid-row: 3;
+    align-self: end;
+  }
+
+  .replyCopy > .photos {
+    grid-area: 1 / 2 / 4;
+    align-self: end;
+    margin-inline-end: 2.5rem;
+  }
+
+  .replyCopy > .photos > span {
+    block-size: clamp(5rem, 6.5vw, 6rem);
+    aspect-ratio: auto;
+  }
+
+  .replyCopy > .photos > span:only-child {
+    justify-self: end;
+    inline-size: min(100%, 14rem);
+  }
+}
+
 .replyInlineEditor {
   grid-column: 1 / -1;
   min-inline-size: 0;
@@ -802,7 +880,9 @@
 
 .postDetail {
   --preview-scroll-height: 65dvh;
+  --reply-photo-width: 42%;
 
+  container: daily-thread / inline-size;
   row-gap: 1rem;
   max-block-size: var(--preview-scroll-height);
   padding-inline-end: clamp(1.125rem, 2vw, 1.5rem);
@@ -816,6 +896,29 @@
   overflow-wrap: anywhere;
 }
 
+@media (width >= 48rem) {
+  .detailFrame,
+  .detailBody {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .detailFrame {
+    block-size: min(45rem, calc(100dvh - 3rem));
+  }
+
+  .detailBody,
+  .postDetail {
+    flex: 1;
+    min-block-size: 0;
+  }
+
+  .postDetail {
+    max-block-size: none;
+    align-content: start;
+  }
+}
+
 .postDetail > .copy {
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
@@ -823,6 +926,10 @@
 
 .postDetail > .photos {
   grid-column: 2;
+}
+
+.postDetail > .photos:has(> span:only-child) {
+  max-inline-size: calc(18.75rem * 16 / 9);
 }
 
 .postDetail > .counts {
